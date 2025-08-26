@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 // import type { Post } from '@/drizzle/schema';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { presignPostImageUpload } from '@/app/actions/storage';
+import { randomUUIDv7 } from '@/lib/uuid';
 
 type OptimisticPost = {
   content?: string;
@@ -49,6 +49,12 @@ export function CreatePost({
   const [posting, setPosting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const overallProgress = useMemo(() => {
+    if (items.length === 0) return 0;
+    const values = items.map((i) => uploadProgress[i.id] ?? 0);
+    const sum = values.reduce((a, b) => a + b, 0);
+    return Math.round(sum / values.length);
+  }, [items, uploadProgress]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -179,31 +185,50 @@ export function CreatePost({
     };
 
     try {
-      // Add Authorization header from Supabase session (token in localStorage)
+      // 1) upload each image with progress to Storage REST (authenticated)
+      const metas: Array<{ id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: "image/jpeg" | "image/png" | "image/webp"; }> = [];
+      const postId = randomUUIDv7();
+      const baseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object`;
+      const bucket = 'social-art';
       const { data: { session } } = await supabase.auth.getSession();
-      const authHeader = session?.access_token ? `Bearer ${session.access_token}` : '';
-
-      // 1) upload each image individually with progress (presigned to storage)
-      const uploaded: { url: string; width?: number; height?: number; aspectRatio?: number }[] = [];
+      const token = session?.access_token || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
       for (const it of items) {
-        // presign
-        const ext = (it.file.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg') as 'jpg' | 'png' | 'webp';
-        const pres = await presignPostImageUpload(crypto.randomUUID(), ext, user.id);
-        if (pres.error || !pres.data) throw new Error(pres.error || 'presign failed');
-        // upload with progress
+        const imageId = randomUUIDv7();
+        const ext = (it.file.name.split('.').pop() || 'png').toLowerCase();
+        const key = `posts/${postId}/${imageId}.${ext}`;
+        // compute dims from preview
+        const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+          const im = document.createElement('img') as HTMLImageElement;
+          im.onload = () => resolve({ w: im.naturalWidth || 0, h: im.naturalHeight || 0 });
+          im.src = it.preview;
+        });
+        // multipart upload
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
-          xhr.open('PUT', pres.data!.url);
-          xhr.setRequestHeader('content-type', it.file.type);
+          xhr.open('POST', `${baseUrl}/${bucket}/${key}`);
+          xhr.setRequestHeader('authorization', `Bearer ${token}`);
+          xhr.setRequestHeader('x-upsert', 'true');
           xhr.upload.onprogress = (ev) => {
-            if (!ev.lengthComputable) return;
-            setUploadProgress(prev => ({ ...prev, [it.id]: Math.round((ev.loaded / ev.total) * 100) }));
+            if (ev.lengthComputable) setUploadProgress(prev => ({ ...prev, [it.id]: Math.round((ev.loaded / ev.total) * 100) }));
           };
-          xhr.onerror = () => reject(new Error('upload failed'));
-          xhr.onload = () => resolve();
-          xhr.send(it.file);
+          xhr.onerror = () => reject(new Error('storage_upload_failed'));
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else reject(new Error(`storage_upload_status_${xhr.status}`));
+          };
+          const fd = new FormData();
+          fd.append('file', it.file, `${imageId}.${ext}`);
+          xhr.send(fd);
         });
-        uploaded.push({ url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/social-art/${pres.data.path}` });
+        metas.push({
+          id: imageId,
+          path: key,
+          alt: it.alt || '',
+          width: Math.max(1, Math.min(10000, dims.w || 1)),
+          height: Math.max(1, Math.min(10000, dims.h || 1)),
+          size_bytes: it.file.size,
+          mime: (it.file.type as "image/jpeg" | "image/png" | "image/webp") || 'image/png',
+        });
       }
 
       // 2) optimistic UI
@@ -212,19 +237,10 @@ export function CreatePost({
       // 3) create post
       const res = await fetch('/api/posts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(authHeader ? { Authorization: authHeader } : {}) },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
-          content: optimistic.content,
-          images: items.map((it, position) => ({
-            url: uploaded[position]?.url,
-            position,
-            metadata: {
-              alt: it.alt ?? '',
-              width: uploaded[position]?.width ?? undefined,
-              height: uploaded[position]?.height ?? undefined,
-              aspectRatio: uploaded[position]?.aspectRatio ?? undefined,
-            },
-          })),
+          text: optimistic.content,
+          images: metas,
         }),
       });
 
@@ -321,6 +337,14 @@ export function CreatePost({
             </div>
           ) : (
             <>
+              {posting && (
+                <div className="mb-2">
+                  <div className="h-1 w-full bg-black/10 rounded">
+                    <div className="h-1 bg-primary/80 rounded" style={{ width: `${overallProgress}%` }} />
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1">Uploading… {overallProgress}%</div>
+                </div>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 {items.map((it, idx) => (
                   <div

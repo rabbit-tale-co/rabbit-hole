@@ -43,7 +43,7 @@ export default function UserProfilePage() {
   }
 
   return (
-    <div className="min-h-screen ">
+    <>
       {/* UserProfile component */}
       <UserProfile
         profile={profile}
@@ -51,9 +51,19 @@ export default function UserProfilePage() {
         isOwnProfile={isOwn}
       />
 
-      <div className="max-w-4xl mx-auto w-[56rem]">
-        <Feed debugLoading={false} authorId={profile.user_id} isOwnProfile={isOwn} />
-      </div>
-    </div>
+
+      <Feed
+        debugLoading={false}
+        authorId={profile.user_id}
+        isOwnProfile={isOwn}
+        onCountChange={(n) => {
+          try {
+            const el = document.querySelector('[data-profile-posts-count]');
+            if (el) el.textContent = String(n);
+          } catch { }
+        }}
+      />
+
+    </>
   );
 }

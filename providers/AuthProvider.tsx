@@ -112,7 +112,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const { error, data } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { ...meta, is_premium: false } }, // raw_user_meta_data
     });
     if (error) return { error: error.message };
 

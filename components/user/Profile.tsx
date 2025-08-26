@@ -41,7 +41,7 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
   // no longer needed since we reuse SettingsDialog's profile section
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <>
       {/* Cover Image or Pastel Background */}
       <ProfileCover coverImage={profile.cover_url || undefined} coverBgStyle={coverBgStyle} />
 
@@ -99,7 +99,6 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
           sections={["profile"]}
         />
       )}
-    </div>
-
+    </>
   );
 }

@@ -1,34 +1,34 @@
 "use server";
 
-import { randomUUID } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { randomUUID } from "crypto";
 
 const BUCKET = "social-art";
-const FOLDER_AVATARS = "avatar"; // avatar/<userUUID>/avatar.webp
-const FOLDER_POSTS = "posts";   // posts/<postUUID>/<imageUUID>.webp
+const FOLDER_AVATARS = "avatar"; // avatar/<userUUID>/avatar.ext
+const FOLDER_POSTS = "posts";   // posts/<postUUID>/<imageUUID>.ext
 
-type PresignResp = { path: string; url: string; imageId: string };
+type PresignResp = { path: string; url: string; token: string; imageId: string };
 
 export async function presignPostImageUpload(postId: string, ext: "jpg" | "jpeg" | "png" | "webp", authorId: string): Promise<{ error?: string; data?: PresignResp }> {
   if (!postId || !authorId) return { error: "Missing ids" };
   const sb = supabaseAdmin;
   const imageId = randomUUID();
-  const targetExt = ext === "jpeg" ? "webp" : ext === "jpg" ? "webp" : ext === "png" ? "webp" : ext; // prefer webp
+  const targetExt = ext; // keep original extension to avoid client-side conversion issues
   const path = `${FOLDER_POSTS}/${postId}/${imageId}.${targetExt}`;
   // 15 min
   const { data, error } = await sb.storage.from(BUCKET).createSignedUploadUrl(path);
   if (error) return { error: error.message };
-  return { data: { path, url: data.signedUrl, imageId } };
+  return { data: { path, url: data.signedUrl, token: data.token, imageId } };
 }
 
 export async function presignAvatarUpload(userId: string, ext: "jpg"|"jpeg"|"png"|"webp"): Promise<{ error?: string; data?: PresignResp }> {
   if (!userId) return { error: "Missing userId" };
   const sb = supabaseAdmin;
-  const targetExt = ext === "jpeg" || ext === "jpg" || ext === "png" ? "webp" : ext; // prefer webp
+  const targetExt = ext; // keep original extension
   const path = `${FOLDER_AVATARS}/${userId}/avatar.${targetExt}`;
   const { data, error } = await sb.storage.from(BUCKET).createSignedUploadUrl(path);
   if (error) return { error: error.message };
-  return { data: { path, url: data.signedUrl, imageId: "avatar" } };
+  return { data: { path, url: data.signedUrl, token: data.token, imageId: "avatar" } };
 }
 
 export async function finalizeAvatar(userId: string, path: string) {
@@ -42,11 +42,11 @@ export async function finalizeAvatar(userId: string, path: string) {
 export async function presignCoverUpload(userId: string, ext: "jpg"|"jpeg"|"png"|"webp"): Promise<{ error?: string; data?: PresignResp }> {
   if (!userId) return { error: "Missing userId" };
   const sb = supabaseAdmin;
-  const targetExt = ext === "jpeg" || ext === "jpg" || ext === "png" ? "webp" : ext;
+  const targetExt = ext; // keep original extension
   const path = `covers/${userId}/cover.${targetExt}`;
   const { data, error } = await sb.storage.from(BUCKET).createSignedUploadUrl(path);
   if (error) return { error: error.message };
-  return { data: { path, url: data.signedUrl, imageId: "cover" } };
+  return { data: { path, url: data.signedUrl, token: data.token, imageId: "cover" } };
 }
 
 export async function finalizeCover(userId: string, path: string) {
