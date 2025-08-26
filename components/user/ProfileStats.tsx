@@ -20,7 +20,7 @@ export function ProfileStats({ posts, following, followers, onClickPosts, onClic
         className="font-mono"
         onClick={onClickPosts}
       >
-        <h4 className="font-semibold text-neutral-950 mr-0.5">{posts.toLocaleString()}</h4>
+        <h4 className="font-semibold text-neutral-950 mr-0.5" data-profile-posts-count>{posts.toLocaleString()}</h4>
         <span className="text-neutral-500">Posts</span>
       </Button>
       <Separator orientation="vertical" className="!h-4" />

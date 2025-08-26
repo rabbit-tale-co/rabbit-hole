@@ -8,10 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Eye, EyeOff, Mail } from "lucide-react";
 
+interface RegisterFormProps {
+  onClose: () => void;
+}
+
 export function RegisterForm({
-  onSuccess,
+  onClose,
   compact = false,
-}: { onSuccess?: () => void; compact?: boolean }) {
+}: { onClose: () => void; compact?: boolean }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

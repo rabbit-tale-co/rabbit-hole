@@ -11,25 +11,25 @@ export default function Footer() {
     { label: "Twitter", href: "https://twitter.com/hasiradoo", icon: "TW" },
     { label: "Bsky", href: "https://bsky.app/profile/hasiradoo.rabbittale.co", icon: "BS" },
     { label: "Patreon", href: "https://patreon.com/rabbittale", icon: "PA" },
-    { label: "Discord", href: "https://discord.com/users/569975072417251378", icon: "DC" },
+    { label: "Discord", href: "https://discord.gg/rabbittale", icon: "DC" },
     { label: "Telegram", href: "https://t.me/rabbit_tale", icon: "TG" },
   ];
 
   const navigationLinks = [
     { label: "Home", href: "/" },
+    { label: "Explore", href: "/explore" },
     { label: "About", href: "/about" },
-    { label: "Projects", href: "/projects" },
-    { label: "Experience", href: "/experience" },
-    { label: "Contact", href: "/contact" },
+    { label: "Terms", href: "/terms" },
+    { label: "Privacy", href: "/privacy" },
   ];
 
   const resourceLinks = [
     { label: "RabbitTale Studio", href: "https://rabbittale.co" },
-    { label: "Blog", href: "https://blog.rabbittale.co" },
+    // { label: "Blog", href: "https://blog.rabbittale.co" },
     { label: "Source Code", href: "https://github.com/rabbit-tale-co/portfolio" },
   ];
 
-  const LinkWithArrow = ({ href, label, icon, isExternal = false }: { href: string; label: string; icon?: string; isExternal?: boolean }) => (
+  const LinkWithArrow = ({ href, label, isExternal = false }: { href: string; label: string; icon?: string; isExternal?: boolean }) => (
     <Link
       href={href}
       target={isExternal ? '_blank' : undefined}
@@ -59,7 +59,7 @@ export default function Footer() {
                   <SolidLogo size={20} />
                 </div>
                 <span className="font-bold text-background text-sm uppercase tracking-wider">
-                  Social Art
+                  Rabbit Hole
                 </span>
               </div>
               <div className="space-y-2">
@@ -84,7 +84,6 @@ export default function Footer() {
                       key={link.label}
                       href={link.href}
                       label={link.label}
-                      icon={link.icon}
                       isExternal={link.href.startsWith('http')}
                     />
                   ))}
@@ -93,11 +92,9 @@ export default function Footer() {
 
               {/* Navigation Links */}
               <div className="space-y-4">
-
                 <h4 className="text-xs font-bold text-background tracking-wider">
                   Navigation
                 </h4>
-
                 <div className="space-y-2">
                   {navigationLinks.map((link) => (
                     <LinkWithArrow

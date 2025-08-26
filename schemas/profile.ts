@@ -5,6 +5,7 @@ export const ProfileRow = z.object({
   user_id: UUID,
   username: USERNAME,
   display_name: z.string().min(1).max(50),
+  bio: z.string().max(500).nullable().optional(),
   is_premium: z.boolean().default(false),
   avatar_url: z.url().nullable().optional(),
   cover_url: z.url().nullable().optional(),
@@ -17,18 +18,12 @@ export const UpsertProfile = z.object({
   user_id: UUID,
   username: USERNAME,
   display_name: z.string().min(1).max(50),
+  bio: z.string().max(500).nullable().optional(),
   cover_url: z.url().nullable().optional(),
   accent_color: HEX6.nullable().optional(),
 });
 
 export const InitProfile = z.object({
   user_id: UUID,
-  meta: z.object({
-    username: z.string().optional(),
-    display_name: z.string().optional(),
-    is_premium: z.boolean().optional(),
-    avatar_url: z.url().nullable().optional(),
-    cover_url: z.url().nullable().optional(),
-    accent_color: HEX6.nullable().optional(),
-  }),
+  username: USERNAME.optional(),
 });

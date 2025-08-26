@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getFeedPage, getUserFeedPage } from "@/app/actions/posts";
 import { PostRow } from "@/types";
 
@@ -48,6 +48,14 @@ export function useInfiniteFeed(initial?: { items: PostRow[]; nextCursor: string
 
   // hasMore: we still have more if cursor is "" (haven't loaded first page) or a non-null string
   const hasMore = cursor !== null;
+
+  // auto-load first page on mount
+  useEffect(() => {
+    if (cursor === "" && !inFlight.current) {
+      // fire and forget
+      void loadMore();
+    }
+  }, [cursor, loadMore]);
 
   return { items, loadMore, loading, error, hasMore };
 }

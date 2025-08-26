@@ -1,9 +1,12 @@
 import { Session, User } from "@supabase/supabase-js";
+import type { ProfileRow } from "./db";
 
 export type AuthCtx = {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  profile: ProfileRow | null;
+  refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (params: {
     email: string;

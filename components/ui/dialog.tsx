@@ -161,7 +161,6 @@ function isFromToast(e: Event) {
 function DialogContent({
   className,
   children,
-  showCloseButton = true,
   toast,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {

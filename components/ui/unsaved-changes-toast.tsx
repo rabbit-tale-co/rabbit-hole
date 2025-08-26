@@ -12,11 +12,11 @@ interface UnsavedChangesToastProps {
 }
 
 export function UnsavedChangesToast({
-  message = "Careful — you have unsaved changes!",
+  message = "You have unsaved changes",
   onSave,
   onReset,
   toastId,
-  onToastDismiss
+  onToastDismiss,
 }: UnsavedChangesToastProps) {
   const handleSave = async () => {
     if (onSave) {
@@ -27,7 +27,7 @@ export function UnsavedChangesToast({
           onToastDismiss?.()
         }
       } catch (error) {
-        // Error handling is done in onSave
+        console.error(error)
       }
     }
   }

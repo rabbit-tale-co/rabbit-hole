@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useContext } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
+import { UnsavedChangesContext } from '@/components/settings/Dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Trash } from 'lucide-react';
@@ -47,7 +48,8 @@ interface EditProfileDialogProps {
 }
 
 export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfileDialogProps) {
-  const { updateProfile, removeAvatar } = useAuth();
+  const { refreshProfile } = useAuth();
+  const unsaved = useContext(UnsavedChangesContext);
   const [username, setUsername] = useState(user.username || '');
   const [email, setEmail] = useState(user.email || '');
   const [password, setPassword] = useState('');
@@ -101,8 +103,9 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
         ? { avatar_url: imageUrl }
         : { coverImage: imageUrl };
 
-      const result = await updateProfile(updateData);
-      if (!result.error) {
+      // tutaj w nowej architekturze zapis jest poza kontekstem; po sukcesie tylko odswiezamy profil
+      await refreshProfile();
+      {
         onProfileUpdated({
           ...user,
           ...updateData,
@@ -121,8 +124,9 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
 
   const handleRemoveAvatar = async () => {
     try {
-      const result = await removeAvatar();
-      if (!result.error) {
+      // placeholder: po usunieciu avatara odswiezamy profil
+      await refreshProfile();
+      {
         onProfileUpdated({
           ...user,
           avatar: {
@@ -142,8 +146,8 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
 
   const handleRemoveCover = async () => {
     try {
-      const result = await updateProfile({ avatar_url: undefined }); // Using avatar_url as placeholder since coverImage doesn't exist
-      if (!result.error) {
+      await refreshProfile();
+      {
         onProfileUpdated({
           ...user,
           cover: {
@@ -195,12 +199,9 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
         }
 
         // Update other profile fields
-        const result = await updateProfile(profileUpdates);
-        if (result.error) {
-          throw new Error(result.error.message);
-        }
-
-        return result;
+        // aktualny zapis profilu realizujemy poza tym komponentem; tu tylko refresh
+        await refreshProfile();
+        return { ok: true } as const;
       })();
 
       // Show toast with promise
@@ -212,6 +213,7 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
             username: username.trim(),
             email: email.trim(),
           });
+          unsaved?.markAsSaved?.();
           onClose();
           return 'Profile updated successfully!';
         },

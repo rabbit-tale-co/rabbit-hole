@@ -4,6 +4,7 @@ export type UpsertProfileDTO = {
   user_id: UUID;
   username: string;
   display_name: string;
+  bio?: string | null;
   cover_url?: string | null;
   accent_color?: string | null; // "#RRGGBB"
 };

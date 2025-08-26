@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { createPost, updatePost, deletePost } from "@/app/actions/posts";
 import { presignPostImageUpload } from "@/app/actions/storage";
-import { ImageMeta } from "@/app/actions/types";
+import type { ImageMetaRow } from "@/types/db";
 
 type FileLike = File & { mime?: string };
 
@@ -48,7 +48,7 @@ export function usePostComposer(authorId: string) {
     } finally { setBusy(false); }
   }, [authorId, uploadOne]);
 
-  const edit = useCallback(async (post_id: string, caption?: string, images?: typeof ImageMeta.shape[]) => {
+  const edit = useCallback(async (post_id: string, caption?: string, images?: ImageMetaRow[]) => {
     setBusy(true); setError(null);
     try {
       const res = await updatePost({ post_id, author_id: authorId, text: caption, images });

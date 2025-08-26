@@ -7,6 +7,7 @@ export type ProfileRow = {
   user_id: UUID;
   username: string;
   display_name: string;
+  bio: string | null;
   is_premium: boolean;
   avatar_url: string | null;
   cover_url: string | null;

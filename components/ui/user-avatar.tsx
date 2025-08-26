@@ -1,12 +1,13 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User } from "lucide-react";
-import { generateAccentColor, getAccentColorStyle, type AccentColor } from "@/lib/accent-colors";
+import { generateAccentColor, getAccentColorStyle, type AccentColor, getStyleFromHexShade } from "@/lib/accent-colors";
 
 interface UserAvatarProps {
   username: string;
   avatarUrl?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   accentColor?: AccentColor;
+  accentHex?: string | null;
   className?: string;
   showBorder?: boolean;
 }
@@ -32,6 +33,7 @@ export function UserAvatar({
   avatarUrl,
   size = 'md',
   accentColor,
+  accentHex,
   className = '',
   showBorder = false
 }: UserAvatarProps) {
@@ -39,8 +41,8 @@ export function UserAvatar({
   const currentAccentColor = accentColor || generateAccentColor(username);
 
   // Get color styles for fallback
-  const avatarBgStyle = getAccentColorStyle(currentAccentColor, 200, 'backgroundColor');
-  const avatarForegroundStyle = getAccentColorStyle(currentAccentColor, 950, 'color');
+  const avatarBgStyle = accentHex ? getStyleFromHexShade(accentHex, '200', 'backgroundColor') : getAccentColorStyle(currentAccentColor, 200, 'backgroundColor');
+  const avatarForegroundStyle = accentHex ? getStyleFromHexShade(accentHex, '950', 'color') : getAccentColorStyle(currentAccentColor, 950, 'color');
 
   const sizeClass = sizeClasses[size];
   const fallbackSize = fallbackSizes[size];

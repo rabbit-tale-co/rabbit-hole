@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+export const revalidate = 0;
+
 const Username = z.string().min(3).max(20).regex(/^[a-z0-9_]+$/);
 
 export async function GET(_req: NextRequest, context: { params: Promise<{ username: string }> }) {
@@ -11,7 +13,7 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ userna
 
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("user_id, username, display_name, avatar_url, cover_url, accent_color, is_premium")
+    .select("user_id, username, display_name, bio, avatar_url, cover_url, accent_color, is_premium")
     .eq("username", parsed.data)
     .maybeSingle();
 

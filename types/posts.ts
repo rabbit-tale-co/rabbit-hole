@@ -1,4 +1,4 @@
-import type { UUID, ImageMetaRow, CommentRow } from "./db";
+import type { UUID, ImageMetaRow, CommentRow, PostRow } from "./db";
 import type { Tile } from "./bento";
 
 // DTOs for server actions / API
@@ -51,18 +51,6 @@ export type Post = {
   repost_count: number;
   comment_count: number;
   bookmark_count: number;
-};
-
-export type PostRow = {
-  id: string;
-  author_id: string;
-  text?: string | null;
-  images: Array<{ id: string; path: string; alt?: string; width: number; height: number; size_bytes: number; mime: string }>;
-  like_count: number;
-  repost_count: number;
-  comment_count: number;
-  bookmark_count: number;
-  created_at: string;
 };
 
 // Cursor page

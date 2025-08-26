@@ -13,34 +13,27 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { LogOut, User, Settings } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-// import { SettingsDialog } from '@/components/settings-dialog'
+import { SettingsDialog } from '@/components/settings/Dialog'
 
 export function UserProfileMenu() {
-  const { user, signOut } = useAuth()
-  const router = useRouter()
+  const { user: auth_user, profile: user, signOut } = useAuth()
   const [settingsOpen, setSettingsOpen] = React.useState(false)
 
-  if (!user) {
+  if (!auth_user || !user) {
     return null
   }
 
-  // Use username from user_metadata (now consistent with database)
-  const username = user.user_metadata?.username || user.email?.split('@')[0] || 'User';
-
-  const links = [
-    {
-      href: `/user/${username}`, label: 'Profile', icon: User
-    },
-  ]
+  const items: Array<
+    | { href: string; label: string; icon?: React.ElementType; onClick?: undefined }
+    | { href?: undefined; label: string; icon?: React.ElementType; onClick: () => void }
+  > = [
+      { href: `/user/${user.username}`, label: 'Profile', icon: User },
+      { label: 'Settings', icon: Settings, onClick: () => setSettingsOpen(true) },
+    ]
 
   const handleSignOut = async () => {
     await signOut()
-  }
-
-  const getInitials = (email: string) => {
-    return email.substring(0, 2).toUpperCase()
   }
 
   return (
@@ -49,37 +42,39 @@ export function UserProfileMenu() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <UserAvatar
-              username={username}
-              avatarUrl={user.user_metadata?.avatar_url}
+              username={user.username}
+              avatarUrl={user.avatar_url || undefined}
               size="sm"
-              className="h-8 w-8"
+              accentHex={user.accent_color || undefined}
             />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56" align="end" forceMount>
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">
-                {username}
-              </p>
+              <p className="text-sm font-medium leading-none">{user.username}</p>
               <p className="text-xs leading-none text-muted-foreground">
-                {user.email}
+                {auth_user.email}
               </p>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {links.map((link) => (
-            <Link href={link.href} key={link.href}>
-              <DropdownMenuItem>
-                {link.icon && <link.icon className="mr-2 size-4" />}
-                <span>{link.label}</span>
+          {items.map((item, idx) => (
+            item.href ? (
+              <Link href={item.href} key={item.href}>
+                <DropdownMenuItem>
+                  {item.icon && <item.icon className="mr-2 size-4" />}
+                  <span>{item.label}</span>
+                </DropdownMenuItem>
+              </Link>
+            ) : (
+              <DropdownMenuItem key={`action-${idx}`} onClick={item.onClick}>
+                {item.icon && <item.icon className="mr-2 size-4" />}
+                <span>{item.label}</span>
               </DropdownMenuItem>
-            </Link>
+            )
           ))}
-          <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
-            <Settings className="mr-2 size-4" />
-            <span>Settings</span>
-          </DropdownMenuItem>
+          {/* Settings entry is provided in links */}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => handleSignOut()}>
             <LogOut className="mr-2 size-4" />
@@ -88,7 +83,7 @@ export function UserProfileMenu() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} /> */}
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   )
 }

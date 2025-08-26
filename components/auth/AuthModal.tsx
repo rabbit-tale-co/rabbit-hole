@@ -14,10 +14,8 @@ import { RegisterForm } from "./RegisterForm";
 type AuthTab = "login" | "register";
 
 export function AuthModal({
-  trigger,
   defaultTab = "login",
 }: {
-  trigger?: React.ReactNode;
   defaultTab?: AuthTab;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -27,7 +25,9 @@ export function AuthModal({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger ?? <Button size="sm">Sign in</Button>}</DialogTrigger>
+      <DialogTrigger asChild>
+        <Button size="sm">Sign in</Button>
+      </DialogTrigger>
 
       {/* compact width, horizontal split on md+ */}
       <DialogContent className="p-0 overflow-hidden sm:max-w-[720px] md:max-w-2xl">

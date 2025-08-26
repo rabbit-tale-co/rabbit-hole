@@ -150,13 +150,14 @@ export async function getFeedPage(input: unknown) {
   const query = sb
     .from("posts")
     .select("*")
-    .eq("is_deleted", false)
+    .or("is_deleted.is.null,is_deleted.eq.false")
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(parsed.data.limit);
 
   if (decoded) {
-    query.lt("created_at", decoded.ts).or(`and(created_at.eq.${decoded.ts},id.lt.${decoded.id})`);
+    // simple keyset without tie-break OR to avoid overriding previous OR filters
+    query.lt("created_at", decoded.ts);
   }
 
   const { data, error } = await query;
@@ -186,18 +187,19 @@ export async function getUserFeedPage(input: unknown) {
   const query = sb
     .from("posts")
     .select("*")
-    .eq("is_deleted", false)
+    .or("is_deleted.is.null,is_deleted.eq.false")
     .eq("author_id", parsed.data.author_id)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(parsed.data.limit);
 
   if (decoded) {
-    query.lt("created_at", decoded.ts).or(`and(created_at.eq.${decoded.ts},id.lt.${decoded.id})`);
+    // simple keyset without tie-break OR to avoid overriding filters
+    query.lt("created_at", decoded.ts);
   }
 
   const { data, error } = await query;
-  if (error) return { error: error.message };
+  if (error) return { error: error.message};
 
   const nextCursor =
     data && data.length

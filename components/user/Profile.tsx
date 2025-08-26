@@ -1,69 +1,59 @@
 import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
 import { OutlineEdit } from "@/components/icons/Icons";
-import { EditProfileDialog } from "./Edit";
-import { generateAccentColor, type AccentColor } from "@/lib/accent-colors";
+import { SettingsDialog } from "@/components/settings/Dialog";
+import { generateAccentColor } from "@/lib/accent-colors";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { ProfileCover } from "./ProfileCover";
 import { ProfileBio } from "./ProfileBio";
 import { ProfileStats } from "./ProfileStats";
-import { getUserAccentStyles } from "@/lib/profile";
+import { getUserAccentStyles, getUserAccentStylesFromHex } from "@/lib/profile";
+
+interface UserProfileData {
+  user_id: string;
+  username: string;
+  display_name: string;
+  bio?: string | null;
+  avatar_url?: string | null;
+  cover_url?: string | null;
+  accent_color?: string | null;
+}
 
 interface UserProfileProps {
-  displayName: string;
-  username: string;
-  coverImage?: string;
-  avatarImage?: string;
-  accentColor?: AccentColor;
-  bio?: string;
-  stats: {
-    followers: number;
-    following: number;
-    posts: number;
-  };
+  profile: UserProfileData;
+  stats: { followers: number; following: number; posts: number };
   isOwnProfile: boolean;
   onEditProfile?: () => void;
 }
 
-export function UserProfile({ displayName, username, coverImage, avatarImage, accentColor, bio, stats, isOwnProfile }: UserProfileProps) {
+export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Use provided accentColor or generate one based on username
-  const currentAccentColor = useMemo(() => accentColor || generateAccentColor(username), [accentColor, username]);
+  const currentAccentColor = useMemo(() => generateAccentColor(profile.username), [profile.username]);
 
   // Get color styles for colors
-  const { coverBgStyle } = useMemo(() => getUserAccentStyles(currentAccentColor), [currentAccentColor]);
+  const { coverBgStyle } = useMemo(() => {
+    if (profile.accent_color) return getUserAccentStylesFromHex(profile.accent_color);
+    return getUserAccentStyles(currentAccentColor);
+  }, [currentAccentColor, profile.accent_color]);
 
-  // Create user profile object for EditProfileDialog
-  const userProfile = useMemo(() => ({
-    id: username || 'user-id',
-    email: '',
-    username,
-    avatar: {
-      url: avatarImage || '',
-      alt: username || 'User',
-      size: { width: 128, height: 128 },
-    },
-    cover: {
-      url: coverImage || '',
-      alt: 'Cover',
-      size: { width: 800, height: 288 },
-    },
-  }), [username, avatarImage, coverImage]);
+  // no longer needed since we reuse SettingsDialog's profile section
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <>
       {/* Cover Image or Pastel Background */}
-      <ProfileCover coverImage={coverImage} coverBgStyle={coverBgStyle} />
+      <ProfileCover coverImage={profile.cover_url || undefined} coverBgStyle={coverBgStyle} />
 
       {/* Profile Picture */}
       <div className="flex justify-center -mt-16 relative z-10">
 
         <UserAvatar
-          username={username}
-          avatarUrl={avatarImage}
+          username={profile.username}
+          avatarUrl={profile.avatar_url || undefined}
           size="2xl"
           accentColor={currentAccentColor}
+          accentHex={profile.accent_color || undefined}
           showBorder={true}
           className="flex items-center justify-center text-2xl font-bold"
         />
@@ -86,11 +76,11 @@ export function UserProfile({ displayName, username, coverImage, avatarImage, ac
       {/* Profile Info */}
       <div className="text-center mt-2 px-4 space-y-2">
         <div className="relative inline-block">
-          <h3 className="text-2xl font-bold text-neutral-950">{displayName}</h3>
-          <p className="text-neutral-600">@{username}</p>
+          <h3 className="text-2xl font-bold text-neutral-950">{profile.display_name}</h3>
+          <p className="text-neutral-600">@{profile.username}</p>
         </div>
 
-        <ProfileBio bio={bio} />
+        <ProfileBio bio={profile.bio || undefined} />
 
         {/* Stats Grid */}
         <ProfileStats
@@ -102,16 +92,13 @@ export function UserProfile({ displayName, username, coverImage, avatarImage, ac
       </div>
 
       {isEditDialogOpen && (
-        <EditProfileDialog
-          user={userProfile}
-          onClose={() => setIsEditDialogOpen(false)}
-          onProfileUpdated={() => {
-            // Update local state if needed
-            setIsEditDialogOpen(false);
-          }}
+        <SettingsDialog
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          initialSection="profile"
+          sections={["profile"]}
         />
       )}
-    </div>
-
+    </>
   );
 }
