@@ -5,6 +5,7 @@ import { UserProfile } from '@/components/user/Profile';
 import Feed from '@/components/feed/Index';
 import { User } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAuth } from '@/providers/AuthProvider';
 import Center from '@/components/Center';
 
 // Local view-only state no longer needed; we render directly from hook
@@ -14,6 +15,7 @@ export default function UserProfilePage() {
   const username = params.username as string;
 
   const { profile, isOwn, loading } = useUserProfile(username);
+  useAuth();
 
   if (loading) {
     return (
@@ -44,10 +46,7 @@ export default function UserProfilePage() {
     <div className="min-h-screen ">
       {/* UserProfile component */}
       <UserProfile
-        displayName={profile.display_name}
-        username={profile.username}
-        coverImage={profile.cover_url || undefined}
-        avatarImage={profile.avatar_url || undefined}
+        profile={profile}
         stats={{ followers: 0, following: 0, posts: 0 }}
         isOwnProfile={isOwn}
       />

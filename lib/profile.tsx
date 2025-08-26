@@ -1,5 +1,5 @@
 import React from "react";
-import { getAccentColorStyle, type AccentColor } from "./accent-colors";
+import { getAccentColorStyle, type AccentColor, getStyleFromHexShade } from "./accent-colors";
 
 const TOKEN_REGEX = /(\[(?:B|I|U|SPOT)\]|\[\/(?:B|I|U|SPOT)\])/;
 
@@ -44,4 +44,10 @@ export const getUserAccentStyles = (accentColor: AccentColor) => ({
   coverBgStyle: getAccentColorStyle(accentColor, 100, 'backgroundColor'),
   avatarBgStyle: getAccentColorStyle(accentColor, 200, 'backgroundColor'),
   avatarForegroundStyle: getAccentColorStyle(accentColor, 950, 'color'),
+} as const);
+
+export const getUserAccentStylesFromHex = (hex: string) => ({
+  coverBgStyle: getStyleFromHexShade(hex, '100', 'backgroundColor'),
+  avatarBgStyle: getStyleFromHexShade(hex, '200', 'backgroundColor'),
+  avatarForegroundStyle: getStyleFromHexShade(hex, '950', 'color'),
 } as const);

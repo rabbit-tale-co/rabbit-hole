@@ -6,6 +6,7 @@ import { useAuth } from "@/providers/AuthProvider";
 export type FetchedProfile = {
   user_id: string;
   username: string;
+  bio?: string | null;
   display_name: string;
   avatar_url?: string | null;
   cover_url?: string | null;
@@ -15,7 +16,7 @@ export type FetchedProfile = {
 export function useUserProfile(username: string | undefined) {
   const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState<FetchedProfile | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,15 +30,13 @@ export function useUserProfile(username: string | undefined) {
         const res = await fetch(url);
         if (!alive) return;
         if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          console.error("useUserProfile fetch fail:", res.status, text);
           setProfile(null);
           setError(`status_${res.status}`);
           return;
         }
         const data = await res.json();
         setProfile(data?.profile ?? null);
-      } catch (e) {
+      } catch {
         if (!alive) return;
         setError("network_error");
         setProfile(null);
@@ -46,6 +45,8 @@ export function useUserProfile(username: string | undefined) {
       }
     };
     load();
+    const onUpdated = () => load();
+    window.addEventListener('profile:updated', onUpdated);
     return () => { alive = false; };
   }, [username]);
 

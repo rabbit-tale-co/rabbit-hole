@@ -24,6 +24,7 @@ import { ArrowLeft } from "lucide-react";
 import { OutlineBell, OutlineClose, OutlineMenu, SolidLogo } from "@/components/icons/Icons";
 import { generateAccentColor } from "@/lib/accent-colors";
 import { UserProfileMenu } from "./user/Menu";
+import PostButton from "./feed/upload/post-button";
 
 export default function Header() {
   const isMobile = useIsMobile();
@@ -32,7 +33,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user: auth_user, profile: user, loading } = useAuth();
 
   const navigationLinks = [
     { href: "/", label: "Home", icon: null },
@@ -43,6 +44,8 @@ export default function Header() {
     //   { href: "/settings", label: "Settings", icon: null },
     // ] : []),
   ];
+
+  console.log(auth_user);
 
   const NavLinks = ({ onClick, className }: { onClick?: () => void, className?: string }) => (
     <>
@@ -94,9 +97,9 @@ export default function Header() {
           <div className="flex rounded-full p-1 bg-background/90 dark:bg-black/80 backdrop-blur-2xl items-center gap-3">
 
             {/* Authentication */}
-            {user ? (
+            {auth_user && (
               <div className="flex items-center gap-2">
-                {/* <PostButton accentColor={userAccentColor} /> */}
+                <PostButton />
                 {/* Notifications */}
                 <Button variant="ghost" size="icon" className="relative rounded-full">
                   <OutlineBell size={20} />
@@ -105,8 +108,12 @@ export default function Header() {
                 </Button>
                 <UserProfileMenu />
               </div>
-            ) : (
-              <AuthModal />
+            )}
+
+            {!loading && !auth_user && (
+              <div className="pointer-events-auto">
+                <AuthModal />
+              </div>
             )}
 
             {/* Mobile menu */}
@@ -159,10 +166,10 @@ export default function Header() {
                       <NavLinks onClick={() => setIsOpen(false)} />
 
                       {/* Mobile profile link */}
-                      {user && (
+                      {auth_user && (
                         <Button asChild variant="ghost">
                           <Link
-                            href={`/user/${user.user_metadata?.username || user.id}`}
+                            href={`/user/${user?.username}`}
                             onClick={() => setIsOpen(false)}
                           >
                             Profile

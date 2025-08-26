@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
+import { UnsavedChangesContext } from '@/components/settings/Dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Trash } from 'lucide-react';
@@ -48,6 +49,7 @@ interface EditProfileDialogProps {
 
 export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfileDialogProps) {
   const { updateProfile, removeAvatar } = useAuth();
+  const unsaved = React.useContext(UnsavedChangesContext);
   const [username, setUsername] = useState(user.username || '');
   const [email, setEmail] = useState(user.email || '');
   const [password, setPassword] = useState('');
@@ -212,6 +214,7 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
             username: username.trim(),
             email: email.trim(),
           });
+          unsaved?.markAsSaved?.();
           onClose();
           return 'Profile updated successfully!';
         },
