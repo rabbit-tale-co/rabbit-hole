@@ -1,0 +1,28 @@
+import { supabaseAdmin } from "@/lib/supabase-admin";
+
+function parseCookie(header: string | null, name: string): string | null {
+  if (!header) return null;
+  const parts = header.split(/;\s*/);
+  for (const part of parts) {
+    const [k, v] = part.split("=");
+    if (decodeURIComponent(k) === name) return decodeURIComponent(v ?? "");
+  }
+  return null;
+}
+
+function getBearer(req: Request): string | null {
+  const auth = req.headers.get("authorization") || req.headers.get("Authorization");
+  if (auth && auth.startsWith("Bearer ")) return auth.slice(7);
+  const cookieHeader = req.headers.get("cookie") || req.headers.get("Cookie");
+  // common supabase helpers cookie name
+  const token = parseCookie(cookieHeader, "sb-access-token");
+  return token || null;
+}
+
+export async function getUser(req: Request): Promise<{ id: string } | null> {
+  const token = getBearer(req);
+  if (!token) return null;
+  const { data, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !data?.user) return null;
+  return { id: data.user.id };
+}
