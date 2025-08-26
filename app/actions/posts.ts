@@ -201,9 +201,6 @@ export async function getUserFeedPage(input: unknown) {
   const { data, error } = await query;
   if (error) return { error: error.message};
 
-  console.log(data)
-
-
   const nextCursor =
     data && data.length
       ? encodeCursor(data[data.length - 1].created_at as string, data[data.length - 1].id as string)
