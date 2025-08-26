@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Eye, EyeOff, Mail } from "lucide-react";
 
-export default function RegisterForm() {
+export default function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,9 +44,10 @@ export default function RegisterForm() {
     if (error) {
       setError(error);
     } else {
-      // Jesli wymagane jest potwierdzenie emaila, zostawiamy ekran sukcesu
-      // i NIE zamykamy modala od razu.
+      // If email confirmation is required, we leave the success screen
+      // and do not close the modal immediately.
       setSuccess(true);
+      onSuccess?.();
     }
   };
 

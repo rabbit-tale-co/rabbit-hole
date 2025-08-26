@@ -8,10 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
-export function LoginForm({
-  onSuccess,
-  compact = false,
-}: { onSuccess?: () => void; compact?: boolean }) {
+export default function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -30,7 +27,7 @@ export function LoginForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className={`space-y-3 ${compact ? "" : "max-w-md"}`}>
+    <form onSubmit={handleSubmit} className={`space-y-3 max-w-md`}>
       {error && (
         <Alert variant="destructive">
           <AlertDescription className="text-xs">{error}</AlertDescription>

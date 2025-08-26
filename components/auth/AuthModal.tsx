@@ -8,7 +8,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Palette, X } from "lucide-react";
-import { LoginForm } from "./LoginForm";
+import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 
 type AuthTab = "login" | "register";
@@ -20,8 +20,6 @@ export function AuthModal({
 }) {
   const [open, setOpen] = React.useState(false);
   const [tab, setTab] = React.useState<AuthTab>(defaultTab);
-
-  const close = () => setOpen(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -70,10 +68,10 @@ export function AuthModal({
               </TabsList>
 
               <TabsContent value="login" className="mt-3">
-                <LoginForm compact onSuccess={close} />
+                <LoginForm onSuccess={() => setOpen(false)} />
               </TabsContent>
               <TabsContent value="register" className="mt-3">
-                <RegisterForm />
+                <RegisterForm onSuccess={() => setOpen(false)} />
               </TabsContent>
             </Tabs>
 
