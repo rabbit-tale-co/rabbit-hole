@@ -84,7 +84,6 @@ export default function Footer() {
                       key={link.label}
                       href={link.href}
                       label={link.label}
-                      icon={link.icon}
                       isExternal={link.href.startsWith('http')}
                     />
                   ))}
