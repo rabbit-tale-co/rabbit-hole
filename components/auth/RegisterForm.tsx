@@ -8,14 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Eye, EyeOff, Mail } from "lucide-react";
 
-interface RegisterFormProps {
-  onClose: () => void;
-}
-
-export function RegisterForm({
-  onClose,
-  compact = false,
-}: { onClose: () => void; compact?: boolean }) {
+export default function RegisterForm() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,7 +52,7 @@ export function RegisterForm({
 
   if (success) {
     return (
-      <div className={`text-center space-y-4 ${compact ? "" : "max-w-md"}`}>
+      <div className={`text-center space-y-4 max-w-md`}>
         <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
           <Mail className="w-8 h-8 text-green-600" />
         </div>
@@ -77,7 +70,7 @@ export function RegisterForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={`space-y-3 ${compact ? "" : "max-w-md"}`}>
+    <form onSubmit={handleSubmit} className={`space-y-3 max-w-md`}>
       {error && (
         <Alert variant="destructive">
           <AlertDescription className="text-xs">{error}</AlertDescription>

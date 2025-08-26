@@ -56,16 +56,16 @@ export default function Feed({ initial, debugLoading, authorId, isOwnProfile, on
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("user_id,username,display_name,avatar_url")
+        .select("user_id,username,avatar_url,display_name")
         .in("user_id", missing as string[]);
       if (!data) return;
       setAuthorProfiles((prev) => {
         const next = new Map(prev);
-        for (const row of data) next.set(row.user_id, { username: row.username, display_name: row.display_name, avatar_url: row.avatar_url });
+        for (const row of data) next.set(row.user_id, { username: row.username, avatar_url: row.avatar_url, display_name: row.display_name });
         return next;
       });
     })();
-  }, [items]);
+  }, [items, authorProfiles]);
 
 
   // notify parent about count

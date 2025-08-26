@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Palette, X } from "lucide-react";
 import { LoginForm } from "./LoginForm";
-import { RegisterForm } from "./RegisterForm";
+import RegisterForm from "./RegisterForm";
 
 type AuthTab = "login" | "register";
 
@@ -73,7 +73,7 @@ export function AuthModal({
                 <LoginForm compact onSuccess={close} />
               </TabsContent>
               <TabsContent value="register" className="mt-3">
-                <RegisterForm compact onSuccess={close} />
+                <RegisterForm />
               </TabsContent>
             </Tabs>
 

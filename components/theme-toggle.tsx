@@ -4,12 +4,8 @@ import * as React from "react"
 import { useTheme } from "next-themes"
 import { Sun, Moon, Monitor } from "lucide-react"
 
-import {
-  Card, CardContent, CardHeader, CardTitle, CardDescription,
-} from "@/components/ui/card"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 
 type ThemeId = "light" | "dark" | "system"
@@ -25,7 +21,7 @@ const opts = [
  * Two-column row: label/description on the left, compact segmented control on the right.
  * Sized for dialogs; keeps the whole settings sheet calm and consistent.
  */
-export function SettingsThemeRow({ className }: { className?: string }) {
+export function SettingsThemeRow() {
   const { theme, resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
