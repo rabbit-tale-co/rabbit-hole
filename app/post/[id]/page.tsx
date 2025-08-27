@@ -6,7 +6,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, Trash2, Pencil, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
-import { UserChipHoverCard } from "@/components/user/ProfileCard";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import Center from "@/components/Center";

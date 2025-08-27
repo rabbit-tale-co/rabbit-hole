@@ -110,7 +110,15 @@ export default function UsersGrid() {
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((u) => (
-            <UserCard key={u.user_id} user={u as any} />
+            <UserCard key={u.user_id} user={{
+              user_id: u.user_id,
+              username: u.username,
+              display_name: u.display_name ?? null,
+              avatar_url: u.avatar_url ?? null,
+              cover_url: u.cover_url ?? null,
+              accent_color: u.accent_color ?? null,
+              bio: (u as { bio?: string | null }).bio ?? null,
+            }} />
           ))}
         </div>
       )}
