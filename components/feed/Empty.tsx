@@ -188,7 +188,7 @@ export default function ProfileEmptyGallery({
           <Separator />
 
           {/* Creator tips */}
-          <div className="p-6 sm:px-10">
+          <div className="p-3">
             <div className="grid gap-3 md:grid-cols-3">
               <Tip
                 title="Show your process"
@@ -252,7 +252,7 @@ export function HomeEmptyFeed() {
 function Tip({ title, desc, icon }: { title: string; desc: string; icon: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3 rounded-xl border p-3">
-      <div className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+      <div className="mt-0.5 flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground shrink-0">
         <span className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
       </div>
       <div>

@@ -53,7 +53,6 @@ export default function UserProfilePage() {
 
 
       <Feed
-        debugLoading={false}
         authorId={profile.user_id}
         isOwnProfile={isOwn}
         onCountChange={(n) => {

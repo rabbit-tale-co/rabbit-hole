@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getFeedPage, getUserFeedPage } from "@/app/actions/posts";
 import { PostRow } from "@/types";
 
 
@@ -31,9 +30,20 @@ export function useInfiniteFeed(initial?: { items: PostRow[]; nextCursor: string
     setError(null);
 
     const cursorParam = cursor === "" ? undefined : cursor; // first page if ""
-    const res = opts?.authorId
-      ? await getUserFeedPage({ cursor: cursorParam, limit: pageSize, author_id: opts.authorId })
-      : await getFeedPage({ cursor: cursorParam, limit: pageSize });
+    const qs = new URLSearchParams();
+    if (cursorParam) qs.set("cursor", cursorParam);
+    qs.set("limit", String(pageSize));
+    if (opts?.authorId) qs.set("userId", opts.authorId);
+    const url = `/api/posts${qs.toString() ? `?${qs.toString()}` : ""}`;
+    let res: { error?: string; items?: PostRow[]; nextCursor?: string | null } = {};
+    try {
+      const r = await fetch(url, { cache: "no-store" });
+      res = await r.json();
+      if (!r.ok) res = { error: res?.error || `status_${r.status}` };
+    } catch (e: unknown) {
+      console.log(e);
+      res = { error: "network_error" };
+    }
 
     if ("error" in res && res.error) {
       setError(res.error);

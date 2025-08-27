@@ -3,6 +3,7 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { UpsertProfile } from "@/schemas/profile";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 export async function upsertProfile(input: unknown) {
   const parsed = UpsertProfile.safeParse(input);
@@ -81,4 +82,40 @@ export async function deleteAccount(userId: string) {
   const { error: authErr } = await sb.auth.admin.deleteUser(userId);
   if (authErr) return { error: authErr.message };
   return { ok: true };
+}
+
+export async function getUsersPage(input: unknown) {
+  const parsed = z.object({ cursor: z.string().optional(), limit: z.number().int().min(1).max(60).default(24) }).safeParse(input);
+  if (!parsed.success) return { error: "Invalid cursor" };
+
+  const sb = supabaseAdmin;
+  const cursor = parsed.data.cursor;
+  let decoded: { username: string; user_id: string } | null = null;
+  if (cursor) {
+    try {
+      const [username, user_id] = Buffer.from(cursor, "base64").toString("utf8").split("|");
+      decoded = { username, user_id };
+    } catch { decoded = null; }
+  }
+
+  const query = sb
+    .from("profiles")
+    .select("user_id, username, display_name, bio, avatar_url, cover_url, accent_color")
+    .order("username", { ascending: true })
+    .order("user_id", { ascending: true })
+    .limit(parsed.data.limit);
+
+  if (decoded) {
+    // keyset: (username, user_id)
+    query.gt("username", decoded.username);
+  }
+
+  const { data, error } = await query;
+  if (error) return { error: error.message };
+
+  const nextCursor = data && data.length
+    ? Buffer.from(`${data[data.length - 1].username}|${data[data.length - 1].user_id}`).toString("base64")
+    : null;
+
+  return { items: data ?? [], nextCursor };
 }

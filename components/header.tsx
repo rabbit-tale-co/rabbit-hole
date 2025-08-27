@@ -27,15 +27,13 @@ export default function Header() {
 
   const navigationLinks = [
     { href: "/", label: "Home", icon: null },
-    // { href: "/explore", label: "Explore", icon: null },
+    { href: "/explore", label: "Explore", icon: null },
     { href: "/following", label: "Following", icon: null },
     // ...(user ? [
     //   { href: "/profile", label: "Profile", icon: null },
     //   { href: "/settings", label: "Settings", icon: null },
     // ] : []),
   ];
-
-  console.log(auth_user);
 
   const NavLinks = ({ onClick, className }: { onClick?: () => void, className?: string }) => (
     <>

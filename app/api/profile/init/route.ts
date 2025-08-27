@@ -5,8 +5,7 @@ import { InitProfile } from "@/schemas/profile";
 import { USERNAME } from "@/schemas/_shared";
 
 async function findUniqueUsername(base: string) {
-  let candidate = base;
-  let i = 1;
+  const candidate = base;
   while (true) {
     const { data, error } = await supabaseAdmin
       .from("profiles")
@@ -16,11 +15,20 @@ async function findUniqueUsername(base: string) {
       .maybeSingle();
     if (error) throw new Error(`username check failed: ${error.message}`);
     if (!data) return candidate;
-    candidate = `${base}_${i}`;
-    if (candidate.length < 3) candidate = (candidate + "___").slice(0, 3);
-    i += 1;
-    if (i > 1000) throw new Error("could not allocate unique username");
   }
+}
+
+async function isUsernameAvailable(candidate: string, excludeUserId?: string) {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("user_id, username")
+    .ilike("username", candidate)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`username check failed: ${error.message}`);
+  if (!data) return true;
+  if (excludeUserId && data.user_id === excludeUserId) return true;
+  return false;
 }
 
 export async function POST(req: NextRequest) {
@@ -38,7 +46,7 @@ export async function POST(req: NextRequest) {
       return getAccentColorValue(name, 500);
     };
 
-    // 1) If exists: ensure accent_color is set; otherwise insert
+    // 1) If exists: ensure accent_color is set and optionally apply desired username
     {
       const { data: existing, error: exErr } = await supabaseAdmin
         .from("profiles")
@@ -50,17 +58,37 @@ export async function POST(req: NextRequest) {
         return Response.json({ stage: "check_existing", error: exErr.message, code: (exErr as { code?: string }).code, details: (exErr as { details?: string }).details, hint: (exErr as { hint?: string }).hint }, { status: 500 });
       }
       if (existing) {
+        const updates: Record<string, unknown> = {};
+        // assign random accent if missing
         if (!existing.accent_color) {
-          const hex = pickRandomAccentHex();
+          updates.accent_color = pickRandomAccentHex();
+        }
+        // if caller provided a desired username, try to apply it
+        const candidateOk = desiredUsername ? USERNAME.safeParse(desiredUsername).success : false;
+        if (candidateOk) {
+          const base = String(desiredUsername).toLowerCase();
+          if (base !== existing.username?.toLowerCase()) {
+            const available = await isUsernameAvailable(base, user_id);
+            if (!available) {
+              return Response.json({ error: "username_taken" }, { status: 409 });
+            }
+            updates.username = base;
+            // update display_name only if it previously mirrored username
+            if (!existing.display_name || existing.display_name.toLowerCase() === (existing.username ?? '').toLowerCase()) {
+              updates.display_name = base;
+            }
+          }
+        }
+        if (Object.keys(updates).length > 0) {
           const { error: upErr } = await supabaseAdmin
             .from("profiles")
-            .update({ accent_color: hex })
+            .update(updates)
             .eq("user_id", user_id);
           if (upErr) {
-            console.error("init.update_accent.error", upErr);
-            return Response.json({ stage: "update_accent", error: upErr.message, code: (upErr as { code?: string }).code, details: (upErr as { details?: string }).details, hint: (upErr as { hint?: string }).hint }, { status: 500 });
+            console.error("init.update_existing.error", upErr);
+            return Response.json({ stage: "update_existing", error: upErr.message, code: (upErr as { code?: string }).code, details: (upErr as { details?: string }).details, hint: (upErr as { hint?: string }).hint }, { status: 500 });
           }
-          return Response.json({ ok: true, updated: true, accent_color: hex, stage: "update_accent" });
+          return Response.json({ ok: true, updated: true, stage: "update_existing", applied: Object.keys(updates) });
         }
         return Response.json({ ok: true, skipped: true, stage: "exists_noop" });
       }
@@ -68,8 +96,18 @@ export async function POST(req: NextRequest) {
 
     // 2) Defaults and derivations
     const candidateOk = desiredUsername ? USERNAME.safeParse(desiredUsername).success : false;
-    const base = candidateOk ? String(desiredUsername).toLowerCase() : `user_${user_id.slice(0, 6)}`;
-    const username = await findUniqueUsername(base);
+    let username: string;
+    if (candidateOk && desiredUsername) {
+      const base = String(desiredUsername).toLowerCase();
+      const available = await isUsernameAvailable(base);
+      if (!available) {
+        return Response.json({ error: "username_taken" }, { status: 409 });
+      }
+      username = base;
+    } else {
+      const base = `user_${user_id.slice(0, 6)}`;
+      username = await findUniqueUsername(base);
+    }
 
     const display_name = username;
 

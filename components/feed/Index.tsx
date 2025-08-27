@@ -10,13 +10,83 @@ import { BentoSkeleton } from "@/components/feed/Loading"; // your skeleton
 import ProfileEmptyGallery, { HomeEmptyFeed } from "@/components/feed/Empty";    // empty states
 import { useIntersection } from "@/hooks/useIntersection"; // sentinel
 import { UserAvatar } from "@/components/ui/user-avatar";
+// Removed dialog viewer in favor of hover slideshow + click-through
+// import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+// import { Reel, ReelContent, ReelItem, ReelImage, ReelProgress } from "@/components/ui/kibo-ui/reel";
 import { CalendarDays } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { SocialActions } from "@/components/feed/interactions/social-actions";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Progress } from "@/components/ui/progress";
+import { UserChipHoverCard } from "../user/ProfileCard";
+import { Badge } from "../ui/badge";
 
-export default function Feed({ initial, debugLoading, authorId, isOwnProfile, onCountChange }: { initial?: Parameters<typeof useInfiniteFeed>[0]; debugLoading?: boolean; authorId?: string; isOwnProfile?: boolean; onCountChange?: (n: number) => void }) {
+// Local hover slideshow for multi-image posts
+function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; others: { src: string; alt?: string }[]; widthPx: number; alt?: string }) {
+  const [hovered, setHovered] = useState(false);
+  const [idx, setIdx] = useState(0);
+  const [pct, setPct] = useState(0);
+  const imgs = [firstSrc, ...others.map(o => o.src)];
+  const alts = [alt || "", ...others.map(o => o.alt || "")];
+  const DURATION_MS = 1500;
+
+  // progress-driven slideshow while hovered
+  useEffect(() => {
+    if (!hovered || imgs.length <= 1) { setPct(0); return; }
+    let raf = 0;
+    const start = performance.now();
+    const loop = (t: number) => {
+      const elapsed = t - start;
+      const nextPct = Math.min(100, (elapsed / DURATION_MS) * 100);
+      setPct(nextPct);
+      if (nextPct >= 100) {
+        setIdx((i) => (i + 1) % imgs.length);
+      } else {
+        raf = requestAnimationFrame(loop);
+      }
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+    // restart on index change
+  }, [hovered, idx, imgs.length]);
+
+  // reset when mouse leaves
+  useEffect(() => {
+    if (!hovered) { setIdx(0); setPct(0); }
+  }, [hovered]);
+
+  return (
+    <div className="absolute inset-0" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      {imgs.map((src, i) => (
+        <Image
+          key={i}
+          src={src}
+          alt={alts[i]}
+          fill
+          sizes={`${widthPx}px`}
+          className={`object-cover transition-opacity duration-300 ${i === idx ? 'opacity-100' : 'opacity-0'}`}
+          unoptimized
+          priority={false}
+        />
+      ))}
+      {imgs.length > 1 && (
+        <div className="absolute bottom-1 left-0 right-0 z-20 flex gap-1 px-6">
+          {imgs.map((_, i) => (
+            <Progress
+              key={i}
+              value={hovered ? (i < idx ? 100 : i === idx ? pct : 0) : 0}
+              className="h-0.5 flex-1 bg-white/30 [&>div]:bg-white [&>div]:transition-none"
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Feed({ initial, authorId, isOwnProfile, onCountChange }: { initial?: Parameters<typeof useInfiniteFeed>[0]; authorId?: string; isOwnProfile?: boolean; onCountChange?: (n: number) => void }) {
   // data
   const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(initial, 24, { authorId });
 
@@ -46,7 +116,7 @@ export default function Feed({ initial, debugLoading, authorId, isOwnProfile, on
   }, [items]);
 
   // lazy profile cache: author_id -> { username, avatar_url }
-  const [authorProfiles, setAuthorProfiles] = useState<Map<string, { username?: string; display_name?: string; avatar_url?: string }>>(new Map());
+  const [authorProfiles, setAuthorProfiles] = useState<Map<string, { username: string; display_name: string; avatar_url: string }>>(new Map());
   useEffect(() => {
     const missing = items
       .map((p) => p.author_id)
@@ -72,6 +142,8 @@ export default function Feed({ initial, debugLoading, authorId, isOwnProfile, on
   useEffect(() => {
     onCountChange?.(items.length);
   }, [items.length, onCountChange]);
+
+  // Hover slideshow is implemented per-tile; no modal viewer state needed
 
   // packing
   const { cols, placed } = useBento(tiles);
@@ -104,7 +176,7 @@ export default function Feed({ initial, debugLoading, authorId, isOwnProfile, on
   const containerHeight = rows > 0 ? rows * cell + (rows - 1) * gap : Math.max(cell, 240);
 
   // initial loading (no items yet) or container not measured
-  const firstLoad = (items.length === 0 && loading) || debugLoading;
+  const firstLoad = (items.length === 0 && loading);
 
   if (firstLoad || cell <= 0) {
     return (
@@ -120,11 +192,10 @@ export default function Feed({ initial, debugLoading, authorId, isOwnProfile, on
 
   return (
     <div ref={rootRef} className="w-full mt-6">
+      {/* hover slideshow handled within tiles; click-through to post page */}
       {/* loading indicator ABOVE posts while fetching more */}
       {loading && (
-
         <BentoSkeleton cols={cols} containerWidth={containerW} gap={gap} count={6} />
-
       )}
 
       <div className="relative" style={{ height: containerHeight, minHeight: Math.max(240, cell) }}>
@@ -135,87 +206,83 @@ export default function Feed({ initial, debugLoading, authorId, isOwnProfile, on
           const height = Math.max(1, p.h * cell + (p.h - 1) * gap);
 
           return (
-            <article
-              key={p.tile.id}
-              className="absolute bg-neutral-100 ring-1 ring-[--border] rounded-2xl overflow-hidden"
-              style={{ top, left, width, height, minWidth: 160, minHeight: 160 }}
-            >
-              <Image
-                src={publicUrl(p.tile.cover.path)}
-                alt={p.tile.cover.alt || ""}
-                fill
-                sizes={`${Math.ceil(width)}px`}
-                className="object-cover"
-                unoptimized
-                priority={false}
-              />
+            <Link href={`/post/${p.tile.id}`} key={p.tile.id}>
+              <article
+                key={p.tile.id}
+                className="absolute bg-neutral-100 rounded-2xl overflow-hidden"
+                style={{ top, left, width, height, minWidth: 160, minHeight: 160 }}
+              >
+                {(() => {
+                  const post = idToPost.get(p.tile.id);
+                  const imgs = post?.images || [];
+                  const first = publicUrl(p.tile.cover.path);
+                  return (
+                    <HoverSlideshow
+                      firstSrc={first}
+                      others={imgs.slice(1).map(im => ({ src: publicUrl(im.path), alt: im.alt || '' }))}
+                      widthPx={Math.ceil(width)}
+                      alt={p.tile.cover.alt || ''}
+                    />
+                  );
+                })()}
 
-              {/* overlays in BentoGallery style: top-left user, top-right date, bottom actions */}
-              {(() => {
-                const post = idToPost.get(p.tile.id);
-                const profile = post ? authorProfiles.get(post.author_id) : undefined;
-                const username = profile?.username;
-                const displayName = profile?.display_name;
-                const avatarUrl = profile?.avatar_url;
-                const dateLabel = post?.created_at ? new Date(post.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
-                return (
-                  <>
+                {/* overlays in BentoGallery style: top-left user, top-right date, bottom actions */}
+                {(() => {
+                  const post = idToPost.get(p.tile.id);
+                  const profile = post ? authorProfiles.get(post.author_id) : undefined;
+                  const dateLabel = post?.created_at ? new Date(post.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+                  return (
+                    <>
 
-                    {/* top-left user */}
-                    {profile && (
-                      <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 text-white">
-                        <HoverCard>
-                          <HoverCardTrigger asChild>
-                            <Link href={`/user/${username}`} className="flex items-center gap-2 bg-black/30 pr-3 py-1 pl-1 rounded-full backdrop-blur-sm">
-                              <UserAvatar username={username!} avatarUrl={avatarUrl} className="ring-1 ring-white/20" />
-                              <div className="flex flex-col leading-tight">
-                                {displayName && <h4 className="text-xs sm:text-sm font-medium">{displayName}</h4>}
-                                {username && <p className="text-[10px] sm:text-xs opacity-90">@{username}</p>}
-                              </div>
-                            </Link>
-                          </HoverCardTrigger>
-                          <HoverCardContent className="rounded-2xl">
-                            <div className="flex items-start gap-3">
-                              <UserAvatar username={username!} avatarUrl={avatarUrl} size="xl" />
-                              <div className="min-w-0">
-                                {displayName && <div className="font-semibold truncate">{displayName}</div>}
-                                {username && <div className="text-sm text-muted-foreground truncate">@{username}</div>}
-                              </div>
-                            </div>
-                          </HoverCardContent>
-                        </HoverCard>
+                      {/* top-left user */}
+                      {profile && (
+                        <div
+                          className="absolute top-2 left-2 sm:top-3 sm:left-3 z-30 text-white"
+                          onClick={(e) => { e.stopPropagation(); }}
+                        >
+                          <UserChipHoverCard user={{
+                            username: profile.username,
+                            avatarUrl: profile.avatar_url,
+                            displayName: profile.display_name,
+                            stats: {
+                              followers: post?.like_count ?? 0,
+                              following: post?.comment_count ?? 0,
+                              // posts: post?.post_count ?? 0,
+                            }
+                          }} size={'sm'} insideLink />
+                        </div>
+                      )}
+
+                      {/* top-right date */}
+                      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 text-white">
+                        <Badge className="bg-black/50">
+                          <CalendarDays />
+                          {dateLabel}
+                        </Badge>
                       </div>
-                    )}
-
-                    {/* top-right date */}
-                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 text-white">
-                      <div className="inline-flex items-center gap-1 bg-black/30 px-2 py-1 rounded-full backdrop-blur-sm text-[10px] sm:text-xs">
-                        <CalendarDays className="size-3.5 sm:size-4" />
-                        <span>{dateLabel}</span>
+                      {/* bottom gradient + actions row */}
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                      <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3">
+                        <SocialActions
+                          likes={post?.like_count ?? 0}
+                          comments={post?.comment_count ?? 0}
+                          reposts={post?.repost_count ?? 0}
+                          bookmarks={post?.bookmark_count ?? 0}
+                          isLiked={false}
+                          isReposted={false}
+                          isBookmarked={false}
+                          showBookmarksCount={false}
+                          onLike={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onComment={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onRepost={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onBookmark={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        />
                       </div>
-                    </div>
-                    {/* bottom gradient + actions row */}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                    <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3">
-                      <SocialActions
-                        likes={post?.like_count ?? 0}
-                        comments={post?.comment_count ?? 0}
-                        reposts={post?.repost_count ?? 0}
-                        bookmarks={post?.bookmark_count ?? 0}
-                        isLiked={false}
-                        isReposted={false}
-                        isBookmarked={false}
-                        showBookmarksCount={false}
-                        onLike={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                        onComment={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                        onRepost={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                        onBookmark={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                      />
-                    </div>
-                  </>
-                );
-              })()}
-            </article>
+                    </>
+                  );
+                })()}
+              </article>
+            </Link>
           );
         })}
       </div>
