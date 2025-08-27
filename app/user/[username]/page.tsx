@@ -66,3 +66,5 @@ export default function UserProfilePage() {
     </>
   );
 }
+
+// metadata is provided by app/user/[username]/head.tsx to avoid client "use client" restriction

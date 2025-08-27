@@ -4,21 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { useBento } from "@/hooks/useBento";
-import { bucketFromWH } from "@/lib/bento"; // or from your hooks if you moved it there
+import { bucketFromWH } from "@/lib/bento";
 import type { Tile } from "@/types";
-import { BentoSkeleton } from "@/components/feed/Loading"; // your skeleton
-import ProfileEmptyGallery, { HomeEmptyFeed } from "@/components/feed/Empty";    // empty states
-import { useIntersection } from "@/hooks/useIntersection"; // sentinel
-import { UserAvatar } from "@/components/ui/user-avatar";
-// Removed dialog viewer in favor of hover slideshow + click-through
-// import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-// import { Reel, ReelContent, ReelItem, ReelImage, ReelProgress } from "@/components/ui/kibo-ui/reel";
+import { BentoSkeleton } from "@/components/feed/Loading";
+import ProfileEmptyGallery, { HomeEmptyFeed } from "@/components/feed/Empty";
+import { useIntersection } from "@/hooks/useIntersection";
 import { CalendarDays } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { SocialActions } from "@/components/feed/interactions/social-actions";
-import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { UserChipHoverCard } from "../user/ProfileCard";
 import { Badge } from "../ui/badge";
@@ -236,7 +230,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                     <>
 
                       {/* top-left user */}
-                      {profile && (
+                      {profile && !authorId && (
                         <div
                           className="absolute top-2 left-2 sm:top-3 sm:left-3 z-30 text-white"
                           onClick={(e) => { e.stopPropagation(); }}

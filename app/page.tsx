@@ -1,3 +1,10 @@
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+  title: "Home",
+  description: "Latest posts on RabbitHole.",
+  openGraph: { title: "RabbitHole - Home", url: "/", images: [{ url: "/assets/og.webp" }] },
+  twitter: { title: "RabbitHole - Home", images: [{ url: "/assets/og.webp" }] },
+};
 import Feed from "@/components/feed/Index";
 import { getFeedPage } from "@/app/actions/posts";
 

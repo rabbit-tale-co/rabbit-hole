@@ -86,7 +86,6 @@ export default function PostPage() {
 
         {/* header */}
         <div className="flex items-start justify-between">
-          <UserChipHoverCard user={{ username: "", avatarUrl: undefined, displayName: undefined }} className="hidden" />
           <div className="flex items-center gap-3">
             <Link href={`/user/${author?.username || post.author_id}`} className="flex items-center gap-3">
               <UserAvatar username={author?.username || ""} avatarUrl={author?.avatar_url || undefined}

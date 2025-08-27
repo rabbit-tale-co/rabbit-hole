@@ -435,6 +435,7 @@ export const ReelImage = ({
 
   return (
     // biome-ignore lint/performance/noImgElement: "Reel is framework-agnostic"
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       alt={alt}
       className={cn('absolute inset-0 size-full object-cover', className)}
