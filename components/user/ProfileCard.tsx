@@ -54,7 +54,7 @@ export function UserChipHoverCard({
     <HoverCard openDelay={120}>
       <HoverCardTrigger asChild>
         {insideLink ? (
-          <Button
+          <button
             type="button"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/user/${username}`); }}
             className={cn(
@@ -79,7 +79,7 @@ export function UserChipHoverCard({
               </span>
               <span className="block text-[11px] opacity-70 truncate">@{username}</span>
             </span>
-          </Button>
+          </button>
         ) : (
           <Link
             href={`/user/${username}`}

@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { UserChipHoverCard } from "../user/ProfileCard";
 import { Badge } from "../ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Local hover slideshow for multi-image posts
 function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; others: { src: string; alt?: string }[]; widthPx: number; alt?: string }) {
@@ -253,12 +254,21 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                         </div>
                       )}
 
-                      {/* top-right date */}
+                      {/* top-right date with tooltip */}
                       <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 text-white">
-                        <Badge className="bg-black/50">
-                          <CalendarDays />
-                          {dateLabel}
-                        </Badge>
+                        <TooltipProvider delayDuration={150}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge className="bg-black/50">
+                                <CalendarDays />
+                                {dateLabel}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" align="center" className="text-xs">
+                              {post?.created_at ? new Date(post.created_at).toLocaleString() : ""}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                       {/* bottom gradient + actions row */}
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
