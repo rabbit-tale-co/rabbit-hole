@@ -52,7 +52,7 @@ export function UserAvatar({
     <Avatar className={`${sizeClass} ${borderClass} ${className}`}>
       <AvatarImage src={avatarUrl} alt={`${username} avatar`} style={avatarBgStyle} />
       <AvatarFallback
-        className="font-bold"
+        className="font-bold rounded-md"
         style={{ ...avatarBgStyle, ...avatarForegroundStyle }}
       >
         <User size={fallbackSize} />

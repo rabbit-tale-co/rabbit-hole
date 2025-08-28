@@ -47,7 +47,7 @@ export default function Footer() {
   );
 
   return (
-    <footer className="mt-auto">
+    <footer className="mt-auto" style={{ paddingBottom: "calc(var(--mobile-bottom-nav-height, 0px) + env(safe-area-inset-bottom, 0px))" }}>
       <div className="">
         {/* Main Footer Content */}
         <div className="p-6 bg-foreground rounded-3xl">

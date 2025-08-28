@@ -12,11 +12,11 @@ import { useIntersection } from "@/hooks/useIntersection";
 import { CalendarDays } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { SocialActions } from "@/components/feed/interactions/social-actions";
-import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { UserChipHoverCard } from "../user/ProfileCard";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useRouter } from "next/navigation";
 
 // Local hover slideshow for multi-image posts
 function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; others: { src: string; alt?: string }[]; widthPx: number; alt?: string }) {
@@ -66,6 +66,8 @@ function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; 
           priority={false}
         />
       ))}
+      {/* Darken image on parent article hover only */}
+      <div className="pointer-events-none absolute inset-0 bg-black/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
       {imgs.length > 1 && (
         <div className="absolute bottom-1 left-0 right-0 z-20 flex gap-1 px-6">
           {imgs.map((_, i) => (
@@ -84,6 +86,7 @@ function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; 
 export default function Feed({ initial, authorId, isOwnProfile, onCountChange }: { initial?: Parameters<typeof useInfiniteFeed>[0]; authorId?: string; isOwnProfile?: boolean; onCountChange?: (n: number) => void }) {
   // data
   const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(initial, 24, { authorId });
+  const router = useRouter();
 
   const publicUrl = (path: string) => (/^https?:\/\//.test(path) ? path : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/social-art/${path}`);
 
@@ -188,10 +191,6 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   return (
     <div ref={rootRef} className="w-full mt-6">
       {/* hover slideshow handled within tiles; click-through to post page */}
-      {/* loading indicator ABOVE posts while fetching more */}
-      {loading && (
-        <BentoSkeleton cols={cols} containerWidth={containerW} gap={gap} count={6} />
-      )}
 
       <div className="relative" style={{ height: containerHeight, minHeight: Math.max(240, cell) }}>
         {placed.map((p) => {
@@ -201,92 +200,112 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
           const height = Math.max(1, p.h * cell + (p.h - 1) * gap);
 
           return (
-            <Link href={`/post/${p.tile.id}`} key={p.tile.id}>
-              <article
-                key={p.tile.id}
-                className="absolute bg-neutral-100 rounded-2xl overflow-hidden"
-                style={{ top, left, width, height, minWidth: 160, minHeight: 160 }}
-              >
-                {(() => {
-                  const post = idToPost.get(p.tile.id);
-                  const imgs = post?.images || [];
-                  const first = publicUrl(p.tile.cover.path);
+            <article
+              key={p.tile.id}
+              onClick={() => { router.push(`/post/${p.tile.id}`); }}
+              className="group absolute bg-neutral-100 rounded-2xl overflow-hidden cursor-pointer"
+              style={{ top, left, width, height, minWidth: 160, minHeight: 160 }}
+            >
+              {(() => {
+                const post = idToPost.get(p.tile.id);
+                const medias = post?.images || [];
+                const first = medias[0];
+                if (!first) return null;
+                const firstUrl = publicUrl(first.path);
+                const isVideo = String(first.mime || '').startsWith('video/');
+                if (isVideo) {
                   return (
-                    <HoverSlideshow
-                      firstSrc={first}
-                      others={imgs.slice(1).map(im => ({ src: publicUrl(im.path), alt: im.alt || '' }))}
-                      widthPx={Math.ceil(width)}
-                      alt={p.tile.cover.alt || ''}
-                    />
+                    <div className="absolute inset-0">
+                      <video
+                        src={firstUrl}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                      <div className="pointer-events-none absolute inset-0 bg-black/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                    </div>
                   );
-                })()}
+                }
+                // First is image: build slideshow only from image assets (skip videos to avoid Next/Image errors)
+                const restImageMedias = medias
+                  .slice(1)
+                  .filter(im => !String((im as { mime?: string }).mime || '').startsWith('video/'));
+                return (
+                  <HoverSlideshow
+                    firstSrc={firstUrl}
+                    others={restImageMedias.map(im => ({ src: publicUrl(im.path), alt: im.alt || '' }))}
+                    widthPx={Math.ceil(width)}
+                    alt={p.tile.cover.alt || ''}
+                  />
+                );
+              })()}
 
-                {/* overlays in BentoGallery style: top-left user, top-right date, bottom actions */}
-                {(() => {
-                  const post = idToPost.get(p.tile.id);
-                  const profile = post ? authorProfiles.get(post.author_id) : undefined;
-                  const dateLabel = post?.created_at ? new Date(post.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
-                  return (
-                    <>
+              {/* overlays in BentoGallery style: top-left user, top-right date, bottom actions */}
+              {(() => {
+                const post = idToPost.get(p.tile.id);
+                const profile = post ? authorProfiles.get(post.author_id) : undefined;
+                const dateLabel = post?.created_at ? new Date(post.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+                return (
+                  <>
 
-                      {/* top-left user */}
-                      {profile && !authorId && (
-                        <div
-                          className="absolute top-2 left-2 sm:top-3 sm:left-3 z-30 text-white"
-                          onClick={(e) => { e.stopPropagation(); }}
-                        >
-                          <UserChipHoverCard user={{
-                            username: profile.username,
-                            avatarUrl: profile.avatar_url,
-                            displayName: profile.display_name,
-                            stats: {
-                              followers: post?.like_count ?? 0,
-                              following: post?.comment_count ?? 0,
-                              // posts: post?.post_count ?? 0,
-                            }
-                          }} size={'sm'} insideLink />
-                        </div>
-                      )}
-
-                      {/* top-right date with tooltip */}
-                      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 text-white">
-                        <TooltipProvider delayDuration={150}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge className="bg-black/50">
-                                <CalendarDays />
-                                {dateLabel}
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" align="center" className="text-xs">
-                              {post?.created_at ? new Date(post.created_at).toLocaleString() : ""}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                    {/* top-left user */}
+                    {profile && !authorId && (
+                      <div
+                        className="absolute top-2 left-2 sm:top-3 sm:left-3 z-30 text-white"
+                        onClick={(e) => { e.stopPropagation(); }}
+                      >
+                        <UserChipHoverCard user={{
+                          username: profile.username,
+                          avatarUrl: profile.avatar_url,
+                          displayName: profile.display_name,
+                          stats: {
+                            followers: post?.like_count ?? 0,
+                            following: post?.comment_count ?? 0,
+                            // posts: post?.post_count ?? 0,
+                          }
+                        }} size={'sm'} insideLink />
                       </div>
-                      {/* bottom gradient + actions row */}
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                      <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3">
-                        <SocialActions
-                          likes={post?.like_count ?? 0}
-                          comments={post?.comment_count ?? 0}
-                          reposts={post?.repost_count ?? 0}
-                          bookmarks={post?.bookmark_count ?? 0}
-                          isLiked={false}
-                          isReposted={false}
-                          isBookmarked={false}
-                          showBookmarksCount={false}
-                          onLike={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                          onComment={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                          onRepost={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                          onBookmark={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                        />
-                      </div>
-                    </>
-                  );
-                })()}
-              </article>
-            </Link>
+                    )}
+
+                    {/* top-right date with tooltip */}
+                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 text-white">
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge className="bg-black/50">
+                              <CalendarDays />
+                              {dateLabel}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" align="center" className="text-xs">
+                            {post?.created_at ? new Date(post.created_at).toLocaleString() : ""}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    {/* bottom gradient + actions row */}
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3">
+                      <SocialActions
+                        likes={post?.like_count ?? 0}
+                        comments={post?.comment_count ?? 0}
+                        reposts={post?.repost_count ?? 0}
+                        bookmarks={post?.bookmark_count ?? 0}
+                        isLiked={false}
+                        isReposted={false}
+                        isBookmarked={false}
+                        showBookmarksCount={false}
+                        onLike={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onComment={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onRepost={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onBookmark={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      />
+                    </div>
+                  </>
+                );
+              })()}
+            </article>
           );
         })}
       </div>

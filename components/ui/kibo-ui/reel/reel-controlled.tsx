@@ -94,7 +94,7 @@ export function ReelControlledExample() {
       {/* External Controls */}
       <div className="flex flex-col gap-4 rounded-lg border p-4">
         <h3 className="text-lg font-semibold">External Controls</h3>
-        
+
         <div className="flex gap-2">
           <button
             className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
@@ -130,11 +130,10 @@ export function ReelControlledExample() {
           {reelItems.map((item, index) => (
             <button
               key={item.id}
-              className={`rounded px-3 py-1 ${
-                index === currentIndex
+              className={`rounded px-3 py-1 ${index === currentIndex
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-200 hover:bg-gray-300'
-              }`}
+                }`}
               onClick={() => handleJumpToItem(index)}
               type="button"
             >
@@ -163,7 +162,7 @@ export function ReelControlledExample() {
           onMutedChange={setIsMuted}
         >
           <ReelProgress />
-          
+
           <ReelHeader>
             <div className="text-white">
               <h2 className="text-xl font-bold">Controlled Reel</h2>
@@ -297,11 +296,10 @@ export function ReelControlledExample() {
               {reelItems.map((item, index) => (
                 <button
                   key={item.id}
-                  className={`rounded p-2 text-xs ${
-                    index === currentIndex
+                  className={`rounded p-2 text-xs ${index === currentIndex
                       ? 'bg-blue-500 text-white'
                       : 'bg-gray-100 hover:bg-gray-200'
-                  }`}
+                    }`}
                   onClick={() => setCurrentIndex(index)}
                   type="button"
                 >

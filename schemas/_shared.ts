@@ -10,7 +10,7 @@ export const HEX6 = z.string().regex(/^#?[0-9a-fA-F]{6}$/);
 
 // Helpers
 export const PositiveInt = z.number().int().positive();
-export const MimeImage = z.enum(["image/jpeg", "image/png", "image/webp"]);
+export const MimeImage = z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "video/webm"]);
 
 // Pagination
 export const Cursor = z.object({

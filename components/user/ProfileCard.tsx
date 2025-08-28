@@ -3,7 +3,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -37,12 +36,10 @@ export function UserChipHoverCard({
   isFollowing = false,
   pending = false,
   onToggleFollow,
-  insideLink = false,
 }: Props) {
   const { username, displayName, avatarUrl, coverUrl, accentColor, bio, stats } = user;
   const accent500 =
     accentColor || getAccentColorValue(generateAccentColor(username), 500);
-  const router = useRouter();
 
   const handleFollow = async (e: React.MouseEvent) => {
     e.preventDefault(); // prevent link navigation on button click
@@ -53,59 +50,31 @@ export function UserChipHoverCard({
   return (
     <HoverCard openDelay={120}>
       <HoverCardTrigger asChild>
-        {insideLink ? (
-          <button
-            type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/user/${username}`); }}
-            className={cn(
-              "flex items-center jus gap-2 rounded-lg backdrop-blur-sm pr-3 pl-1 py-1",
-              "bg-black/50",
-              size === "sm" && "text-xs",
-              size === "md" && "text-sm",
-              className
-            )}
-            aria-label={`Go to @${username}`}
-          >
-            <UserAvatar
-              size={size === "sm" ? "sm" : "md"}
-              username={username}
-              avatarUrl={avatarUrl || undefined}
-              className="rounded-md"
-              accentHex={accent500}
-            />
-            <span className="flex flex-col items-start justify-center leading-tight">
-              <span className="block font-semibold truncate">
-                {displayName?.trim() || username}
-              </span>
-              <span className="block text-[11px] opacity-70 truncate">@{username}</span>
+        <Link
+          href={`/user/${username}`}
+          className={cn(
+            "flex items-center jus gap-2 rounded-lg backdrop-blur-sm pr-3 pl-1 py-1",
+            "bg-black/50",
+            size === "sm" && "text-xs",
+            size === "md" && "text-sm",
+            className
+          )}
+          aria-label={`Go to @${username}`}
+        >
+          <UserAvatar
+            size={size === "sm" ? "sm" : "md"}
+            username={username}
+            avatarUrl={avatarUrl || undefined}
+            className="rounded-md"
+            accentHex={accent500}
+          />
+          <span className="flex flex-col items-start justify-center leading-tight">
+            <span className="block font-semibold truncate">
+              {displayName?.trim() || username}
             </span>
-          </button>
-        ) : (
-          <Link
-            href={`/user/${username}`}
-            className={cn(
-              "flex items-center gap-2 rounded-lg backdrop-blur-sm pr-3 pl-1 py-1",
-              "bg-black/50",
-              size === "sm" && "text-xs",
-              size === "md" && "text-sm",
-              className
-            )}
-          >
-            <UserAvatar
-              size={size === "sm" ? "sm" : "md"}
-              username={username}
-              avatarUrl={avatarUrl || undefined}
-              className="rounded-md"
-              accentHex={accent500}
-            />
-            <span className="leading-tight">
-              <span className="block font-semibold truncate">
-                {displayName?.trim() || username}
-              </span>
-              <span className="block text-[11px] opacity-70 truncate">@{username}</span>
-            </span>
-          </Link>
-        )}
+            <span className="block text-[11px] opacity-70 truncate">@{username}</span>
+          </span>
+        </Link>
       </HoverCardTrigger>
 
       <HoverCardContent

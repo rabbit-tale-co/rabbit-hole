@@ -8,6 +8,7 @@ import { ProfileCover } from "./ProfileCover";
 import { ProfileBio } from "./ProfileBio";
 import { ProfileStats } from "./ProfileStats";
 import { getUserAccentStyles, getUserAccentStylesFromHex } from "@/lib/profile";
+import { useIsMobile } from "@/hooks/useMobile";
 
 interface UserProfileData {
   user_id: string;
@@ -28,7 +29,7 @@ interface UserProfileProps {
 
 export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
+  const isMobile = useIsMobile();
   // Use provided accentColor or generate one based on username
   const currentAccentColor = useMemo(() => generateAccentColor(profile.username), [profile.username]);
 
@@ -63,10 +64,13 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
           <div className="absolute bottom-4 right-0">
             <Button
               variant="outline"
+              size={isMobile ? "icon" : "default"}
               onClick={() => setIsEditDialogOpen(true)}
             >
               <OutlineEdit size={14} />
-              Edit Profile
+              <span className="hidden md:block">
+                Edit Profile
+              </span>
             </Button>
           </div>
         )}

@@ -78,49 +78,56 @@ export default function PostPage() {
 
   return (
     <>
-      <div className="mx-auto max-w-4xl max-sm:px-3">
-        <div className="mb-3">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-2"><ArrowLeft className="size-4" />Back</Button>
-        </div>
+      <div className="mb-3">
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-2"><ArrowLeft className="size-4" />Back</Button>
+      </div>
 
-        {/* header */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <Link href={`/user/${author?.username || post.author_id}`} className="flex items-center gap-3">
-              <UserAvatar username={author?.username || ""} avatarUrl={author?.avatar_url || undefined}
-                className="rounded-md" />
+      {/* header */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <Link href={`/user/${author?.username || post.author_id}`} className="flex items-center gap-3">
+            <UserAvatar username={author?.username || ""} avatarUrl={author?.avatar_url || undefined}
+              className="rounded-md" />
+          </Link>
+          <div className="min-w-0">
+            {/* author chip */}
+            <Link href={`/user/${author?.username || post.author_id}`} className="font-semibold hover:underline">
+              {author?.display_name?.trim() || author?.username || "View author"}
             </Link>
-            <div className="min-w-0">
-              {/* author chip */}
-              <Link href={`/user/${author?.username || post.author_id}`} className="font-semibold hover:underline">
-                {author?.display_name?.trim() || author?.username || "View author"}
-              </Link>
-              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                <CalendarDays className="size-3" />
-                {new Date(post.created_at).toLocaleString()}
-              </div>
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <CalendarDays className="size-3" />
+              {new Date(post.created_at).toLocaleString()}
             </div>
           </div>
-          {myPost && (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => toast("Edit coming soon")}> <Pencil className="size-4" /> Edit</Button>
-              <Button variant="destructive" size="sm" className="gap-1" onClick={() => setConfirmOpen(true)}> <Trash2 className="size-4" /> Delete</Button>
-            </div>
-          )}
         </div>
-
-        {/* content */}
-        {post.text && <p className="mt-4 whitespace-pre-wrap text-sm">{post.text}</p>}
-
-        {/* media stack */}
-        <div className="mt-4 flex flex-col gap-3">
-          {post.images?.map((img) => (
-            <div key={img.id} className="relative w-full overflow-hidden rounded-xl ring-1 ring-[--border]" style={{ aspectRatio: img.width && img.height ? `${img.width}/${img.height}` : undefined }}>
-              <Image src={publicUrl(img.path)} alt={img.alt || "image"} fill className="object-contain bg-neutral-50" sizes="(max-width:768px) 100vw, 768px" />
-            </div>
-          ))}
-        </div>
+        {myPost && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => toast("Edit coming soon")}> <Pencil className="size-4" /> Edit</Button>
+            <Button variant="destructive" size="sm" className="gap-1" onClick={() => setConfirmOpen(true)}> <Trash2 className="size-4" /> Delete</Button>
+          </div>
+        )}
       </div>
+
+      {/* content */}
+      {post.text && <p className="mt-4 whitespace-pre-wrap text-sm">{post.text}</p>}
+
+      {/* media stack */}
+      <div className="mt-4 flex flex-col gap-3">
+        {post.images?.map((img) => {
+          const isVideo = typeof (img as unknown as { mime?: string }).mime === 'string' && (img as unknown as { mime?: string }).mime!.startsWith('video/');
+          const url = publicUrl(img.path);
+          return (
+            <div key={img.id} className="relative w-full overflow-hidden rounded-xl ring-1 ring-[--border]" style={{ aspectRatio: img.width && img.height ? `${img.width}/${img.height}` : undefined }}>
+              {isVideo ? (
+                <video src={url} controls playsInline preload="metadata" className="w-full h-full object-contain bg-neutral-50" />
+              ) : (
+                <Image src={url} alt={img.alt || "image"} fill className="object-contain bg-neutral-50" sizes="(max-width:768px) 100vw, 768px" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
       <ConfirmDelete open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={handleDelete} loading={deleting} />
     </>
   );

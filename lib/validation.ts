@@ -7,7 +7,7 @@ export const ImageMeta = z.object({
   width: z.number().int().positive().max(10_000),
   height: z.number().int().positive().max(10_000),
   size_bytes: z.number().int().positive().max(50_000_000),
-  mime: z.enum(["image/jpeg","image/png","image/webp"]),
+  mime: z.enum(["image/jpeg","image/png","image/webp","image/gif","video/webm","video/mp4"]),
 });
 
 export const CreatePost = z.object({
