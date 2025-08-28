@@ -191,7 +191,7 @@ interface AlertProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<
   onClose?: () => void;
 }
 
-interface AlertIconProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof alertVariants> {}
+interface AlertIconProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof alertVariants> { }
 
 function Alert({ className, variant, size, icon, appearance, close = false, onClose, children, ...props }: AlertProps) {
   return (
@@ -204,9 +204,8 @@ function Alert({ className, variant, size, icon, appearance, close = false, onCl
       {children}
       {close && (
         <Button
-          size="sm"
-          variant="inverse"
-          mode="icon"
+          size="icon"
+          variant="ghost"
           onClick={onClose}
           aria-label="Dismiss"
           data-slot="alert-close"

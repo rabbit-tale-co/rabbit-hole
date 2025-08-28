@@ -42,7 +42,8 @@ interface KanbanContextProps<T> {
   isColumn: (id: UniqueIdentifier) => boolean;
 }
 
-const KanbanContext = React.createContext<KanbanContextProps<any>>({
+type KanbanItem = { __brand?: 'kanban-item' };
+const defaultKanbanContext: KanbanContextProps<KanbanItem> = {
   columns: {},
   setColumns: () => { },
   getItemId: () => '',
@@ -51,7 +52,8 @@ const KanbanContext = React.createContext<KanbanContextProps<any>>({
   setActiveId: () => { },
   findContainer: () => undefined,
   isColumn: () => false,
-});
+};
+const KanbanContext = React.createContext(defaultKanbanContext);
 
 const ColumnContext = React.createContext<{
   attributes: DraggableAttributes;
@@ -242,11 +244,11 @@ function Kanban<T>({ value, onValueChange, getItemValue, children, className, on
     [columnIds, columns, findContainer, getItemValue, isColumn, setColumns, onMove],
   );
 
-  const contextValue = React.useMemo(
+  const contextValue = React.useMemo<KanbanContextProps<KanbanItem>>(
     () => ({
-      columns,
-      setColumns,
-      getItemId: getItemValue,
+      columns: columns as unknown as Record<string, KanbanItem[]>,
+      setColumns: setColumns as unknown as (v: Record<string, KanbanItem[]>) => void,
+      getItemId: getItemValue as unknown as (it: KanbanItem) => string,
       columnIds,
       activeId,
       setActiveId,
@@ -481,7 +483,7 @@ function KanbanOverlay({ children, className }: KanbanOverlayProps) {
     } else {
       setDimensions(null);
     }
-  }, [activeId]);
+  }, [activeId, isColumn]);
 
   const style = {
     width: dimensions?.width,

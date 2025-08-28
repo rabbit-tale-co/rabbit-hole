@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import {
   formatBytes,
   useFileUpload,
@@ -280,7 +281,7 @@ export default function CardUpload({
                     {fileItem.file.type.startsWith('image/') && fileItem.preview ? (
                       <>
                         {/* Image cover */}
-                        <img src={fileItem.preview} alt={fileItem.file.name} className="h-full w-full object-cover" />
+                        <Image src={fileItem.preview} alt={fileItem.file.name} fill sizes="100vw" className="object-cover" unoptimized />
                         {/* Progress overlay for uploading images */}
                         {fileItem.status === 'uploading' && (
                           <div className="absolute inset-0 flex items-center justify-center bg-black/50">

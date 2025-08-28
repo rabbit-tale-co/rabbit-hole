@@ -101,7 +101,17 @@ export async function POST(req: Request) {
     const uploadRes = await fetch(`${baseUrl}/${bucket}/${key}`, {
       method: 'POST',
       headers: { 'authorization': `Bearer ${serviceKey}`, 'x-upsert': 'true' },
-      body: (() => { const fd = new FormData(); fd.append('file', new Blob([outBuf], { type: outMime }), path.basename(key)); return fd; })(),
+      body: (() => {
+        const fd = new FormData();
+        // Build a typed-array view over the Buffer (ArrayBufferLike) and pass that to Blob
+        const view = new Uint8Array(outBuf.buffer, outBuf.byteOffset, outBuf.byteLength);
+        // Create a standalone ArrayBuffer (not SharedArrayBuffer) and copy bytes
+        const ab = new ArrayBuffer(view.byteLength);
+        new Uint8Array(ab).set(view);
+        const blob = new Blob([ab], { type: outMime });
+        fd.append('file', blob, path.basename(key));
+        return fd;
+      })(),
     });
     if (!uploadRes.ok) {
       const txt = await uploadRes.text().catch(() => '');
