@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import { ImageZoom } from "@/components/ui/kibo-ui/image-zoom";
 import Link from "next/link";
 import { CalendarDays, Trash2, Pencil, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
@@ -121,7 +122,9 @@ export default function PostPage() {
               {isVideo ? (
                 <video src={url} controls playsInline preload="metadata" className="w-full h-full object-contain bg-neutral-50" />
               ) : (
-                <Image src={url} alt={img.alt || "image"} fill className="object-contain bg-neutral-50" sizes="(max-width:768px) 100vw, 768px" />
+                <ImageZoom>
+                  <Image src={url} alt={img.alt || "image"} fill className="object-contain bg-neutral-50" sizes="(max-width:768px) 100vw, 768px" />
+                </ImageZoom>
               )}
             </div>
           );

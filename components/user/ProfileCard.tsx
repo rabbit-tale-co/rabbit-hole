@@ -95,7 +95,7 @@ export function UserChipHoverCard({
         {/* cover */}
         <div className="relative h-20 w-full overflow-hidden">
           {coverUrl ? (
-            <Image src={coverUrl} alt={`${username} cover`} fill className="object-cover" />
+            <Image src={coverUrl} alt={`${username} cover`} fill className="object-cover" unoptimized />
           ) : (
             <div
               className="absolute inset-0"

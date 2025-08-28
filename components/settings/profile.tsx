@@ -18,6 +18,8 @@ import Image from "next/image"
 import { getAccentColorStyle, type AccentColor, getStyleFromHexShade } from "@/lib/accent-colors"
 import { useUnsavedChanges } from "./Dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { ImageCrop, ImageCropApply, ImageCropContent, ImageCropReset } from "@/components/ui/kibo-ui/image-crop"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DeleteAccountDialog } from "./DeleteAccountDialog"
 import { supabase } from "@/lib/supabase"
 import { useProfileMedia } from "@/hooks/useProfileMedia"
@@ -157,7 +159,10 @@ export function Profile({ user }: ProfileProps) {
   // Get current accent color from user metadata for display purposes only
   const currentAccentColor = 'blue' as AccentColor
   const accentHex = profile?.accent_color || null
-  const { uploadCoverViaPicker, uploadAvatarViaPicker, removeCoverSafely, removeAvatarSafely } = useProfileMedia(user?.id || null, refreshProfile)
+  const { removeCoverSafely, removeAvatarSafely, uploadAvatarFromCropped, uploadCoverFromCropped } = useProfileMedia(user?.id || null, refreshProfile)
+  const [cropAvatarFile, setCropAvatarFile] = React.useState<File | null>(null)
+  const [cropCoverFile, setCropCoverFile] = React.useState<File | null>(null)
+  const [cropping, setCropping] = React.useState<"avatar" | "cover" | null>(null)
 
   return (
     <div className="space-y-6">
@@ -171,7 +176,7 @@ export function Profile({ user }: ProfileProps) {
           <div
             className="group/cover relative w-full h-48 rounded-2xl overflow-hidden cursor-pointer"
             style={accentHex ? getStyleFromHexShade(accentHex, '100', 'backgroundColor') : getAccentColorStyle(currentAccentColor, 100, 'backgroundColor')}
-            onClick={uploadCoverViaPicker}
+            onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.onchange = () => { const f = input.files?.[0] || null; if (f) { setCropCoverFile(f); setCropping('cover'); } }; input.click(); }}
           >
             {profile?.cover_url ? (
               <>
@@ -217,7 +222,7 @@ export function Profile({ user }: ProfileProps) {
               {/* Avatar with same design as edit-profile-dialog - Clickable for adding image */}
               <div
                 className="size-28 rounded-full border-2 border-white overflow-hidden bg-white ring-3 ring-white shadow-lg cursor-pointer transition-all relative"
-                onClick={uploadAvatarViaPicker}
+                onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.onchange = () => { const f = input.files?.[0] || null; if (f) { setCropAvatarFile(f); setCropping('avatar'); } }; input.click(); }}
               >
                 {profile?.avatar_url ? (
                   <Image
@@ -272,6 +277,34 @@ export function Profile({ user }: ProfileProps) {
       </div>
 
       <Separator />
+      {/* Crop Modal rendered via portal to avoid nesting dialog-in-dialog */}
+      <Dialog open={!!cropping} onOpenChange={(open) => { if (!open) { setCropping(null); setCropAvatarFile(null); setCropCoverFile(null); } }}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>{cropping === 'avatar' ? 'Crop avatar' : 'Crop cover'}</DialogTitle>
+          </DialogHeader>
+          {cropping === 'avatar' && cropAvatarFile && (
+            <ImageCrop aspect={1} circularCrop file={cropAvatarFile} maxImageSize={1024 * 1024} onCrop={async (dataUrl) => { await uploadAvatarFromCropped(dataUrl); setCropping(null); setCropAvatarFile(null); }}>
+              <ImageCropContent className="max-w-full" />
+              <div className="mt-3 flex items-center gap-2">
+                <ImageCropApply />
+                <ImageCropReset />
+                <Button size="sm" variant="ghost" onClick={() => { setCropping(null); setCropAvatarFile(null); }}>Cancel</Button>
+              </div>
+            </ImageCrop>
+          )}
+          {cropping === 'cover' && cropCoverFile && (
+            <ImageCrop aspect={3 / 1} file={cropCoverFile} maxImageSize={1024 * 1024 * 2} onCrop={async (dataUrl) => { await uploadCoverFromCropped(dataUrl); setCropping(null); setCropCoverFile(null); }}>
+              <ImageCropContent className="max-w-full" />
+              <div className="mt-3 flex items-center gap-2">
+                <ImageCropApply />
+                <ImageCropReset />
+                <Button size="sm" variant="ghost" onClick={() => { setCropping(null); setCropCoverFile(null); }}>Cancel</Button>
+              </div>
+            </ImageCrop>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Profile Information</h3>

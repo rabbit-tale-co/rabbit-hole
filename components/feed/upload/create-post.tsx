@@ -61,6 +61,9 @@ type Item = {
   mime?: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' | 'video/webm';
   // post meta
   isCover?: boolean;
+  // server results
+  serverPath?: string;
+  serverId?: string;
 };
 
 const MAX_ALT = 140;
@@ -285,8 +288,64 @@ export function CreateMediaPost({
     }
 
     const imageId = randomUUIDv7();
-    const key = `posts/${postId}/${imageId}.${ext}`; // finalna sciezka po konwersji moze miec inny ext
+    const key = `posts/${postId}/${imageId}.${ext}`;
     console.debug('[uploadOne] prepared id', { key, mime, size: blob.size });
+
+    // Direct upload for videos or payloads that may exceed serverless limits
+    if (it.kind === 'video' || blob.size > 4 * 1024 * 1024) {
+      const baseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object`;
+      const bucket = 'social-art';
+      const url = `${baseUrl}/${bucket}/${key}`;
+      const { data: { session } } = await supabase.auth.getSession();
+      const bearer = session?.access_token || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.setRequestHeader('authorization', `Bearer ${bearer}`);
+        xhr.setRequestHeader('x-upsert', 'true');
+        xhr.upload.onprogress = (ev) => {
+          const total = (ev.lengthComputable && ev.total) ? ev.total : blob.size;
+          const loaded = ev.loaded || 0;
+          const pct = total > 0 ? Math.max(1, Math.min(99, Math.round((loaded / total) * 100))) : 1;
+          onProgress(pct);
+        };
+        xhr.onerror = () => reject(new Error('storage_upload_failed'));
+        xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error(`storage_upload_status_${xhr.status}`)); };
+        const fd = new FormData();
+        fd.append('file', blob, `${imageId}.${ext}`);
+        xhr.send(fd);
+      });
+
+      // compute dims for image if not probed already
+      let w = probeW || 1, h = probeH || 1;
+      if (it.kind !== 'video' && (w === 0 || h === 0)) {
+        try {
+          const iurl = URL.createObjectURL(it.file);
+          await new Promise<void>((resolve) => {
+            const im = new window.Image();
+            im.onload = () => { w = im.naturalWidth || 1; h = im.naturalHeight || 1; resolve(); };
+            im.onerror = () => resolve();
+            im.src = iurl;
+          });
+          try { URL.revokeObjectURL(iurl); } catch { }
+        } catch { }
+      }
+
+      const meta = {
+        id: imageId,
+        path: key,
+        alt: it.alt || '',
+        width: Math.max(1, w || 1),
+        height: Math.max(1, h || 1),
+        size_bytes: blob.size,
+        mime: mime as NonNullable<Item['mime']>,
+        is_cover: Boolean(it.isCover),
+      } as const;
+      // persist dims locally for UI
+      try { patchItem(it.id, { width: meta.width, height: meta.height, serverPath: meta.path, serverId: meta.id }); } catch { }
+      return meta;
+    }
 
     // Upload to our server endpoint which converts (sharp/ffmpeg) and pushes to storage
     let serverMeta: { id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: NonNullable<Item['mime']>; is_cover: boolean } | null = null;
@@ -311,18 +370,16 @@ export function CreateMediaPost({
           return;
         }
         const json: { id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: NonNullable<Item['mime']>; is_cover: boolean } = await res.json();
-        // propagate server meta poprzez zwracane wartosci nizej
         ext = (json.path?.split('.').pop() || ext);
         mime = json.mime || mime;
-        // zapisz meta z serwera na obiekt, aby zwrocic ponizej
         serverMeta = json;
+        try { patchItem(it.id, { width: json.width, height: json.height, serverPath: json.path, serverId: json.id }); } catch { }
         resolve();
       } catch (e) {
         reject(e);
       }
     });
 
-    // jesli serwer zwrocil meta, uzyj ich, inaczej minimalne fallbacki
     const fallback = {
       id: imageId,
       path: key,
@@ -432,7 +489,16 @@ export function CreateMediaPost({
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           text: optimistic.content,
-          images: metas,
+          images: metas.map(m => ({
+            id: m.id,
+            path: m.path,
+            alt: (items.find(i => i.serverId === m.id)?.alt || m.alt || ''),
+            width: Math.max(1, m.width || 1),
+            height: Math.max(1, m.height || 1),
+            size_bytes: m.size_bytes,
+            mime: m.mime,
+            is_cover: m.is_cover,
+          })),
         }),
       });
       if (!res.ok) {

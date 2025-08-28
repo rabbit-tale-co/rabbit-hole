@@ -113,8 +113,8 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
     return m;
   }, [items]);
 
-  // lazy profile cache: author_id -> { username, avatar_url }
-  const [authorProfiles, setAuthorProfiles] = useState<Map<string, { username: string; display_name: string; avatar_url: string }>>(new Map());
+  // lazy profile cache: author_id -> minimal profile
+  const [authorProfiles, setAuthorProfiles] = useState<Map<string, { username: string; display_name: string; avatar_url: string; cover_url?: string }>>(new Map());
   useEffect(() => {
     const missing = items
       .map((p) => p.author_id)
@@ -124,12 +124,12 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("user_id,username,avatar_url,display_name")
+        .select("user_id,username,avatar_url,cover_url,display_name")
         .in("user_id", missing as string[]);
       if (!data) return;
       setAuthorProfiles((prev) => {
         const next = new Map(prev);
-        for (const row of data) next.set(row.user_id, { username: row.username, avatar_url: row.avatar_url, display_name: row.display_name });
+        for (const row of data) next.set(row.user_id, { username: row.username, avatar_url: row.avatar_url, cover_url: row.cover_url, display_name: row.display_name });
         return next;
       });
     })();
@@ -259,10 +259,10 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                           username: profile.username,
                           avatarUrl: profile.avatar_url,
                           displayName: profile.display_name,
+                          coverUrl: profile.cover_url ? publicUrl(profile.cover_url) : undefined,
                           stats: {
                             followers: post?.like_count ?? 0,
                             following: post?.comment_count ?? 0,
-                            // posts: post?.post_count ?? 0,
                           }
                         }} size={'sm'} insideLink />
                       </div>

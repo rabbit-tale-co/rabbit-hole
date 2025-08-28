@@ -11,7 +11,9 @@ export function bucketFromWH(w: number, h: number): { w: 1|2; h: 1|2 } {
   return { w: 1, h: 1 };
 }
 
-export function packAppend(existing: PlacedTile[], incoming: Tile[], cols: number): PlacedTile[] {
+export type PackStrategy = 'recency' | 'fit';
+
+export function packAppend(existing: PlacedTile[], incoming: Tile[], cols: number, strategy: PackStrategy = 'recency'): PlacedTile[] {
   const grid: number[][] = [];
   const out = [...existing];
 
@@ -38,7 +40,7 @@ export function packAppend(existing: PlacedTile[], incoming: Tile[], cols: numbe
     }
   };
 
-  const tiles = [...incoming].sort((a,b)=>(b.w*b.h)-(a.w*a.h));
+  const tiles = strategy === 'fit' ? [...incoming].sort((a,b)=>(b.w*b.h)-(a.w*a.h)) : incoming;
   for (const t of tiles) {
     const placeW = Math.max(1, Math.min(t.w, cols));
     const placeH = cols === 1 ? 1 : t.h; // keep feed compact on phones
@@ -57,7 +59,8 @@ export type PlacedGeneric<T extends { w: 1|2; h: 1|2 }> = {
 export function packAppendGeneric<T extends { w: 1|2; h: 1|2 }>(
   existing: PlacedGeneric<T>[],
   incoming: T[],
-  cols: number
+  cols: number,
+  strategy: PackStrategy = 'recency'
 ): PlacedGeneric<T>[] {
   const grid: number[][] = [];
   const out = [...existing];
@@ -85,7 +88,7 @@ export function packAppendGeneric<T extends { w: 1|2; h: 1|2 }>(
     }
   };
 
-  const tiles = [...incoming].sort((a,b)=>(b.w*b.h)-(a.w*a.h));
+  const tiles = strategy === 'fit' ? [...incoming].sort((a,b)=>(b.w*b.h)-(a.w*a.h)) : incoming;
   for (const t of tiles) {
     const placeW = Math.max(1, Math.min(t.w, cols));
     const placeH = cols === 1 ? 1 : t.h;
@@ -117,7 +120,8 @@ export function useBento(tiles: Tile[]) {
 
   // compute placed purely with memo to avoid setState churn on rapid resizes
   const placed = useMemo<PlacedTile[]>(() => {
-    return packAppend([], tiles, cols);
+    // Prefer tighter packing: prioritize big 2x2 first
+    return packAppend([], tiles, cols, 'recency');
   }, [tiles, cols]);
 
   return { cols, placed };
