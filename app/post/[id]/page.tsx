@@ -118,12 +118,19 @@ export default function PostPage() {
           const isVideo = typeof (img as unknown as { mime?: string }).mime === 'string' && (img as unknown as { mime?: string }).mime!.startsWith('video/');
           const url = publicUrl(img.path);
           return (
-            <div key={img.id} className="relative w-full overflow-hidden rounded-xl ring-1 ring-[--border]" style={{ aspectRatio: img.width && img.height ? `${img.width}/${img.height}` : undefined }}>
+            <div key={img.id} className="w-full overflow-hidden rounded-xl ring-1 ring-[--border]">
               {isVideo ? (
-                <video src={url} controls playsInline preload="metadata" className="w-full h-full object-contain bg-neutral-50" />
+                <video src={url} controls playsInline preload="metadata" className="w-full h-auto max-h-[80vh] object-contain bg-neutral-50" />
               ) : (
                 <ImageZoom>
-                  <Image src={url} alt={img.alt || "image"} fill className="object-contain bg-neutral-50" sizes="(max-width:768px) 100vw, 768px" />
+                  <Image
+                    src={url}
+                    alt={img.alt || "image"}
+                    width={Math.max(1, img.width || 1000)}
+                    height={Math.max(1, img.height || 1000)}
+                    className="w-full h-auto max-h-[80vh] object-contain bg-neutral-50"
+                    sizes="(max-width:768px) 100vw, 768px"
+                  />
                 </ImageZoom>
               )}
             </div>

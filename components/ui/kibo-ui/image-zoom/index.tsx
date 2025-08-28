@@ -42,7 +42,9 @@ export const ImageZoom = ({
         '[&_[data-rmiz-modal-overlay="hidden"]]:bg-transparent',
         '[&_[data-rmiz-modal-overlay="visible"]]:bg-background/80 [&_[data-rmiz-modal-overlay="visible"]]:backdrop-blur-md',
         '[&_[data-rmiz-modal-content]]:relative [&_[data-rmiz-modal-content]]:size-full',
+        // Ensure zoomed image can grow beyond inline constraints
         '[&_[data-rmiz-modal-img]]:absolute [&_[data-rmiz-modal-img]]:origin-top-left [&_[data-rmiz-modal-img]]:cursor-zoom-out [&_[data-rmiz-modal-img]]:transition-transform',
+        '[&_[data-rmiz-modal-img]]:w-auto [&_[data-rmiz-modal-img]]:h-auto [&_[data-rmiz-modal-img]]:max-w-[95vw] [&_[data-rmiz-modal-img]]:max-h-[95vh]',
         'motion-reduce:[&_[data-rmiz-modal-img]]:transition-none motion-reduce:[&_[data-rmiz-modal-overlay]]:transition-none',
         backdropClassName
       )}
