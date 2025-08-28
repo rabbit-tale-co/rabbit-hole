@@ -1,6 +1,5 @@
 'use client';
 
-import type { Metadata } from 'next';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Check, ExternalLink, Sparkles, Star } from 'lucide-react';
+import { Check, Sparkles, Star } from 'lucide-react';
 import Link from 'next/link';
 
 /* ---------- Model ---------- */
