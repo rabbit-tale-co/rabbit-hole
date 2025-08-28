@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     const isCover = String(form.get('isCover') || 'false') === 'true';
     const alt = String(form.get('alt') || '');
     const file = form.get('file');
-    if (!(file instanceof File)) return NextResponse.json({ error: 'No file' }, { status: 400 });
+    if (!(file instanceof File)) return NextResponse.json({ error: 'No file' }, { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } });
 
     const arrayBuffer = await file.arrayBuffer();
     const input = Buffer.from(arrayBuffer);
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
     const key = `posts/${postId}/${imageId}.${ext}`;
     const baseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object`;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
-    if (!baseUrl || !serviceKey) return NextResponse.json({ error: 'Missing Supabase env' }, { status: 500 });
+    if (!baseUrl || !serviceKey) return NextResponse.json({ error: 'Missing Supabase env' }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
 
     const uploadRes = await fetch(`${baseUrl}/${bucket}/${key}`, {
       method: 'POST',
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
     });
     if (!uploadRes.ok) {
       const txt = await uploadRes.text().catch(() => '');
-      return NextResponse.json({ error: 'storage_upload_failed', status: uploadRes.status, details: txt }, { status: 500 });
+      return NextResponse.json({ error: 'storage_upload_failed', status: uploadRes.status, details: txt }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
     }
 
     return NextResponse.json({
@@ -130,10 +130,10 @@ export async function POST(req: Request) {
       size_bytes: outBuf.length,
       mime: outMime,
       is_cover: isCover,
-    });
+    }, { headers: { 'Access-Control-Allow-Origin': '*' } });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: 'server_error', message: msg }, { status: 500 });
+    return NextResponse.json({ error: 'server_error', message: msg }, { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
   }
 }
 
@@ -147,4 +147,12 @@ export async function OPTIONS() {
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   });
+}
+
+export async function GET() {
+  return NextResponse.json({ ok: true }, { headers: { 'Access-Control-Allow-Origin': '*' } });
+}
+
+export async function HEAD() {
+  return new NextResponse(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*' } });
 }
