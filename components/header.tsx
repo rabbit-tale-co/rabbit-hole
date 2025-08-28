@@ -12,6 +12,7 @@ import { SolidLogo } from "@/components/icons/Icons";
 import { UserProfileMenu } from "./user/Menu";
 import PostButton from "./feed/upload/post-button";
 import { Button } from "./ui/button";
+import { Crown } from "lucide-react";
 
 export default function Header() {
   const isMobile = useIsMobile();
@@ -106,8 +107,13 @@ export default function Header() {
 
           {/* Right side actions */}
           <div className="flex items-center justify-end">
-            <div className="flex rounded-full p-1 bg-background/90 dark:bg-black/80 backdrop-blur-2xl items-center gap-3">
-
+            <div className="flex rounded-full p-1 bg-background/90 dark:bg-black/80 backdrop-blur-2xl items-center gap-2">
+              <Button variant="ghost" asChild className="rounded-full bg-amber-100 text-amber-950 hover:bg-amber-200">
+                <Link href="/support">
+                  <Crown size={20} />
+                  <span className="text-sm">Support</span>
+                </Link>
+              </Button>
               {/* Authentication */}
               {auth_user && (
                 <div className="flex items-center gap-2">

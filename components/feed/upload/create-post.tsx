@@ -579,7 +579,7 @@ export function CreateMediaPost({
                       {it.kind === 'video' ? <VideoIcon className="size-3" /> : <ImageIcon className="size-3" />}
                     </div>
 
-                    <SortableItemHandle className="absolute top-1.5 left-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    <SortableItemHandle className="absolute top-1.5 left-1.5">
                       <div className="inline-flex size-6 items-center justify-center rounded-full bg-background/80
                         border border-border text-muted-foreground">
                         <GripVertical className="size-4" />
@@ -590,7 +590,7 @@ export function CreateMediaPost({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); removeById(it.id); }}
-                      className="absolute top-1.5 right-1.5 inline-flex size-6 items-center justify-center rounded-full bg-background/80 border border-border text-muted-foreground hover:text-foreground transition-opacity opacity-0 group-hover:opacity-100"
+                      className="absolute top-1.5 right-1.5 z-10 inline-flex size-6 items-center justify-center rounded-full bg-background/80 border border-border text-muted-foreground hover:text-foreground transition-opacity opacity-0 group-hover:opacity-100"
                       aria-label="Remove"
                     >
                       <XIcon className="size-3.5" />
@@ -603,8 +603,8 @@ export function CreateMediaPost({
                       </div>
                     )}
                     {it.status === 'error' && (
-                      <div className="absolute inset-0 bg-red-600/10 ring-1 ring-red-500/50 flex items-end">
-                        <div className="w-full h-1 bg-red-500" />
+                      <div className="absolute inset-0 pointer-events-none bg-red-600/30 ring-2 ring-red-600 flex items-end">
+                        <div className="w-full h-1 bg-red-700" />
                       </div>
                     )}
                   </div>

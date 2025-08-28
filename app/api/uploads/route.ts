@@ -16,6 +16,9 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const preferredRegion = 'auto';
+export const maxDuration = 60;
 
 const execFileAsync = promisify(execFile);
 
@@ -132,4 +135,16 @@ export async function POST(req: Request) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: 'server_error', message: msg }, { status: 500 });
   }
+}
+
+// Allow simple CORS/preflight if ever called cross-origin
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
 }

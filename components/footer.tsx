@@ -7,12 +7,12 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   const socialLinks = [
-    { label: "GitHub", href: "https://github.com/rabbit-tale-co", icon: "GH" },
-    { label: "Twitter", href: "https://twitter.com/hasiradoo", icon: "TW" },
-    { label: "Bsky", href: "https://bsky.app/profile/hasiradoo.rabbittale.co", icon: "BS" },
-    { label: "Patreon", href: "https://patreon.com/rabbittale", icon: "PA" },
-    { label: "Discord", href: "https://discord.gg/rabbittale", icon: "DC" },
-    { label: "Telegram", href: "https://t.me/rabbit_tale", icon: "TG" },
+    { label: "GitHub", href: "https://github.com/rabbit-tale-co" },
+    { label: "Twitter", href: "https://twitter.com/hasiradoo" },
+    { label: "Bsky", href: "https://bsky.app/profile/hasiradoo.rabbittale.co" },
+    { label: "Patreon", href: "https://patreon.com/rabbittale" },
+    { label: "Discord", href: "https://discord.gg/rabbittale" },
+    { label: "Telegram", href: "https://t.me/rabbit_tale" },
   ];
 
   const navigationLinks = [
@@ -21,12 +21,13 @@ export default function Footer() {
     { label: "About", href: "/about" },
     { label: "Terms", href: "/terms" },
     { label: "Privacy", href: "/privacy" },
+    { label: "Support", href: "/support" },
   ];
 
   const resourceLinks = [
     { label: "RabbitTale Studio", href: "https://rabbittale.co" },
     // { label: "Blog", href: "https://blog.rabbittale.co" },
-    { label: "Source Code", href: "https://github.com/rabbit-tale-co/portfolio" },
+    { label: "Source Code", href: "https://github.com/rabbit-tale-co/rabbit-hole" },
   ];
 
   const LinkWithArrow = ({ href, label, isExternal = false }: { href: string; label: string; icon?: string; isExternal?: boolean }) => (
