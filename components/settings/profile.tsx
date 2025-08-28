@@ -50,6 +50,10 @@ export function Profile({ user }: ProfileProps) {
     username: profile?.username ?? 'username',
     bio: profile?.bio ?? '',
   })
+  const [pwdCurrent, setPwdCurrent] = React.useState("")
+  const [pwdNew, setPwdNew] = React.useState("")
+  const [pwdConfirm, setPwdConfirm] = React.useState("")
+  const [pwdLoading, setPwdLoading] = React.useState(false)
 
   // Update form data when user changes
   React.useEffect(() => {
@@ -61,7 +65,7 @@ export function Profile({ user }: ProfileProps) {
   }, [profile])
 
   // Use the context for unsaved changes
-  const { markAsSaved, markAsChanged, registerSaveFunction } = useUnsavedChanges()
+  const { markAsSaved, markAsChanged, registerSaveFunction, resetChanges, checkForChanges } = useUnsavedChanges()
 
   // Add handleSave function back as a regular function
   const handleSave = React.useCallback(async () => {
@@ -373,11 +377,60 @@ export function Profile({ user }: ProfileProps) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="current-password">Current Password</Label>
-            <Input id="current-password" type="password" placeholder="Enter current password" />
+            <Input id="current-password" type="password" placeholder="Enter current password" value={pwdCurrent} onChange={(e) => setPwdCurrent(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="new-password">New Password</Label>
-            <Input id="new-password" type="password" placeholder="Enter new password" />
+            <Input id="new-password" type="password" placeholder="Enter new password" value={pwdNew} onChange={(e) => setPwdNew(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm New Password</Label>
+            <Input id="confirm-password" type="password" placeholder="Re-enter new password" value={pwdConfirm} onChange={(e) => setPwdConfirm(e.target.value)} />
+          </div>
+          <div>
+            <Button
+              size="sm"
+              disabled={pwdLoading}
+              onClick={async () => {
+                if (!user?.email) { toast.error("Missing user email"); return }
+                // basic validations
+                if (!pwdCurrent) { toast.error("Enter current password"); return }
+                if (pwdNew.length < 8) { toast.error("New password must be at least 8 characters"); return }
+                if (pwdNew !== pwdConfirm) { toast.error("Passwords do not match"); return }
+                if (pwdNew === pwdCurrent) { toast.error("New password cannot be the same as current"); return }
+
+                setPwdLoading(true)
+                try {
+                  // Temporarily suppress unsaved-changes state
+                  try { resetChanges?.() } catch { }
+                  // verify current password
+                  const { error: verifyErr } = await supabase.auth.signInWithPassword({ email: user.email, password: pwdCurrent })
+                  if (verifyErr) { toast.error("Current password is incorrect"); return }
+
+                  // update to new password
+                  const { error: updErr } = await supabase.auth.updateUser({ password: pwdNew })
+                  if (updErr) { toast.error(updErr.message); return }
+
+                  try { await supabase.auth.refreshSession() } catch { }
+                  setPwdCurrent("")
+                  setPwdNew("")
+                  setPwdConfirm("")
+                  toast.success("Password updated")
+                } finally {
+                  setPwdLoading(false)
+                  // Recompute unsaved status for profile fields only
+                  try {
+                    checkForChanges?.({
+                      displayName: formData.displayName,
+                      username: formData.username,
+                      bio: formData.bio || ''
+                    })
+                  } catch { }
+                }
+              }}
+            >
+              {pwdLoading ? "Updating…" : "Change Password"}
+            </Button>
           </div>
         </div>
       </div>

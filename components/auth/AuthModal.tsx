@@ -8,8 +8,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Palette, X } from "lucide-react";
-import { LoginForm } from "./LoginForm";
-import { RegisterForm } from "./RegisterForm";
+import LoginForm from "./LoginForm";
+import RegisterForm from "./RegisterForm";
+import ForgotForm from "./ForgotForm";
 
 type AuthTab = "login" | "register";
 
@@ -20,13 +21,12 @@ export function AuthModal({
 }) {
   const [open, setOpen] = React.useState(false);
   const [tab, setTab] = React.useState<AuthTab>(defaultTab);
-
-  const close = () => setOpen(false);
+  const [forgotOpen, setForgotOpen] = React.useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">Sign in</Button>
+        <Button size="sm" className="rounded-full">Sign in</Button>
       </DialogTrigger>
 
       {/* compact width, horizontal split on md+ */}
@@ -70,10 +70,10 @@ export function AuthModal({
               </TabsList>
 
               <TabsContent value="login" className="mt-3">
-                <LoginForm compact onSuccess={close} />
+                <LoginForm onSuccess={() => setOpen(false)} onForgot={() => setForgotOpen(true)} />
               </TabsContent>
               <TabsContent value="register" className="mt-3">
-                <RegisterForm compact onSuccess={close} />
+                <RegisterForm />
               </TabsContent>
             </Tabs>
 
@@ -83,6 +83,15 @@ export function AuthModal({
           </section>
         </div>
       </DialogContent>
+      {/* Separate forgot password dialog */}
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="p-4 sm:max-w-[480px]">
+          <DialogHeader className="mb-2">
+            <DialogTitle className="text-base">Reset your password</DialogTitle>
+          </DialogHeader>
+          <ForgotForm onSent={() => { setForgotOpen(false); setTab("login"); setOpen(true); }} />
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

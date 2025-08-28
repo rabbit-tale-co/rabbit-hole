@@ -1,17 +1,17 @@
-// import { supabaseAdmin } from "@/lib/supabase-admin";
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+  title: "Home",
+  description: "Latest posts on RabbitHole.",
+  openGraph: { title: "RabbitHole - Home", url: "/", images: [{ url: "/assets/og.webp" }] },
+  twitter: { title: "RabbitHole - Home", images: [{ url: "/assets/og.webp" }] },
+};
 import Feed from "@/components/feed/Index";
 import { getFeedPage } from "@/app/actions/posts";
 
 export const revalidate = 0; // fresh; you can tune with ISR if desired
 
-export default async function HomePage({ searchParams }: { searchParams?: Promise<{ skeleton?: string }> }) {
+export default async function HomePage() {
   const limit = 24;
-
-  // Debug: allow forcing skeleton with ?skeleton=1
-  const sp = (await searchParams) ?? {};
-  if (sp.skeleton === "1") {
-    return <Feed debugLoading />;
-  }
 
   const res = await getFeedPage({ limit });
   if ("error" in res && res.error) {

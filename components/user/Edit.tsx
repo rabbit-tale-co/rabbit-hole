@@ -53,74 +53,73 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
   const [username, setUsername] = useState(user.username || '');
   const [email, setEmail] = useState(user.email || '');
   const [password, setPassword] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [showCrop, setShowCrop] = useState(false);
-  const [cropImage, setCropImage] = useState<string | null>(null);
-  const [cropType, setCropType] = useState<'avatar' | 'cover' | null>(null);
+  // const [showCrop, setShowCrop] = useState(false);
+  // const [cropImage, setCropImage] = useState<string | null>(null);
+  // const [cropType, setCropType] = useState<'avatar' | 'cover' | null>(null);
 
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'cover') => {
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     // Show crop interface
     const reader = new FileReader();
-    reader.onload = (e) => {
-      setCropImage(e.target?.result as string);
-      setCropType(type);
-      setShowCrop(true);
-    };
+    // reader.onload = (e) => {
+    //   setCropImage(e.target?.result as string);
+    //   setCropType(type);
+    //   setShowCrop(true);
+    // };
     reader.readAsDataURL(file);
   };
 
-  const handleCropComplete = async (croppedImage: string) => {
-    setIsUploading(true);
-    try {
-      // Convert base64 to blob
-      const response = await fetch(croppedImage);
-      const blob = await response.blob();
+  // const handleCropComplete = async (croppedImage: string) => {
+  //   setIsUploading(true);
+  //   try {
+  //     // Convert base64 to blob
+  //     const response = await fetch(croppedImage);
+  //     const blob = await response.blob();
 
-      const formData = new FormData();
-      formData.append('file', blob, 'cropped-image.jpg');
-      formData.append('userId', user.id);
+  //     const formData = new FormData();
+  //     formData.append('file', blob, 'cropped-image.jpg');
+  //     formData.append('userId', user.id);
 
-      const uploadEndpoint = cropType === 'avatar' ? '/api/upload/avatar' : '/api/upload/cover';
-      const response2 = await fetch(uploadEndpoint, {
-        method: 'POST',
-        body: formData,
-      });
+  //     const uploadEndpoint = cropType === 'avatar' ? '/api/upload/avatar' : '/api/upload/cover';
+  //     const response2 = await fetch(uploadEndpoint, {
+  //       method: 'POST',
+  //       body: formData,
+  //     });
 
-      if (!response2.ok) {
-        throw new Error('Failed to upload image');
-      }
+  //     if (!response2.ok) {
+  //       throw new Error('Failed to upload image');
+  //     }
 
-      const { imageUrl } = await response2.json();
+  //     const { imageUrl } = await response2.json();
 
-      // Update profile
-      const updateData = cropType === 'avatar'
-        ? { avatar_url: imageUrl }
-        : { coverImage: imageUrl };
+  //     // Update profile
+  //     const updateData = cropType === 'avatar'
+  //       ? { avatar_url: imageUrl }
+  //       : { coverImage: imageUrl };
 
-      // tutaj w nowej architekturze zapis jest poza kontekstem; po sukcesie tylko odswiezamy profil
-      await refreshProfile();
-      {
-        onProfileUpdated({
-          ...user,
-          ...updateData,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to upload image:', error);
-      alert('Failed to upload image. Please try again.');
-    } finally {
-      setIsUploading(false);
-      setShowCrop(false);
-      setCropImage(null);
-      setCropType(null);
-    }
-  };
+  //     // tutaj w nowej architekturze zapis jest poza kontekstem; po sukcesie tylko odswiezamy profil
+  //     await refreshProfile();
+  //     {
+  //       onProfileUpdated({
+  //         ...user,
+  //         ...updateData,
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error('Failed to upload image:', error);
+  //     alert('Failed to upload image. Please try again.');
+  //   } finally {
+  //     setIsUploading(false);
+  //     setShowCrop(false);
+  //     setCropImage(null);
+  //     setCropType(null);
+  //   }
+  // };
 
   const handleRemoveAvatar = async () => {
     try {
@@ -180,7 +179,7 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
       // Create a promise for the profile update
       const updatePromise = (async () => {
         // Update profile data
-        const profileUpdates: { username?: string; avatar_url?: string } = { username: username.trim() };
+        // const profileUpdates: { username?: string; avatar_url?: string } = { username: username.trim() };
 
         // Update email if changed
         if (email !== user.email) {
@@ -280,7 +279,7 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
                     size="icon"
                     variant="secondary"
                     onClick={() => avatarFileInputRef.current?.click()}
-                    disabled={isUploading}
+                    disabled={false}
                     className="bg-white shadow-lg border-2 border-gray-200"
                   >
                     <OutlineImage size={14} />
@@ -318,7 +317,7 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
                     size="sm"
                     variant="outline"
                     onClick={() => coverFileInputRef.current?.click()}
-                    disabled={isUploading}
+                    disabled={false}
                   >
                     <OutlineImage size={16} className="mr-1" />
                     {user.cover.url ? 'Change' : 'Add'}
@@ -359,20 +358,18 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
               ref={coverFileInputRef}
               type="file"
               accept="image/*"
-              onChange={(e) => handleImageSelect(e, 'cover')}
+              onChange={(e) => handleImageSelect(e)}
               className="hidden"
             />
             <input
               ref={avatarFileInputRef}
               type="file"
               accept="image/*"
-              onChange={(e) => handleImageSelect(e, 'avatar')}
+              onChange={(e) => handleImageSelect(e)}
               className="hidden"
             />
 
-            {isUploading && (
-              <p className="text-sm text-gray-500 mt-2 text-center">Uploading...</p>
-            )}
+            {/* Upload status removed since functionality is commented out */}
           </div>
 
           {/* Username Input */}

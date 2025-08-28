@@ -8,6 +8,7 @@ export type AuthCtx = {
   profile: ProfileRow | null;
   refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
+  resetPassword: (email: string) => Promise<{ error?: string }>;
   signUp: (params: {
     email: string;
     password: string;

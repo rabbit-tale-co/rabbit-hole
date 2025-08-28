@@ -37,7 +37,8 @@ export async function GET(req: NextRequest) {
   let query = supabaseAdmin
     .from("posts")
     .select("*")
-    .eq("is_deleted", false)
+    // include rows where is_deleted is null (legacy) OR false
+    .or("is_deleted.is.null,is_deleted.eq.false")
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(limit);

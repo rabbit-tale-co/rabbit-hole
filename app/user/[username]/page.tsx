@@ -53,7 +53,6 @@ export default function UserProfilePage() {
 
 
       <Feed
-        debugLoading={false}
         authorId={profile.user_id}
         isOwnProfile={isOwn}
         onCountChange={(n) => {
@@ -67,3 +66,5 @@ export default function UserProfilePage() {
     </>
   );
 }
+
+// metadata is provided by app/user/[username]/head.tsx to avoid client "use client" restriction

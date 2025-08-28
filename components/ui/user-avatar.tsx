@@ -50,7 +50,7 @@ export function UserAvatar({
 
   return (
     <Avatar className={`${sizeClass} ${borderClass} ${className}`}>
-      <AvatarImage src={avatarUrl} alt={`${username} avatar`} />
+      <AvatarImage src={avatarUrl} alt={`${username} avatar`} style={avatarBgStyle} />
       <AvatarFallback
         className="font-bold"
         style={{ ...avatarBgStyle, ...avatarForegroundStyle }}

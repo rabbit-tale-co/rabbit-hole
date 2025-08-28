@@ -192,6 +192,23 @@ export function CreatePost({
       const bucket = 'social-art';
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+      // helper to get a fresh auth token (avoids stale session causing 0% stall)
+      const getToken = async () => {
+        const { data: s1 } = await supabase.auth.getSession();
+        if (s1.session?.access_token) return s1.session.access_token;
+        try { await supabase.auth.refreshSession(); } catch { }
+        const { data: s2 } = await supabase.auth.getSession();
+        return s2.session?.access_token || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+      };
+
+      // initialize progress for all items to 1% so overall bar never shows 0%
+      setUploadProgress(prev => {
+        const next = { ...prev } as Record<string, number>;
+        for (const it of items) next[it.id] = Math.max(1, next[it.id] ?? 1);
+        return next;
+      });
+
+      // Upload each image with retry (handles auth errors) and initializes progress
       for (const it of items) {
         const imageId = randomUUIDv7();
         const ext = (it.file.name.split('.').pop() || 'png').toLowerCase();
@@ -202,23 +219,41 @@ export function CreatePost({
           im.onload = () => resolve({ w: im.naturalWidth || 0, h: im.naturalHeight || 0 });
           im.src = it.preview;
         });
-        // multipart upload
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', `${baseUrl}/${bucket}/${key}`);
-          xhr.setRequestHeader('authorization', `Bearer ${token}`);
-          xhr.setRequestHeader('x-upsert', 'true');
-          xhr.upload.onprogress = (ev) => {
-            if (ev.lengthComputable) setUploadProgress(prev => ({ ...prev, [it.id]: Math.round((ev.loaded / ev.total) * 100) }));
+        // multipart upload with progress + retry on 401/403
+        await new Promise<void>(async (resolve, reject) => {
+          const sendOnce = async (bearer: string, attempt: number) => {
+            // initialize progress to 1% so UI does not look stuck before first tick
+            setUploadProgress(prev => ({ ...prev, [it.id]: Math.max(1, prev[it.id] ?? 1) }));
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `${baseUrl}/${bucket}/${key}`);
+            xhr.setRequestHeader('authorization', `Bearer ${bearer}`);
+            xhr.setRequestHeader('x-upsert', 'true');
+            xhr.timeout = 120000; // 2 minutes per image
+            xhr.upload.onprogress = (ev) => {
+              const pct = ev.lengthComputable
+                ? Math.round((ev.loaded / (ev.total || 1)) * 100)
+                : 1; // keep at least 1% until first computable tick
+              setUploadProgress(prev => ({ ...prev, [it.id]: pct }));
+            };
+            xhr.onerror = () => reject(new Error('storage_upload_failed'));
+            xhr.ontimeout = () => reject(new Error('storage_upload_timeout'));
+            xhr.onload = async () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                setUploadProgress(prev => ({ ...prev, [it.id]: 100 }));
+                resolve();
+              } else if ((xhr.status === 401 || xhr.status === 403) && attempt < 1) {
+                const refreshed = await getToken();
+                sendOnce(refreshed, attempt + 1);
+              } else {
+                reject(new Error(`storage_upload_status_${xhr.status}`));
+              }
+            };
+            const fd = new FormData();
+            fd.append('file', it.file, `${imageId}.${ext}`);
+            xhr.send(fd);
           };
-          xhr.onerror = () => reject(new Error('storage_upload_failed'));
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) resolve();
-            else reject(new Error(`storage_upload_status_${xhr.status}`));
-          };
-          const fd = new FormData();
-          fd.append('file', it.file, `${imageId}.${ext}`);
-          xhr.send(fd);
+          const bearer = token || (await getToken());
+          sendOnce(bearer, 0);
         });
         metas.push({
           id: imageId,

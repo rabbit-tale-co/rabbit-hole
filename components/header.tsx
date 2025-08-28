@@ -9,15 +9,12 @@ import {
   Sheet,
   SheetContent,
   SheetTrigger,
-  SheetClose,
   SheetTitle,
   SheetDescription,
-  SheetFooter
 } from "./ui/sheet";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/providers/AuthProvider";
 import { AuthModal } from "./auth/AuthModal";
-import { OutlineBell, OutlineClose, OutlineMenu, SolidLogo } from "@/components/icons/Icons";
+import { OutlineMenu, SolidLogo } from "@/components/icons/Icons";
 
 import { UserProfileMenu } from "./user/Menu";
 import PostButton from "./feed/upload/post-button";
@@ -25,21 +22,18 @@ import PostButton from "./feed/upload/post-button";
 export default function Header() {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const pathname = usePathname();
-  const { user: auth_user, profile: user, loading } = useAuth();
+  const { user: auth_user, loading } = useAuth();
 
   const navigationLinks = [
     { href: "/", label: "Home", icon: null },
-    // { href: "/explore", label: "Explore", icon: null },
+    { href: "/explore", label: "Explore", icon: null },
     { href: "/following", label: "Following", icon: null },
     // ...(user ? [
     //   { href: "/profile", label: "Profile", icon: null },
     //   { href: "/settings", label: "Settings", icon: null },
     // ] : []),
   ];
-
-  console.log(auth_user);
 
   const NavLinks = ({ onClick, className }: { onClick?: () => void, className?: string }) => (
     <>

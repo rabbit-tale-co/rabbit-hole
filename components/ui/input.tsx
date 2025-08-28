@@ -5,7 +5,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 // Define input size variants
 const inputVariants = cva(
   `
-    flex w-full bg-background border border-input shadow-xs shadow-black/5 transition-[color,box-shadow] text-foreground placeholder:text-muted-foreground/80
+    flex w-full bg-background border border-input transition-[color] text-foreground placeholder:text-muted-foreground/80
     focus-visible:ring-ring/30  focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px]
     disabled:cursor-not-allowed disabled:opacity-60
     [&[readonly]]:bg-muted/80 [&[readonly]]:cursor-not-allowed
@@ -16,9 +16,9 @@ const inputVariants = cva(
   {
     variants: {
       variant: {
-        lg: 'h-10 px-4 text-sm rounded-md file:pe-4 file:me-4',
-        md: 'h-8.5 px-3 text-[0.8125rem] leading-(--text-sm--line-height) rounded-md file:pe-3 file:me-3',
-        sm: 'h-7 px-2.5 text-xs rounded-md file:pe-2.5 file:me-2.5',
+        lg: 'h-12 px-4 text-sm rounded-md file:pe-4 file:me-4',
+        md: 'h-10 px-3 text-[0.8125rem] leading-(--text-sm--line-height) rounded-md file:pe-3 file:me-3',
+        sm: 'h-8 px-2.5 text-xs rounded-md file:pe-2.5 file:me-2.5',
       },
     },
     defaultVariants: {
@@ -32,9 +32,9 @@ const inputAddonVariants = cva(
   {
     variants: {
       variant: {
-        sm: 'rounded-md h-7 min-w-7 text-xs px-2.5 [&_svg:not([class*=size-])]:size-3.5',
-        md: 'rounded-md h-8.5 min-w-8.5 px-3 text-[0.8125rem] leading-(--text-sm--line-height) [&_svg:not([class*=size-])]:size-4.5',
-        lg: 'rounded-md h-10 min-w-10 px-4 text-sm [&_svg:not([class*=size-])]:size-4.5',
+        sm: 'rounded-md h-8 min-w-8 text-xs px-2.5 [&_svg:not([class*=size-])]:size-3.5',
+        md: 'rounded-md h-10 min-w-10 px-3 text-[0.8125rem] leading-(--text-sm--line-height) [&_svg:not([class*=size-])]:size-4.5',
+        lg: 'rounded-md h-12 min-w-12 px-4 text-sm [&_svg:not([class*=size-])]:size-4.5',
       },
       mode: {
         default: '',

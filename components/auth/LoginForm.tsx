@@ -3,15 +3,14 @@
 import { useState } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, InputAddon, InputGroup } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import ShowPassword from "./ShowPassword";
+import Link from "next/link";
 
-export function LoginForm({
-  onSuccess,
-  compact = false,
-}: { onSuccess?: () => void; compact?: boolean }) {
+export default function LoginForm({ onSuccess, onForgot }: { onSuccess?: () => void; onForgot?: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -30,12 +29,13 @@ export function LoginForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className={`space-y-3 ${compact ? "" : "max-w-md"}`}>
+    <form onSubmit={handleSubmit} className={`space-y-3 max-w-md`}>
       {error && (
         <Alert variant="destructive">
           <AlertDescription className="text-xs">{error}</AlertDescription>
         </Alert>
       )}
+
 
       <div className="space-y-1">
         <Label htmlFor="email" className="text-xs">Email</Label>
@@ -47,13 +47,12 @@ export function LoginForm({
           onChange={(e) => setEmail(e.target.value)}
           required
           disabled={loading}
-          className="h-9"
         />
       </div>
 
       <div className="space-y-1">
         <Label htmlFor="password" className="text-xs">Password</Label>
-        <div className="relative">
+        <InputGroup>
           <Input
             id="password"
             type={showPwd ? "text" : "password"}
@@ -62,22 +61,26 @@ export function LoginForm({
             onChange={(e) => setPassword(e.target.value)}
             required
             disabled={loading}
-            className="h-9 pr-10"
+            className="pr-10"
           />
-          <button
-            type="button"
-            onClick={() => setShowPwd((s) => !s)}
-            className="absolute inset-y-0 right-2 grid place-items-center rounded px-2 text-muted-foreground hover:text-foreground"
-            tabIndex={-1}
-          >
-            {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
+          <InputAddon className="px-0">
+            <ShowPassword showPwd={showPwd} setShowPwd={setShowPwd} />
+          </InputAddon>
+        </InputGroup>
       </div>
 
-      <Button type="submit" size="sm" className="w-full" disabled={loading}>
+      <Button type="submit" className="w-full" disabled={loading}>
         {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in…</>) : "Sign in"}
       </Button>
+
+      <div className="flex items-center justify-end text-xs">
+        {onForgot ? (
+          <button type="button" onClick={onForgot} className="text-muted-foreground underline underline-offset-2">Forgot password?</button>
+        ) : (
+          <Link href="/auth/forgot-password" className="text-muted-foreground underline underline-offset-2">Forgot password?</Link>
+        )}
+      </div>
+      {/* success message handled on dedicated /auth/forgot-password page */}
     </form>
   );
 }
