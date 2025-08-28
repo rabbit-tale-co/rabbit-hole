@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { randomUUIDv7 } from '@/lib/uuid';
-import sharp from 'sharp';
 import path from 'path';
 import os from 'os';
 import { promises as fs } from 'fs';
@@ -22,15 +21,37 @@ export const maxDuration = 60;
 
 const execFileAsync = promisify(execFile);
 
-async function convertImage(buffer: Buffer, mime: string) {
+type ImageConvertResult = {
+  buffer: Buffer;
+  ext: 'webp' | 'gif' | 'png' | 'jpg' | 'jpeg' | 'bin';
+  outMime: string;
+  width: number;
+  height: number;
+};
+
+async function convertImage(buffer: Buffer, mime: string): Promise<ImageConvertResult> {
   const isGif = mime === 'image/gif';
   if (isGif) {
     return { buffer, ext: 'gif', outMime: 'image/gif', width: 0, height: 0 };
   }
-  const img = sharp(buffer);
-  const meta = await img.metadata();
-  const webp = await img.webp({ quality: 90 }).toBuffer();
-  return { buffer: webp, ext: 'webp', outMime: 'image/webp', width: meta.width || 0, height: meta.height || 0 };
+  // Try to load sharp lazily; if unavailable (e.g., platform binary), fallback to original
+  try {
+    const sharpMod = await import('sharp');
+    const sharp = sharpMod.default || sharpMod;
+    const img = sharp(buffer);
+    const meta = await img.metadata();
+    const webp = await img.webp({ quality: 90 }).toBuffer();
+    return { buffer: webp, ext: 'webp', outMime: 'image/webp', width: meta.width || 0, height: meta.height || 0 };
+  } catch (e) {
+    console.error('[uploads] sharp not available, skipping conversion', e);
+    // Return original as-is (png/jpg), let client/uploaders handle conversion later if needed
+    const fallbackExt: ImageConvertResult['ext'] = mime.endsWith('png')
+      ? 'png'
+      : (mime.endsWith('jpeg') || mime.endsWith('jpg'))
+        ? 'jpg'
+        : 'bin';
+    return { buffer, ext: fallbackExt, outMime: mime || 'application/octet-stream', width: 0, height: 0 };
+  }
 }
 
 async function convertVideo(buffer: Buffer, originalMime?: string, originalExt?: string) {
