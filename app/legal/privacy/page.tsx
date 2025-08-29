@@ -27,7 +27,6 @@ function smoothScrollTo(href: string, e?: React.MouseEvent<HTMLAnchorElement>) {
 export default function PrivacyPage() {
   const effectiveDate = useMemo(() => new Date(EFFECTIVE_PRIVACY), []);
   const effectiveHuman = useMemo(() => effectiveDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' }), [effectiveDate]);
-  const effectiveYear = useMemo(() => effectiveDate.getFullYear(), [effectiveDate]);
   const [activeSection, setActiveSection] = useState<string>('intro');
   const sectionIds = useMemo(() => PRIVACY_SECTIONS.map((s) => s.id), []);
 

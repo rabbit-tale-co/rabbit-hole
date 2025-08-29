@@ -27,7 +27,6 @@ function smoothScrollTo(href: string, e?: React.MouseEvent<HTMLAnchorElement>) {
 export default function TermsPage() {
   const effectiveDate = useMemo(() => new Date(EFFECTIVE_TERMS), []);
   const effectiveHuman = useMemo(() => effectiveDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' }), [effectiveDate]);
-  const year = useMemo(() => effectiveDate.getFullYear(), [effectiveDate]);
   const [activeSection, setActiveSection] = useState<string>('acceptance');
   const sectionIds = useMemo(() => TERMS_SECTIONS.map((s) => s.id), []);
 
