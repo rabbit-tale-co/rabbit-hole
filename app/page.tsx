@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 import Feed from "@/components/feed/Index";
 export const dynamic = 'force-static';
-export const revalidate = 60 * 5;
+export const revalidate = 300;
 
 export default async function HomePage() {
   // Render statyczny; dane laduje klient przez /api/posts (CSR)

@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = 'force-static';
-export const revalidate = 60 * 60;
+export const revalidate = 3600;
 
 export default function TermsLayout({ children }: { children: React.ReactNode }) {
   return children;
