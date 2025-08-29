@@ -62,7 +62,7 @@ export default function PrivacyPage() {
             <h1 className="text-left text-2xl font-bold">Privacy Policy</h1>
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">Effective {effectiveHuman}</Badge>
-              <Badge>{effectiveYear}</Badge>
+              <Badge>WIP</Badge>
             </div>
           </div>
         </div>

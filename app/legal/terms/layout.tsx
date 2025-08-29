@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   description: 'Your rights and responsibilities when using the Service.',
 };
 
+export const dynamic = 'force-static';
+export const revalidate = 60 * 60;
+
 export default function TermsLayout({ children }: { children: React.ReactNode }) {
   return children;
 }

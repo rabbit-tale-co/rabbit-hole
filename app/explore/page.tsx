@@ -5,7 +5,8 @@ export const metadata: Metadata = {
   openGraph: { title: "RabbitHole - Explore", url: "/explore", images: [{ url: "/assets/og.webp" }] },
   twitter: { title: "RabbitHole - Explore", images: [{ url: "/assets/og.webp" }] },
 };
-export const revalidate = 0;
+export const dynamic = 'force-static';
+export const revalidate = 60 * 5;
 
 import UsersGrid from "@/components/users/Grid";
 

@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { TypographyP } from '@/components/ui/typography/p';
 import { TypographyList } from '@/components/ui/typography/list';
 import { FileText, Link as LinkIcon } from 'lucide-react';
-import { SITE, COMPANY, CONTACT_EMAIL, EFFECTIVE_TERMS, TERMS_SECTIONS, TERMS_CONTENT, ADDRESS, COMPANY_ADDR, ListItem } from '@/app/legal/data';
+import { SITE, COMPANY, CONTACT_EMAIL, EFFECTIVE_TERMS, TERMS_SECTIONS, TERMS_CONTENT, ADDRESS, ListItem } from '@/app/legal/data';
 
 // constants moved to app/legal/data
 
@@ -62,7 +62,7 @@ export default function TermsPage() {
             <h1 className="text-left text-2xl font-bold">Terms of Service</h1>
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">Effective {effectiveHuman}</Badge>
-              <Badge>{year}</Badge>
+              <Badge>WIP</Badge>
             </div>
           </div>
 
@@ -160,7 +160,6 @@ function renderInline(text: string, boldBeforeColon: boolean = false): React.Rea
   const replaced = text
     .replaceAll('{SITE}', SITE)
     .replaceAll('{COMPANY}', COMPANY)
-    .replaceAll('{COMPANY_ADDR}', (typeof COMPANY_ADDR === 'string' ? COMPANY_ADDR : ''))
     .replaceAll('{ADDRESS}', ADDRESS ?? '')
     .replaceAll('{CONTACT_EMAIL}', CONTACT_EMAIL);
 
@@ -202,14 +201,12 @@ function renderInline(text: string, boldBeforeColon: boolean = false): React.Rea
       const label = match[1]
         .replaceAll('{SITE}', SITE)
         .replaceAll('{COMPANY}', COMPANY)
-        .replaceAll('{COMPANY_ADDR}', (typeof COMPANY_ADDR === 'string' ? COMPANY_ADDR : ''))
         .replaceAll('{ADDRESS}', ADDRESS ?? '')
         .replaceAll('{CONTACT_EMAIL}', CONTACT_EMAIL)
         .replaceAll('CONTACT_EMAIL', CONTACT_EMAIL);
       const href = match[2]
         .replaceAll('{SITE}', SITE)
         .replaceAll('{COMPANY}', COMPANY)
-        .replaceAll('{COMPANY_ADDR}', (typeof COMPANY_ADDR === 'string' ? COMPANY_ADDR : ''))
         .replaceAll('{ADDRESS}', ADDRESS ?? '')
         .replaceAll('{CONTACT_EMAIL}', CONTACT_EMAIL);
       parts.push(
