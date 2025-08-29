@@ -10,6 +10,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default function UpdatePasswordLayout({ children }: { children: React.ReactNode }) {
+export default function SupportLayout({ children }: { children: React.ReactNode }) {
   return children;
 }

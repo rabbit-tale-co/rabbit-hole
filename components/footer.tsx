@@ -19,8 +19,8 @@ export default function Footer() {
     { label: "Home", href: "/" },
     { label: "Explore", href: "/explore" },
     { label: "About", href: "/about" },
-    { label: "Terms", href: "/terms" },
-    { label: "Privacy", href: "/privacy" },
+    { label: "Terms", href: "/legal/terms" },
+    { label: "Privacy", href: "/legal/privacy" },
     { label: "Support", href: "/support" },
   ];
 

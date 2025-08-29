@@ -59,7 +59,8 @@ export const viewport: Viewport = {
 // FIXME: grid is not pushing 1x1 to bottom of page (it sticks to top of page)
 // + it's not from newest (top left) to oldest (bottom right)
 // FIXME: sometimes uplaod post stuck at 0%
-// FIXME: gif is allowed, but gives [object, object] error
+
+//TODO: replace all <video> with media-player component
 
 export default function RootLayout({
   children,
