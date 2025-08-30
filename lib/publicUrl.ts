@@ -3,8 +3,14 @@ export function buildPublicUrl(path: string): string {
   try {
     if (/^https?:\/\//.test(path)) {
       const u = new URL(path);
-      const socialHost = (process.env.NEXT_PUBLIC_SOCIAL_HOST || "social.rabbittale.co").toLowerCase();
-      if (u.hostname.toLowerCase() === socialHost) {
+      const hostLower = u.hostname.toLowerCase();
+      const known = [
+        "social.rabbittale.co",
+        "api.rabbittale.co",
+        "media.rabbittale.co",
+      ];
+      const looksLikeKey = /^\/(posts|avatar|cover|social|media)\//.test(u.pathname);
+      if (known.includes(hostLower) || looksLikeKey) {
         // rebase to S3 if configured
         key = u.pathname.replace(/^\/+/, "");
       } else {
@@ -15,7 +21,7 @@ export function buildPublicUrl(path: string): string {
     // fall through and treat as key
   }
 
-  key = String(key || "").replace(/^\/+/, "");
+  key = String(key || "").replace(/[\\]+/g, "/").replace(/^\/+/, "");
 
   const endpointRaw = (process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.SOCIAL_S3_ENDPOINT || "").replace(/\/$/, "");
   const bucket = process.env.NEXT_PUBLIC_S3_BUCKET || process.env.SOCIAL_S3_BUCKET || "";
