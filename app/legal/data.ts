@@ -753,7 +753,7 @@ export const TERMS_CONTENT: Array<
       { type: 'p', text: 'If you have any questions, concerns, or feedback about these Terms or the Service, you can reach out to us:' },
       { type: 'ul', items: [
         'Controller/Operator: {COMPANY}',
-        'Registered Address: {COMPANY_ADDR}',
+        'Registered Address: {ADDRESS}',
         'Email: [CONTACT_EMAIL](mailto:{CONTACT_EMAIL})',
       ]},
       { type: 'p', text: 'We typically respond to user inquiries within a few business days. For any legal notices or service of process, please send them to our registered address with a copy via email if possible.' },

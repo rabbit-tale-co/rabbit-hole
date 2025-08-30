@@ -10,8 +10,9 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ userna
   if (!parsed.success) return Response.json({ error: "bad username" }, { status: 400 });
 
   const { data, error } = await supabaseAdmin
+    .schema('social_art')
     .from("profiles")
-    .select("user_id, username, display_name, bio, avatar_url, cover_url, accent_color, is_premium")
+    .select("user_id, username, display_name, bio, avatar_url, cover_url, accent_color, is_premium, is_admin, banned_until")
     .eq("username", parsed.data)
     .maybeSingle();
 

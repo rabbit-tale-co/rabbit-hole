@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { UserProfile } from '@/components/user/Profile';
 import Feed from '@/components/feed/Index';
+import { EmptyState } from '@/components/feed/Empty';
 import { User } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/providers/AuthProvider';
@@ -42,6 +43,15 @@ export default function UserProfilePage() {
     );
   }
 
+  // Dev: log current viewer and viewed profile
+  try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[profile:view] username', username, 'isOwn', isOwn, 'profile', profile);
+    }
+  } catch { }
+
+  const isSuspended = Boolean(profile.banned_until && Date.parse(profile.banned_until) > Date.now());
+
   return (
     <>
       {/* UserProfile component */}
@@ -51,17 +61,25 @@ export default function UserProfilePage() {
         isOwnProfile={isOwn}
       />
 
-
-      <Feed
-        authorId={profile.user_id}
-        isOwnProfile={isOwn}
-        onCountChange={(n) => {
-          try {
-            const el = document.querySelector('[data-profile-posts-count]');
-            if (el) el.textContent = String(n);
-          } catch { }
-        }}
-      />
+      {!isSuspended ? (
+        <Feed
+          authorId={profile.user_id}
+          isOwnProfile={isOwn}
+          onCountChange={(n) => {
+            try {
+              const el = document.querySelector('[data-profile-posts-count]');
+              if (el) el.textContent = String(n);
+            } catch { }
+          }}
+        />
+      ) : (
+        <EmptyState
+          variant="profile"
+          isOwnProfile={false}
+          message="This account is suspended"
+          description="Posts are hidden while the account is under review."
+        />
+      )}
 
     </>
   );

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { buildPublicUrl } from "@/lib/publicUrl";
 import { useInfiniteUsers } from "@/hooks/useInfiniteUsers";
 import { useIntersection } from "@/hooks/useIntersection";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -12,12 +13,13 @@ import {
   getStyleFromHexShade,
 } from "@/lib/accent-colors";
 import { renderBioContent } from "@/lib/profile";
+import { SolidCarrot } from "../icons/Icons";
 
 /** Minimal card with bg-white, ring-1, rounded, no shadows. */
 function UserCard({ user: u }: {
   user: {
     user_id: string; username: string; display_name: string | null;
-    avatar_url: string | null; cover_url: string | null; accent_color: string | null; bio?: string | null;
+    avatar_url: string | null; cover_url: string | null; accent_color: string | null; bio?: string | null; is_premium: boolean;
   }
 }) {
   const avatarAccentHex =
@@ -31,13 +33,25 @@ function UserCard({ user: u }: {
         {/* cover: fixed height */}
         <div className="relative h-24 sm:h-30 w-full overflow-hidden rounded-t-2xl">
           {u.cover_url ? (
-            <Image
-              src={u.cover_url}
-              alt={`${u.username} cover`}
-              fill
-              className="object-cover"
-              sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-            />
+            /\.webm(\?|#|$)/i.test(u.cover_url) ? (
+              <video
+                key={u.cover_url}
+                src={buildPublicUrl(u.cover_url)}
+                className="absolute inset-0 size-full object-cover"
+                muted
+                playsInline
+                autoPlay
+                loop
+              />
+            ) : (
+              <Image
+                src={buildPublicUrl(u.cover_url)}
+                alt={`${u.username} cover`}
+                fill
+                className="object-cover"
+                sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+              />
+            )
           ) : (
             <div
               className="absolute inset-0"
@@ -57,14 +71,17 @@ function UserCard({ user: u }: {
             <UserAvatar
               className="ring-2 ring-white size-14"
               username={u.username}
-              avatarUrl={u.avatar_url || undefined}
+              avatarUrl={u.avatar_url ? buildPublicUrl(u.avatar_url) : undefined}
               accentHex={avatarAccentHex}
             />
           </div>
 
           <div className="mt-2 min-w-0">
-            <h3 className="text-sm font-semibold truncate">
-              {u.display_name?.trim() || u.username}
+            <h3 className="text-sm font-semibold">
+              <span className="flex items-center gap-1 min-w-0">
+                <span className="truncate">{u.display_name?.trim() || u.username}</span>
+                {u.is_premium && <SolidCarrot className="size-4 shrink-0" />}
+              </span>
             </h3>
             <p className="mt-0.5 text-xs text-muted-foreground truncate">@{u.username}</p>
           </div>
@@ -118,6 +135,7 @@ export default function UsersGrid() {
               cover_url: u.cover_url ?? null,
               accent_color: u.accent_color ?? null,
               bio: (u as { bio?: string | null }).bio ?? null,
+              is_premium: (u as { is_premium?: boolean }).is_premium ?? false,
             }} />
           ))}
         </div>

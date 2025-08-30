@@ -23,7 +23,7 @@ export type ImageMetaRow = {
   width: number;
   height: number;
   size_bytes: number;
-  mime: "image/jpeg" | "image/png" | "image/webp";
+  mime: "image/jpeg" | "image/png" | "image/webp" | "video/webm" | "video/mp4";
 };
 
 export type PostRow = {

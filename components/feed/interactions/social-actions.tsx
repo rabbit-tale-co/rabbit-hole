@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import type { MouseEvent } from "react";
 import { Heart, MessageCircle, Repeat2, Bookmark } from "lucide-react";
+import { OutlineBookmark, OutlineChat, OutlineHeart, OutlineRepeat } from "@/components/icons/Icons";
 
 interface SocialActionsProps {
   likes: number;
@@ -48,8 +49,7 @@ export function SocialActions({
             className={`hover:bg-white/12 hover:text-white ${isLiked ? 'text-red-500 hover:text-red-500 hover:bg-red-500/12' : 'text-white'}`}
             onClick={onLike}
           >
-            <Heart
-              size={16}
+            <OutlineHeart
               className={isLiked ? 'fill-current' : ''}
             />
           </Button>
@@ -71,7 +71,7 @@ export function SocialActions({
             className="hover:bg-white/12 hover:text-white text-white"
             onClick={onComment}
           >
-            <MessageCircle size={16} />
+            <OutlineChat />
           </Button>
           {showCommentsCount && (
             comments > 0 ? (
@@ -90,7 +90,7 @@ export function SocialActions({
             className={`hover:bg-white/12 hover:text-white ${isReposted ? 'text-green-500 hover:text-green-500 hover:bg-green-500/12' : 'text-white'}`}
             onClick={onRepost}
           >
-            <Repeat2 size={16} />
+            <OutlineRepeat />
           </Button>
           {showRepostsCount && (
             reposts > 0 ? (
@@ -110,8 +110,7 @@ export function SocialActions({
           className={`hover:bg-white/12 hover:text-white ${isBookmarked ? 'text-yellow-500 hover:text-yellow-500 hover:bg-yellow-500/12' : 'text-white'}`}
           onClick={onBookmark}
         >
-          <Bookmark
-            size={16}
+          <OutlineBookmark
             className={isBookmarked ? 'fill-current' : ''}
           />
         </Button>

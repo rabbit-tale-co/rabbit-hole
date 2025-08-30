@@ -100,7 +100,7 @@ export async function getUsersPage(input: unknown) {
 
   const query = sb
     .from("profiles")
-    .select("user_id, username, display_name, bio, avatar_url, cover_url, accent_color")
+    .select("user_id, username, display_name, bio, avatar_url, cover_url, accent_color, is_premium")
     .order("username", { ascending: true })
     .order("user_id", { ascending: true })
     .limit(parsed.data.limit);

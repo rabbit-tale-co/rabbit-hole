@@ -1,6 +1,7 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getUserFromCookies, isBanned } from "@/lib/auth";
 import { CreatePost, UpdatePost, PostIdUserId, CommentCreate, CommentDelete, FeedCursor } from "@/schemas/post";
 import { UUID } from "@/schemas/_shared";
 import { z } from "zod";
@@ -19,10 +20,24 @@ function encodeCursor(ts: string, id: string) {
   return Buffer.from(`${ts}|${id}`).toString("base64");
 }
 
+// Require logged-in and not-banned user. Optionally assert the userId matches the current user.
+async function requireActiveUser(expectedUserId?: string): Promise<{ error?: string; me?: { id: string } }> {
+  const me = await getUserFromCookies();
+  if (!me) return { error: "Unauthorized" };
+  if (isBanned(me.bannedUntil)) return { error: "Banned" };
+  if (expectedUserId && me.id !== expectedUserId) return { error: "Forbidden" };
+  return { me: { id: me.id } };
+}
+
 // --- create post (images must be already uploaded to Storage with those paths) ---
 export async function createPost(input: unknown) {
   const parsed = CreatePost.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  {
+    const auth = await requireActiveUser(parsed.data.author_id);
+    if (auth.error) return { error: auth.error };
+  }
 
   const sb = supabaseAdmin;
   const { data, error } = await sb
@@ -43,6 +58,11 @@ export async function createPost(input: unknown) {
 export async function updatePost(input: unknown) {
   const parsed = UpdatePost.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  {
+    const auth = await requireActiveUser(parsed.data.author_id);
+    if (auth.error) return { error: auth.error };
+  }
 
   const sb = supabaseAdmin;
   const { data: post, error: fetchErr } = await sb
@@ -70,6 +90,10 @@ export async function updatePost(input: unknown) {
 
 // --- delete post (soft delete + return paths for caller to purge if needed) ---
 export async function deletePost(post_id: string, author_id: string) {
+  {
+    const auth = await requireActiveUser(author_id);
+    if (auth.error) return { error: auth.error };
+  }
   const sb = supabaseAdmin;
   const { data: post, error: getErr } = await sb
     .from("posts")
@@ -86,6 +110,26 @@ export async function deletePost(post_id: string, author_id: string) {
     .eq("id", post_id);
   if (error) return { error: error.message };
   return { ok: true, images: post.images ?? [] };
+}
+
+// --- ADMIN ONLY: delete any post by id ---
+export async function adminDeletePost(post_id: string) {
+  const me = await getUserFromCookies();
+  if (!me || (!me.isSuperAdmin && !me.roles.includes("admin"))) return { error: "Forbidden" };
+  if (isBanned(me.bannedUntil)) return { error: "Banned" };
+  const { error } = await supabaseAdmin.from("posts").update({ is_deleted: true }).eq("id", post_id);
+  if (error) return { error: error.message };
+  return { ok: true };
+}
+
+// --- ADMIN ONLY: delete all posts (TEMP DEV TOOL) ---
+export async function adminDeleteAllPosts() {
+  const me = await getUserFromCookies();
+  if (!me || (!me.isSuperAdmin && !me.roles.includes("admin"))) return { error: "Forbidden" };
+  if (isBanned(me.bannedUntil)) return { error: "Banned" };
+  const { error } = await supabaseAdmin.from("posts").update({ is_deleted: true }).neq("id", "");
+  if (error) return { error: error.message };
+  return { ok: true };
 }
 
 // --- like / bookmark / repost (idempotent toggle) ---
@@ -105,16 +149,28 @@ async function toggle(table: "likes" | "bookmarks" | "reposts", post_id: string,
 export async function setLike(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+  {
+    const auth = await requireActiveUser(parsed.data.user_id);
+    if (auth.error) return { error: auth.error };
+  }
   return toggle("likes", parsed.data.post_id, parsed.data.user_id, on);
 }
 export async function setBookmark(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+  {
+    const auth = await requireActiveUser(parsed.data.user_id);
+    if (auth.error) return { error: auth.error };
+  }
   return toggle("bookmarks", parsed.data.post_id, parsed.data.user_id, on);
 }
 export async function setRepost(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+  {
+    const auth = await requireActiveUser(parsed.data.user_id);
+    if (auth.error) return { error: auth.error };
+  }
   return toggle("reposts", parsed.data.post_id, parsed.data.user_id, on);
 }
 
@@ -122,6 +178,10 @@ export async function setRepost(input: unknown, on: boolean) {
 export async function addComment(input: unknown) {
   const parsed = CommentCreate.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+  {
+    const auth = await requireActiveUser(parsed.data.author_id);
+    if (auth.error) return { error: auth.error };
+  }
   const sb = supabaseAdmin;
   const { data, error } = await sb.from("comments").insert(parsed.data).select().single();
   if (error) return { error: error.message };
@@ -130,6 +190,10 @@ export async function addComment(input: unknown) {
 export async function removeComment(input: unknown) {
   const parsed = CommentDelete.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+  {
+    const auth = await requireActiveUser(parsed.data.author_id);
+    if (auth.error) return { error: auth.error };
+  }
   const sb = supabaseAdmin;
   // authorize: author only
   const { data: c, error: e1 } = await sb.from("comments").select("author_id").eq("id", parsed.data.comment_id).single();

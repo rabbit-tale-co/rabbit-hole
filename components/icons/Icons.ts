@@ -4,6 +4,18 @@ export { SolidLogoText } from './assets/logo/logo_text'
 //User Inferface
 
 export {
+  OutlineHeart,
+  SolidHeart,
+  DuotoneHeart
+} from './assets/user_interface/Heart'
+
+export {
+	OutlineCrown,
+	SolidCrown,
+	DuotoneCrown,
+} from './assets/user_interface/Crown'
+
+export {
 	OutlineSend,
 	SolidSend,
 	DuotoneSend,
@@ -251,3 +263,19 @@ export {
 // Formating
 
 export { OutlineBold, SolidBold, DuotoneBold } from './assets/formatting/Bold'
+
+// Food and Drinks
+
+export {
+	OutlineCarrot,
+	SolidCarrot,
+	DuotoneCarrot,
+} from './assets/food_and_drinks/Carrot'
+
+// Date and Time
+
+export {
+	OutlineCalendar,
+	SolidCalendar,
+	DuotoneCalendar,
+} from './assets/date_and_time/Calendar'

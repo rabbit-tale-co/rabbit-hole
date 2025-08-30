@@ -8,6 +8,8 @@ import Center from "@/components/Center";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OutlineImage } from "@/components/icons/Icons";
+import dynamic from "next/dynamic";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 /**
  * Empty gallery states for profile & home feed
@@ -33,6 +35,9 @@ export default function ProfileEmptyGallery({
 }: ProfileEmptyGalleryProps) {
   const [isDragging, setIsDragging] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [openComposer, setOpenComposer] = React.useState(false);
+
+  const CreatePostDialog = React.useMemo(() => dynamic(() => import("@/components/feed/upload/create-post").then(m => m.CreatePost), { ssr: false }), []);
 
   const defaultDescription = isOwnProfile
     ? "Share your first piece — images, process shots or short reels."
@@ -96,11 +101,8 @@ export default function ProfileEmptyGallery({
               >
                 {isOwnProfile ? (
                   <>
-                    <Button onClick={onCreate ?? openFileDialog} className="gap-2">
+                    <Button onClick={onCreate ? onCreate : () => setOpenComposer(true)} className="gap-2">
                       <Wand2 className="h-4 w-4" /> Create post
-                    </Button>
-                    <Button variant="secondary" className="gap-2" onClick={openFileDialog}>
-                      <UploadCloud className="h-4 w-4" /> Upload images
                     </Button>
                     <input
                       ref={fileInputRef}
@@ -209,6 +211,16 @@ export default function ProfileEmptyGallery({
           </div>
         </CardContent>
       </Card>
+      <Dialog open={isOwnProfile && openComposer} onOpenChange={setOpenComposer}>
+        <DialogContent className="p-0 sm:max-w-[640px] rounded-3xl overflow-hidden bg-background">
+          <DialogHeader className="px-5 pt-5 pb-3">
+            <DialogTitle className="text-base">Create a post</DialogTitle>
+          </DialogHeader>
+          <div className="px-5 pb-5">
+            <CreatePostDialog onPostCreated={() => setOpenComposer(false)} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

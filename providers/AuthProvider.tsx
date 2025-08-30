@@ -25,6 +25,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       if (data.session?.user?.id) {
         // fetch profile from public view (RLS allows select)
         const { data: p } = await supabase
+          .schema('social_art')
           .from("profiles")
           .select("*")
           .eq("user_id", data.session.user.id)
@@ -68,6 +69,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             (async () => {
               try {
                 const { data: p } = await supabase
+                  .schema('social_art')
                   .from("profiles")
                   .select("*")
                   .eq("user_id", sess.user.id)
@@ -100,6 +102,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const refreshProfile = useCallback(async () => {
     if (!user?.id) return;
     const { data: p } = await supabase
+      .schema('social_art')
       .from("profiles")
       .select("*")
       .eq("user_id", user.id)
@@ -250,6 +253,17 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     refreshProfile, signIn, signUp, signOut,
     resetPassword
   }), [user, session, loading, profile, refreshProfile]);
+
+  // Dev logs for debugging auth state
+  useEffect(() => {
+    try {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[auth] session', session);
+        console.log('[auth] user', user);
+        console.log('[auth] profile', profile);
+      }
+    } catch { }
+  }, [session, user, profile]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

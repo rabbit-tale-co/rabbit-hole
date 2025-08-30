@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { buildPublicUrl } from "@/lib/publicUrl";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { useBento } from "@/hooks/useBento";
 import { bucketFromWH } from "@/lib/bento";
@@ -14,9 +15,11 @@ import { supabase } from "@/lib/supabase";
 import { SocialActions } from "@/components/feed/interactions/social-actions";
 import { Progress } from "@/components/ui/progress";
 import { UserChipHoverCard } from "../user/ProfileCard";
+import { PremiumBadge } from "../user/PremiumBadge";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRouter } from "next/navigation";
+import { OutlineCalendar } from "../icons/Icons";
 
 // Local hover slideshow for multi-image posts
 function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; others: { src: string; alt?: string }[]; widthPx: number; alt?: string }) {
@@ -88,7 +91,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(initial, 24, { authorId });
   const router = useRouter();
 
-  const publicUrl = (path: string) => (/^https?:\/\//.test(path) ? path : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/social-art/${path}`);
+  const publicUrl = (path: string) => buildPublicUrl(path);
 
   // map posts -> tiles (first image per post as cover)
   const tiles: Tile[] = useMemo(() => {
@@ -211,7 +214,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                 const medias = post?.images || [];
                 const first = medias[0];
                 if (!first) return null;
-                const firstUrl = publicUrl(first.path);
+                const firstUrl = publicUrl(first.path || "");
                 const isVideo = String(first.mime || '').startsWith('video/');
                 if (isVideo) {
                   return (
@@ -233,8 +236,8 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                   .filter(im => !String((im as { mime?: string }).mime || '').startsWith('video/'));
                 return (
                   <HoverSlideshow
-                    firstSrc={firstUrl}
-                    others={restImageMedias.map(im => ({ src: publicUrl(im.path), alt: im.alt || '' }))}
+                    firstSrc={firstUrl || ""}
+                    others={restImageMedias.map(im => ({ src: publicUrl(im.path || ""), alt: im.alt || '' }))}
                     widthPx={Math.ceil(width)}
                     alt={p.tile.cover.alt || ''}
                   />
@@ -258,7 +261,12 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                         <UserChipHoverCard user={{
                           username: profile.username,
                           avatarUrl: profile.avatar_url,
-                          displayName: profile.display_name,
+                          displayName: (
+                            <span className="inline-flex items-center gap-1">
+                              <span className="truncate">{profile.display_name}</span>
+                              <PremiumBadge show={true} />
+                            </span>
+                          ),
                           coverUrl: profile.cover_url ? publicUrl(profile.cover_url) : undefined,
                           stats: {
                             followers: post?.like_count ?? 0,
@@ -274,7 +282,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Badge className="bg-black/50">
-                              <CalendarDays />
+                              <OutlineCalendar />
                               {dateLabel}
                             </Badge>
                           </TooltipTrigger>

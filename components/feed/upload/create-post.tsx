@@ -195,6 +195,7 @@ export function CreateMediaPost({
   const [postId, setPostId] = useState<string | null>(null);
   type Meta = { id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: NonNullable<Item['mime']>; is_cover: boolean };
   const [uploadedMetas, setUploadedMetas] = useState<Meta[]>([]);
+  type UploadResp = { path?: string; mime?: NonNullable<Item['mime']> };
 
   const canSubmit = useMemo(() => {
     const res = payloadSchema.safeParse({
@@ -291,69 +292,60 @@ export function CreateMediaPost({
     const key = `posts/${postId}/${imageId}.${ext}`;
     console.debug('[uploadOne] prepared id', { key, mime, size: blob.size });
 
+    const MEDIA_API = process.env.NEXT_PUBLIC_BACKEND || process.env.NEXT_PUBLIC_MEDIA_API_URL || 'https://api.rabbittale.co';
+
     // Direct upload for videos or payloads that may exceed serverless limits
     if (it.kind === 'video' || blob.size > 4 * 1024 * 1024) {
-      const baseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object`;
-      const bucket = 'social-art';
-      const url = `${baseUrl}/${bucket}/${key}`;
-      const { data: { session } } = await supabase.auth.getSession();
-      const bearer = session?.access_token || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', url);
-        xhr.setRequestHeader('authorization', `Bearer ${bearer}`);
-        xhr.setRequestHeader('x-upsert', 'true');
-        xhr.upload.onprogress = (ev) => {
-          const total = (ev.lengthComputable && ev.total) ? ev.total : blob.size;
-          const loaded = ev.loaded || 0;
-          const pct = total > 0 ? Math.max(1, Math.min(99, Math.round((loaded / total) * 100))) : 1;
-          onProgress(pct);
-        };
-        xhr.onerror = () => reject(new Error('storage_upload_failed'));
-        xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error(`storage_upload_status_${xhr.status}`)); };
-        const fd = new FormData();
-        fd.append('file', blob, `${imageId}.${ext}`);
-        xhr.send(fd);
-      });
-
-      // compute dims for image if not probed already
-      let w = probeW || 1, h = probeH || 1;
-      if (it.kind !== 'video' && (w === 0 || h === 0)) {
+      let serverMeta: Meta | null = null;
+      await new Promise<void>(async (resolve, reject) => {
         try {
-          const iurl = URL.createObjectURL(it.file);
-          await new Promise<void>((resolve) => {
-            const im = new window.Image();
-            im.onload = () => { w = im.naturalWidth || 1; h = im.naturalHeight || 1; resolve(); };
-            im.onerror = () => resolve();
-            im.src = iurl;
-          });
-          try { URL.revokeObjectURL(iurl); } catch { }
-        } catch { }
-      }
-
-      const meta = {
-        id: imageId,
-        path: key,
-        alt: it.alt || '',
-        width: Math.max(1, w || 1),
-        height: Math.max(1, h || 1),
-        size_bytes: blob.size,
-        mime: mime as NonNullable<Item['mime']>,
-        is_cover: Boolean(it.isCover),
-      } as const;
-      // persist dims locally for UI
-      try { patchItem(it.id, { width: meta.width, height: meta.height, serverPath: meta.path, serverId: meta.id }); } catch { }
-      return meta;
+          const fd = new FormData();
+          fd.append('file', blob, `${imageId}.${ext}`);
+          fd.append('postId', postId);
+          fd.append('userId', user?.id || '');
+          fd.append('kind', it.kind);
+          fd.append('isCover', String(Boolean(it.isCover)));
+          fd.append('alt', it.alt || '');
+          if (probeW && probeH) {
+            fd.append('width', String(probeW));
+            fd.append('height', String(probeH));
+          }
+          onProgress(1);
+          const res = await fetch(`${MEDIA_API}/social/v1/post/upload`, { method: 'POST', body: fd });
+          if (!res.ok) {
+            const t = await res.text().catch(() => '');
+            console.error('[uploadOne] server upload failed', res.status, t);
+            reject(new Error('server_upload_failed'));
+            return;
+          }
+          const json: UploadResp = await res.json();
+          serverMeta = {
+            id: imageId,
+            path: json.path || key,
+            alt: it.alt || '',
+            width: probeW || 1,
+            height: probeH || 1,
+            size_bytes: Number(blob.size || 1),
+            mime: (json.mime || 'video/webm') as NonNullable<Item['mime']>,
+            is_cover: Boolean(it.isCover),
+          } as Meta;
+          try { patchItem(it.id, { width: serverMeta.width, height: serverMeta.height, serverPath: serverMeta.path, serverId: serverMeta.id }); } catch { }
+          resolve();
+        } catch (e) { reject(e); }
+      });
+      return (serverMeta as unknown) as {
+        id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: NonNullable<Item['mime']>; is_cover: boolean
+      };
     }
 
     // Upload to our server endpoint which converts (sharp/ffmpeg) and pushes to storage
-    let serverMeta: { id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: NonNullable<Item['mime']>; is_cover: boolean } | null = null;
+    let serverMeta: Meta | null = null;
     await new Promise<void>(async (resolve, reject) => {
       try {
         const fd = new FormData();
         fd.append('file', blob, `${imageId}.${ext}`);
         fd.append('postId', postId);
+        fd.append('userId', user?.id || '');
         fd.append('kind', it.kind);
         fd.append('isCover', String(Boolean(it.isCover)));
         fd.append('alt', it.alt || '');
@@ -362,18 +354,28 @@ export function CreateMediaPost({
           fd.append('height', String(probeH));
         }
         onProgress(1);
-        const res = await fetch('/api/uploads', { method: 'POST', body: fd });
+        const res = await fetch(`${MEDIA_API}/social/v1/post/upload`, { method: 'POST', body: fd });
         if (!res.ok) {
           const t = await res.text().catch(() => '');
           console.error('[uploadOne] server upload failed', res.status, t);
           reject(new Error('server_upload_failed'));
           return;
         }
-        const json: { id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: NonNullable<Item['mime']>; is_cover: boolean } = await res.json();
-        ext = (json.path?.split('.').pop() || ext);
-        mime = json.mime || mime;
-        serverMeta = json;
-        try { patchItem(it.id, { width: json.width, height: json.height, serverPath: json.path, serverId: json.id }); } catch { }
+        const json: UploadResp = await res.json();
+        const built = {
+          id: imageId,
+          path: json.path || key,
+          alt: it.alt || '',
+          width: probeW || 1,
+          height: probeH || 1,
+          size_bytes: Number(blob.size || 1),
+          mime: (json.mime || (it.kind === 'gif' || it.kind === 'video' ? 'video/webm' : 'image/webp')) as NonNullable<Item['mime']>,
+          is_cover: Boolean(it.isCover),
+        } as Meta;
+        ext = (built.path?.split('.').pop() || ext);
+        mime = built.mime || mime;
+        serverMeta = built;
+        try { patchItem(it.id, { width: built.width, height: built.height, serverPath: built.path, serverId: built.id }); } catch { }
         resolve();
       } catch (e) {
         reject(e);

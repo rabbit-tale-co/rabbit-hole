@@ -5,13 +5,16 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { ImageZoom } from "@/components/ui/kibo-ui/image-zoom";
 import Link from "next/link";
+import { buildPublicUrl } from "@/lib/publicUrl";
 import { CalendarDays, Trash2, Pencil, ArrowLeft } from "lucide-react";
+import { PremiumBadge } from "@/components/user/PremiumBadge";
 import { useAuth } from "@/providers/AuthProvider";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import Center from "@/components/Center";
 import { toast } from "sonner";
 import { ConfirmDelete } from "./ConfirmDelete";
+import { isCurrentUserAdmin, adminDeletePost } from "@/app/actions/admin";
 
 type Post = {
   id: string;
@@ -33,6 +36,7 @@ export default function PostPage() {
   const [author, setAuthor] = React.useState<Author | null>(null);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [isAdmin, setIsAdmin] = React.useState(false);
 
   React.useEffect(() => {
     let alive = true;
@@ -51,9 +55,16 @@ export default function PostPage() {
     return () => { alive = false; };
   }, [id]);
 
-  const publicUrl = React.useCallback((path: string) => (
-    /^https?:\/\//.test(path) ? path : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/social-art/${path}`
-  ), []);
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const { admin } = await isCurrentUserAdmin();
+        setIsAdmin(Boolean(admin));
+      } catch { }
+    })();
+  }, []);
+
+  const publicUrl = React.useCallback((path: string) => buildPublicUrl(path), []);
 
   const myPost = post && user?.id === post.author_id;
 
@@ -74,6 +85,8 @@ export default function PostPage() {
     }
   }
 
+  // admin delete helper kept for future use in contextual menus
+
   if (loading) return <Center><div>Loading…</div></Center>;
   if (error || !post) return <Center><div className="text-sm text-muted-foreground">Post not found.</div></Center>;
 
@@ -92,8 +105,9 @@ export default function PostPage() {
           </Link>
           <div className="min-w-0">
             {/* author chip */}
-            <Link href={`/user/${author?.username || post.author_id}`} className="font-semibold hover:underline">
-              {author?.display_name?.trim() || author?.username || "View author"}
+            <Link href={`/user/${author?.username || post.author_id}`} className="font-semibold hover:underline inline-flex items-center gap-1">
+              <span className="truncate">{author?.display_name?.trim() || author?.username || "View author"}</span>
+              <PremiumBadge show={true} />
             </Link>
             <div className="text-xs text-muted-foreground flex items-center gap-1">
               <CalendarDays className="size-3" />
@@ -101,7 +115,7 @@ export default function PostPage() {
             </div>
           </div>
         </div>
-        {myPost && (
+        {(myPost || isAdmin) && (
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="gap-1" onClick={() => toast("Edit coming soon")}> <Pencil className="size-4" /> Edit</Button>
             <Button variant="destructive" size="sm" className="gap-1" onClick={() => setConfirmOpen(true)}> <Trash2 className="size-4" /> Delete</Button>

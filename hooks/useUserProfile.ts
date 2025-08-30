@@ -11,6 +11,7 @@ export type FetchedProfile = {
   avatar_url?: string | null;
   cover_url?: string | null;
   accent_color?: string | null;
+  banned_until?: string | null;
 };
 
 export function useUserProfile(username: string | undefined) {
