@@ -24,6 +24,7 @@ interface UserProfileData {
   cover_url?: string | null;
   accent_color?: string | null;
   banned_until?: string | null;
+  is_premium?: boolean | null;
 }
 
 interface UserProfileProps {
@@ -121,7 +122,7 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
         <div className="relative inline-block">
           <h3 className="text-2xl font-bold text-neutral-950 inline-flex items-center gap-2">
             <span>{profile.display_name}</span>
-            <PremiumBadge show={true} />
+            <PremiumBadge show={Boolean(profile.is_premium)} />
           </h3>
           <p className="text-neutral-600">@{profile.username}</p>
         </div>
