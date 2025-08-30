@@ -1,8 +1,9 @@
+export const dynamic = 'force-dynamic';
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
-  const username = params.username;
+export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+  const { username } = await params;
   // fetch display_name for nicer title; fall back to username
   let displayName: string | null = null;
   try {

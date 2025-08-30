@@ -2,8 +2,6 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-export const revalidate = 0;
-
 const Username = z.string().min(3).max(20).regex(/^[a-z0-9_]+$/);
 
 export async function GET(_req: NextRequest, context: { params: Promise<{ username: string }> }) {

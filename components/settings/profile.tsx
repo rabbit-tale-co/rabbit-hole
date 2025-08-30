@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { AtSign, X, HelpCircle, User } from "lucide-react"
+import { AtSign, HelpCircle, User, X } from "lucide-react"
 import { OutlineImage } from "@/components/icons/Icons"
 import { Button } from "@/components/ui/button"
 import { Input, InputWrapper } from "@/components/ui/input"
@@ -18,9 +18,11 @@ import Image from "next/image"
 import { getAccentColorStyle, type AccentColor, getStyleFromHexShade } from "@/lib/accent-colors"
 import { useUnsavedChanges } from "./Dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { ImageCrop, ImageCropApply, ImageCropContent, ImageCropReset } from "@/components/ui/kibo-ui/image-crop"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DeleteAccountDialog } from "./DeleteAccountDialog"
 import { supabase } from "@/lib/supabase"
-import { finalizeAvatar, finalizeCover, presignAvatarUpload, presignCoverUpload } from "@/app/actions/storage"
+import { useProfileMedia } from "@/hooks/useProfileMedia"
 
 // bio formatting not persisted yet
 
@@ -157,6 +159,10 @@ export function Profile({ user }: ProfileProps) {
   // Get current accent color from user metadata for display purposes only
   const currentAccentColor = 'blue' as AccentColor
   const accentHex = profile?.accent_color || null
+  const { removeCoverSafely, removeAvatarSafely, uploadAvatarFromCropped, uploadCoverFromCropped } = useProfileMedia(user?.id || null, refreshProfile)
+  const [cropAvatarFile, setCropAvatarFile] = React.useState<File | null>(null)
+  const [cropCoverFile, setCropCoverFile] = React.useState<File | null>(null)
+  const [cropping, setCropping] = React.useState<"avatar" | "cover" | null>(null)
 
   return (
     <div className="space-y-6">
@@ -168,37 +174,37 @@ export function Profile({ user }: ProfileProps) {
         <div className="relative">
           {/* Cover with same design as edit-profile-dialog - Clickable for adding image */}
           <div
-            className="w-full h-48 rounded-2xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+            className="group/cover relative w-full h-48 rounded-2xl overflow-hidden cursor-pointer"
             style={accentHex ? getStyleFromHexShade(accentHex, '100', 'backgroundColor') : getAccentColorStyle(currentAccentColor, 100, 'backgroundColor')}
-            onClick={async () => {
-              if (!user?.id) return;
-              const input = document.createElement('input');
-              input.type = 'file';
-              input.accept = 'image/*';
-              input.onchange = async () => {
-                const file = input.files?.[0];
-                if (!file) return;
-                const ext = (file.name.split('.').pop() || 'jpg').toLowerCase() as "jpg" | "jpeg" | "png" | "webp";
-                const { data, error } = await presignCoverUpload(user.id, ext);
-                if (!data || error) { toast.error(error || 'upload failed'); return; }
-                const res = await fetch(data.url, { method: 'PUT', headers: { 'content-type': file.type }, body: file });
-                if (!res.ok) { toast.error('upload failed'); return; }
-                const fin = await finalizeCover(user.id, data.path);
-                if (typeof fin === 'object' && fin && 'error' in fin && (fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || 'update failed'); return; }
-                await refreshProfile();
-                window.dispatchEvent(new CustomEvent('profile:updated'));
-              };
-              input.click();
-            }}
+            onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.onchange = () => { const f = input.files?.[0] || null; if (f) { setCropCoverFile(f); setCropping('cover'); } }; input.click(); }}
           >
             {profile?.cover_url ? (
-              <Image
-                src={profile.cover_url}
-                alt="Cover"
-                className="w-full h-full object-cover"
-                width={600}
-                height={192}
-              />
+              <>
+                <Image
+                  src={profile.cover_url}
+                  alt="Cover"
+                  className="w-full h-full object-cover"
+                  width={600}
+                  height={192}
+                />
+                {/* Remove cover button with tooltip (visible on hover/focus) */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label="Remove cover"
+                        size="icon"
+                        variant="destructive"
+                        className="absolute size-8 top-2 right-2 z-10 opacity-0 group-hover/cover:opacity-100 focus:opacity-100 transition-opacity"
+                        onClick={async (e) => { e.stopPropagation(); await removeCoverSafely(); }}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" align="center">Remove cover</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
             ) : (
               <div className="flex flex-col items-center justify-center h-full space-y-3" style={accentHex ? getStyleFromHexShade(accentHex, '950', 'color') : getAccentColorStyle(currentAccentColor, 950, 'color')} >
                 <OutlineImage size={42} />
@@ -212,30 +218,11 @@ export function Profile({ user }: ProfileProps) {
 
           {/* Avatar positioned on top of cover like edit-profile-dialog */}
           <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2">
-            <div className="relative">
+            <div className="relative group/avatar">
               {/* Avatar with same design as edit-profile-dialog - Clickable for adding image */}
               <div
-                className="size-28 rounded-full border-2 border-white overflow-hidden bg-white ring-3 ring-white shadow-lg cursor-pointer transition-all relative group"
-                onClick={async () => {
-                  if (!user?.id) return;
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'image/*';
-                  input.onchange = async () => {
-                    const file = input.files?.[0];
-                    if (!file) return;
-                    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase() as "jpg" | "jpeg" | "png" | "webp";
-                    const { data, error } = await presignAvatarUpload(user.id, ext);
-                    if (!data || error) { toast.error(error || 'upload failed'); return; }
-                    const res = await fetch(data.url, { method: 'PUT', headers: { 'content-type': file.type }, body: file });
-                    if (!res.ok) { toast.error('upload failed'); return; }
-                    const fin = await finalizeAvatar(user.id, data.path);
-                    if (typeof fin === 'object' && fin && 'error' in fin && (fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || 'update failed'); return; }
-                    await refreshProfile();
-                    window.dispatchEvent(new CustomEvent('profile:updated'));
-                  };
-                  input.click();
-                }}
+                className="size-28 rounded-full border-2 border-white overflow-hidden bg-white ring-3 ring-white shadow-lg cursor-pointer transition-all relative"
+                onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.onchange = () => { const f = input.files?.[0] || null; if (f) { setCropAvatarFile(f); setCropping('avatar'); } }; input.click(); }}
               >
                 {profile?.avatar_url ? (
                   <Image
@@ -253,8 +240,8 @@ export function Profile({ user }: ProfileProps) {
                     <User size={48} />
                     {/* hover overlay sliding from bottom */}
                     <div className="absolute bottom-0 left-0 w-full h-full pointer-events-none overflow-hidden rounded-full">
-                      <div className="absolute bottom-0 left-0 w-full h-1/3 translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-out bg-neutral-950/30" />
-                      <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-full flex justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <div className="absolute bottom-0 left-0 w-full h-1/3 translate-y-full group-hover/avatar:translate-y-0 transition-transform duration-200 ease-out bg-neutral-950/30" />
+                      <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-full flex justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200">
                         <OutlineImage size={24} className="text-white" />
                       </div>
                     </div>
@@ -262,22 +249,25 @@ export function Profile({ user }: ProfileProps) {
                 )}
               </div>
 
-              {/* Avatar Actions - Remove button instead of Add */}
-              <div className="absolute -bottom-2 -right-2">
-                {profile?.avatar_url && (
-                  <Button
-                    size="icon"
-                    variant="destructive"
-                    className="bg-red-500 hover:bg-red-600 text-white shadow-lg border-2 border-red-600 w-8 h-8"
-                    onClick={() => {
-                      // TODO: Implement avatar removal
-                      console.log('Remove avatar clicked')
-                    }}
-                  >
-                    <X size={12} />
-                  </Button>
-                )}
-              </div>
+              {/* Floating remove button as sibling over avatar (better z-index/overflow) */}
+              {profile?.avatar_url && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label="Remove avatar"
+                        size="icon"
+                        variant="destructive"
+                        className="absolute size-8 -bottom-1.5 -right-1.5 z-50 opacity-0 group-hover/avatar:opacity-100 focus:opacity-100 transition-opacity"
+                        onClick={async (e) => { e.preventDefault(); e.stopPropagation(); await removeAvatarSafely(); }}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="center">Remove avatar</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
           </div>
         </div>
@@ -287,6 +277,34 @@ export function Profile({ user }: ProfileProps) {
       </div>
 
       <Separator />
+      {/* Crop Modal rendered via portal to avoid nesting dialog-in-dialog */}
+      <Dialog open={!!cropping} onOpenChange={(open) => { if (!open) { setCropping(null); setCropAvatarFile(null); setCropCoverFile(null); } }}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>{cropping === 'avatar' ? 'Crop avatar' : 'Crop cover'}</DialogTitle>
+          </DialogHeader>
+          {cropping === 'avatar' && cropAvatarFile && (
+            <ImageCrop aspect={1} circularCrop file={cropAvatarFile} maxImageSize={1024 * 1024} onCrop={async (dataUrl) => { await uploadAvatarFromCropped(dataUrl); setCropping(null); setCropAvatarFile(null); }}>
+              <ImageCropContent className="max-w-full" />
+              <div className="mt-3 flex items-center gap-2">
+                <ImageCropApply />
+                <ImageCropReset />
+                <Button size="sm" variant="ghost" onClick={() => { setCropping(null); setCropAvatarFile(null); }}>Cancel</Button>
+              </div>
+            </ImageCrop>
+          )}
+          {cropping === 'cover' && cropCoverFile && (
+            <ImageCrop aspect={3 / 1} file={cropCoverFile} maxImageSize={1024 * 1024 * 2} onCrop={async (dataUrl) => { await uploadCoverFromCropped(dataUrl); setCropping(null); setCropCoverFile(null); }}>
+              <ImageCropContent className="max-w-full" />
+              <div className="mt-3 flex items-center gap-2">
+                <ImageCropApply />
+                <ImageCropReset />
+                <Button size="sm" variant="ghost" onClick={() => { setCropping(null); setCropCoverFile(null); }}>Cancel</Button>
+              </div>
+            </ImageCrop>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Profile Information</h3>

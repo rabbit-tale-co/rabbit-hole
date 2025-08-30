@@ -1,8 +1,9 @@
+export const dynamic = 'force-dynamic';
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const id = params.id;
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
   let authorId: string | null = null;
   let text: string | null = null;
   try {

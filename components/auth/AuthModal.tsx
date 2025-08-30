@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Palette, X } from "lucide-react";
+import { Link, Palette, X } from "lucide-react";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 import ForgotForm from "./ForgotForm";
@@ -78,7 +78,7 @@ export function AuthModal({
             </Tabs>
 
             <p className="mt-3 text-[10px] text-muted-foreground">
-              By continuing you agree to our Terms and Privacy Policy.
+              By continuing you agree to our <Link href="/legal/terms">Terms</Link> and <Link href="/legal/privacy">Privacy Policy</Link>.
             </p>
           </section>
         </div>

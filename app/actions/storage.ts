@@ -21,11 +21,19 @@ export async function presignPostImageUpload(postId: string, ext: "jpg" | "jpeg"
   return { data: { path, url: data.signedUrl, token: data.token, imageId } };
 }
 
-export async function presignAvatarUpload(userId: string, ext: "jpg"|"jpeg"|"png"|"webp"): Promise<{ error?: string; data?: PresignResp }> {
+export async function presignAvatarUpload(userId: string, ext: "jpg"|"jpeg"|"png"|"webp"|"gif"): Promise<{ error?: string; data?: PresignResp }> {
   if (!userId) return { error: "Missing userId" };
   const sb = supabaseAdmin;
-  const targetExt = ext; // keep original extension
-  const path = `${FOLDER_AVATARS}/${userId}/avatar.${targetExt}`;
+  const targetExt = ext; // keep original extension (gif allowed)
+  // Clean up any existing avatar files for this user to prevent clutter and conflicts
+  try {
+    const { data: listed } = await sb.storage.from(BUCKET).list(`${FOLDER_AVATARS}/${userId}`);
+    const toRemove = (listed || []).map((it) => `${FOLDER_AVATARS}/${userId}/${it.name}`);
+    if (toRemove.length > 0) { await sb.storage.from(BUCKET).remove(toRemove); }
+  } catch { }
+  // Use unique name to avoid "resource already exists"
+  const uid = randomUUID();
+  const path = `${FOLDER_AVATARS}/${userId}/avatar-${uid}.${targetExt}`;
   const { data, error } = await sb.storage.from(BUCKET).createSignedUploadUrl(path);
   if (error) return { error: error.message };
   return { data: { path, url: data.signedUrl, token: data.token, imageId: "avatar" } };
@@ -39,11 +47,17 @@ export async function finalizeAvatar(userId: string, path: string) {
   return { ok: true, avatar_url: publicUrl };
 }
 
-export async function presignCoverUpload(userId: string, ext: "jpg"|"jpeg"|"png"|"webp"): Promise<{ error?: string; data?: PresignResp }> {
+export async function presignCoverUpload(userId: string, ext: "jpg"|"jpeg"|"png"|"webp"|"gif"): Promise<{ error?: string; data?: PresignResp }> {
   if (!userId) return { error: "Missing userId" };
   const sb = supabaseAdmin;
   const targetExt = ext; // keep original extension
-  const path = `covers/${userId}/cover.${targetExt}`;
+  try {
+    const { data: listed } = await sb.storage.from(BUCKET).list(`covers/${userId}`);
+    const toRemove = (listed || []).map((it) => `covers/${userId}/${it.name}`);
+    if (toRemove.length > 0) { await sb.storage.from(BUCKET).remove(toRemove); }
+  } catch { }
+  const uid = randomUUID();
+  const path = `covers/${userId}/cover-${uid}.${targetExt}`;
   const { data, error } = await sb.storage.from(BUCKET).createSignedUploadUrl(path);
   if (error) return { error: error.message };
   return { data: { path, url: data.signedUrl, token: data.token, imageId: "cover" } };
@@ -61,6 +75,35 @@ export async function finalizeCover(userId: string, path: string) {
 export async function deletePostFolder(postId: string) {
   const sb = supabaseAdmin;
   const { error } = await sb.storage.from(BUCKET).remove([`${FOLDER_POSTS}/${postId}`]);
+  if (error) return { error: error.message };
+  return { ok: true };
+}
+
+// Remove user's avatar file(s) and clear profile.avatar_url
+export async function removeAvatar(userId: string) {
+  if (!userId) return { error: "Missing userId" };
+  const sb = supabaseAdmin;
+  // Remove all files in avatar folder for this user
+  try {
+    const { data: listed } = await sb.storage.from(BUCKET).list(`${FOLDER_AVATARS}/${userId}`);
+    const toRemove = (listed || []).map((it) => `${FOLDER_AVATARS}/${userId}/${it.name}`);
+    if (toRemove.length > 0) { await sb.storage.from(BUCKET).remove(toRemove); }
+  } catch { }
+  const { error } = await sb.from("profiles").update({ avatar_url: null }).eq("user_id", userId);
+  if (error) return { error: error.message };
+  return { ok: true };
+}
+
+// Remove user's cover file(s) and clear profile.cover_url
+export async function removeCover(userId: string) {
+  if (!userId) return { error: "Missing userId" };
+  const sb = supabaseAdmin;
+  try {
+    const { data: listed } = await sb.storage.from(BUCKET).list(`covers/${userId}`);
+    const toRemove = (listed || []).map((it) => `covers/${userId}/${it.name}`);
+    if (toRemove.length > 0) { await sb.storage.from(BUCKET).remove(toRemove); }
+  } catch { }
+  const { error } = await sb.from("profiles").update({ cover_url: null }).eq("user_id", userId);
   if (error) return { error: error.message };
   return { ok: true };
 }
