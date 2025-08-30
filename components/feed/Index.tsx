@@ -117,7 +117,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   }, [items]);
 
   // lazy profile cache: author_id -> minimal profile
-  const [authorProfiles, setAuthorProfiles] = useState<Map<string, { username: string; display_name: string; avatar_url: string; cover_url?: string }>>(new Map());
+  const [authorProfiles, setAuthorProfiles] = useState<Map<string, { username: string; display_name: string; avatar_url: string; cover_url?: string; is_premium?: boolean }>>(new Map());
   useEffect(() => {
     const missing = items
       .map((p) => p.author_id)
@@ -127,12 +127,12 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("user_id,username,avatar_url,cover_url,display_name")
+        .select("user_id,username,avatar_url,cover_url,display_name,is_premium")
         .in("user_id", missing as string[]);
       if (!data) return;
       setAuthorProfiles((prev) => {
         const next = new Map(prev);
-        for (const row of data) next.set(row.user_id, { username: row.username, avatar_url: row.avatar_url, cover_url: row.cover_url, display_name: row.display_name });
+        for (const row of data) next.set(row.user_id, { username: row.username, avatar_url: row.avatar_url, cover_url: row.cover_url, display_name: row.display_name, is_premium: (row as { is_premium?: boolean }).is_premium });
         return next;
       });
     })();
@@ -264,7 +264,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                           displayName: (
                             <span className="inline-flex items-center gap-1">
                               <span className="truncate">{profile.display_name}</span>
-                              <PremiumBadge show={true} />
+                              <PremiumBadge show={Boolean(profile.is_premium)} />
                             </span>
                           ),
                           coverUrl: profile.cover_url ? publicUrl(profile.cover_url) : undefined,
