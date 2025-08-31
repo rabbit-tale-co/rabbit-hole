@@ -2,6 +2,16 @@ export const dynamic = 'force-dynamic';
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+/**
+ * TODO: title as displayname (@username)
+ * description as user bio or our default
+ * og image as user cover or canvas of their accent color
+ * og:site_name as "rabbit-hole"
+ * og:type as "profile"
+ * profile:username as username
+ * og:url as /user/username
+ */
+
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
   // fetch display_name for nicer title; fall back to username
