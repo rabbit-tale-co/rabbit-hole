@@ -77,6 +77,47 @@ const fmt = (n: number) => {
   return `${v.toFixed(v < 10 ? 1 : 0)} ${u[i]}`;
 };
 
+// Probe media dimensions for images/gifs/videos using browser APIs
+async function probeDimensions(file: File, kind: Kind): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    // Videos: use a <video> element to read metadata
+    if (kind === 'video') {
+      let url = '';
+      try { url = URL.createObjectURL(file); } catch { /* noop */ }
+      const v = document.createElement('video');
+      v.preload = 'metadata';
+      v.onloadedmetadata = () => {
+        const width = v.videoWidth || 1;
+        const height = v.videoHeight || 1;
+        resolve({ width, height });
+        try { if (url) { URL.revokeObjectURL(url); } } catch { }
+      };
+      v.onerror = () => {
+        resolve({ width: 1, height: 1 });
+        try { if (url) { URL.revokeObjectURL(url); } } catch { }
+      };
+      v.src = url;
+      return;
+    }
+
+    // Images/GIFs: use an Image element to read natural size
+    let url = '';
+    try { url = URL.createObjectURL(file); } catch { /* noop */ }
+    const imgEl = new window.Image();
+    imgEl.onload = () => {
+      const width = imgEl.naturalWidth || 1;
+      const height = imgEl.naturalHeight || 1;
+      resolve({ width, height });
+      try { if (url) { URL.revokeObjectURL(url); } } catch { }
+    };
+    imgEl.onerror = () => {
+      resolve({ width: 1, height: 1 });
+      try { if (url) { URL.revokeObjectURL(url); } } catch { }
+    };
+    imgEl.src = url;
+  });
+}
+
 // Local components to safely create/revoke fresh blob URLs
 function VideoBlob({ file, className, controls = false }: { file: File; className?: string; controls?: boolean }) {
   const [url, setUrl] = useState<string>('');
@@ -272,21 +313,13 @@ export function CreateMediaPost({
 
     // dims bedzie liczony po stronie serwera
 
-    // if video, probe dims on client (server will use provided values)
+    // Probe dims on client for all kinds (image/gif/video). Server may also verify.
     let probeW = 0, probeH = 0;
-    if (it.kind === 'video') {
-      try {
-        const url = URL.createObjectURL(it.file);
-        await new Promise<void>((resolve) => {
-          const v = document.createElement('video');
-          v.preload = 'metadata';
-          v.onloadedmetadata = () => { probeW = v.videoWidth || 0; probeH = v.videoHeight || 0; resolve(); };
-          v.onerror = () => resolve();
-          v.src = url;
-        });
-        try { URL.revokeObjectURL(url); } catch { }
-      } catch { }
-    }
+    try {
+      const dim = await probeDimensions(it.file, it.kind);
+      probeW = dim.width || 0;
+      probeH = dim.height || 0;
+    } catch { /* noop */ }
 
     const imageId = randomUUIDv7();
     const key = `posts/${postId}/${imageId}.${ext}`;

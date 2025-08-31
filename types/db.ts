@@ -38,6 +38,7 @@ export type PostRow = {
   repost_count: number;
   comment_count: number;
   bookmark_count: number;
+  is_liked?: boolean;  // Added by API when fetching posts
 };
 
 export type CommentRow = {

@@ -10,11 +10,13 @@ import type { Tile } from "@/types";
 import { BentoSkeleton } from "@/components/feed/Loading";
 import ProfileEmptyGallery, { HomeEmptyFeed } from "@/components/feed/Empty";
 import { useIntersection } from "@/hooks/useIntersection";
-import { CalendarDays } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { SocialActions } from "@/components/feed/interactions/social-actions";
+import { PostImpressionTracker } from "@/components/feed/PostImpressionTracker";
+import { PostStats } from "@/components/feed/PostStats";
 import { Progress } from "@/components/ui/progress";
 import { UserChipHoverCard } from "../user/ProfileCard";
+import { useManualImpression } from "@/hooks/useManualImpression";
 import { PremiumBadge } from "../user/PremiumBadge";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -90,6 +92,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   // data
   const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(initial, 24, { authorId });
   const router = useRouter();
+  const { recordImpression } = useManualImpression();
 
   const publicUrl = (path: string) => buildPublicUrl(path);
 
@@ -176,6 +179,23 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   const rows = placed.length ? Math.max(...placed.map((p) => p.y + p.h)) : 0;
   const containerHeight = rows > 0 ? rows * cell + (rows - 1) * gap : Math.max(cell, 240);
 
+  // bramka animacji: włącz po dwóch rAF (po paint/layout)
+  const feedReady = !loading && items.length > 0 && cell > 0;
+  const [animateGate, setAnimateGate] = useState(false);
+  useEffect(() => {
+    if (!feedReady) { setAnimateGate(false); return; }
+    const id1 = requestAnimationFrame(() => {
+      const id2 = requestAnimationFrame(() => setAnimateGate(true));
+      // cleanup drugiego rAF:
+      (setAnimateGate as { _id2?: number })._id2 = id2;
+    });
+    return () => {
+      cancelAnimationFrame(id1);
+      const id2 = (setAnimateGate as { _id2?: number })._id2;
+      if (id2) cancelAnimationFrame(id2);
+    };
+  }, [feedReady]);
+
   // initial loading (no items yet) or container not measured
   const firstLoad = (items.length === 0 && loading);
 
@@ -205,10 +225,17 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
           return (
             <article
               key={p.tile.id}
-              onClick={() => { router.push(`/post/${p.tile.id}`); }}
+              data-post-id={p.tile.id}
+              onClick={async () => {
+                await recordImpression(p.tile.id);
+                router.push(`/post/${p.tile.id}`);
+              }}
               className="group absolute bg-neutral-100 rounded-2xl overflow-hidden cursor-pointer"
               style={{ top, left, width, height, minWidth: 160, minHeight: 160 }}
             >
+              {/* Track impressions for this post */}
+              <PostImpressionTracker postId={p.tile.id} />
+
               {(() => {
                 const post = idToPost.get(p.tile.id);
                 const medias = post?.images || [];
@@ -276,8 +303,9 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                       </div>
                     )}
 
-                    {/* top-right date with tooltip */}
-                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 text-white">
+                    {/* top-right date and stats */}
+                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 text-white flex flex-col items-end gap-2">
+                      {/* Date */}
                       <TooltipProvider delayDuration={150}>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -291,19 +319,25 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
+
+                      {/* Post Stats */}
+                      <PostStats postId={p.tile.id} />
                     </div>
                     {/* bottom gradient + actions row */}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3">
                       <SocialActions
+                        postId={p.tile.id}
                         likes={post?.like_count ?? 0}
                         comments={post?.comment_count ?? 0}
                         reposts={post?.repost_count ?? 0}
                         bookmarks={post?.bookmark_count ?? 0}
-                        isLiked={false}
+                        isLiked={post?.is_liked ?? false}
                         isReposted={false}
                         isBookmarked={false}
                         showBookmarksCount={false}
+                        animateGate={animateGate}
                         onLike={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         onComment={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         onRepost={(e) => { e.preventDefault(); e.stopPropagation(); }}

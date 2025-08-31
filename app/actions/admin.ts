@@ -1,21 +1,43 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getUserFromCookies, isBanned } from "@/lib/auth";
+import { getUserFromCookies, getUserFromToken } from "@/lib/auth";
 
-async function requireAdmin() {
-  const me = await getUserFromCookies();
+async function requireAdmin(token?: string) {
+  const me = token ? await getUserFromToken(token) : await getUserFromCookies();
   if (!me) return { error: "Unauthorized" } as const;
-  if (isBanned(me.bannedUntil)) return { error: "Banned" } as const;
-  const isAdmin = me.isSuperAdmin || me.roles.includes("admin");
-  if (!isAdmin) return { error: "Forbidden" } as const;
+  // Server-side check against social_art.profiles.is_admin
+  try {
+    const { data: prof, error } = await supabaseAdmin
+      .schema('social_art')
+      .from('profiles')
+      .select('is_admin')
+      .eq('user_id', me.id)
+      .maybeSingle();
+    if (error) return { error: error.message } as const;
+    const isAdmin = Boolean((prof as { is_admin?: boolean } | null)?.is_admin);
+    if (!isAdmin) return { error: "Forbidden" } as const;
+  } catch (e) {
+    return { error: (e as Error).message } as const;
+  }
   return { me } as const;
 }
 
 export async function isCurrentUserAdmin() {
   const me = await getUserFromCookies();
   if (!me) return { admin: false };
-  return { admin: me.isSuperAdmin || me.roles.includes("admin") || me.roles.includes("super_admin") };
+  try {
+    const { data: prof } = await supabaseAdmin
+      .schema('social_art')
+      .from('profiles')
+      .select('is_admin')
+      .eq('user_id', me.id)
+      .maybeSingle();
+    const isAdmin = Boolean((prof as { is_admin?: boolean } | null)?.is_admin);
+    return { admin: isAdmin };
+  } catch {
+    return { admin: false };
+  }
 }
 
 export async function adminDeletePost(post_id: string) {
@@ -35,25 +57,25 @@ export async function adminDeleteAllPosts() {
   return { ok: true };
 }
 
-export async function adminBanUser(targetUserId: string, bannedUntilISO: string) {
-  const auth = await requireAdmin();
+export async function adminBanUser(targetUserId: string, bannedUntilISO: string, reason?: string, note?: string, token?: string) {
+  const auth = await requireAdmin(token);
   if ("error" in auth) return auth;
   const { error } = await supabaseAdmin
     .schema('social_art')
-    .from("profiles")
-    .update({ banned_until: bannedUntilISO })
-    .eq("user_id", targetUserId);
+    .from("suspended_users")
+    .upsert({ user_id: targetUserId, banned_until: bannedUntilISO, reason: reason || null, note: note || null }, { onConflict: 'user_id' });
   if (error) return { error: error.message };
   return { ok: true };
 }
 
-export async function adminUnbanUser(targetUserId: string) {
-  const auth = await requireAdmin();
+export async function adminUnbanUser(targetUserId: string, token?: string) {
+  const auth = await requireAdmin(token);
   if ("error" in auth) return auth;
+  // Remove suspension entry entirely
   const { error } = await supabaseAdmin
     .schema('social_art')
-    .from("profiles")
-    .update({ banned_until: null })
+    .from("suspended_users")
+    .delete()
     .eq("user_id", targetUserId);
   if (error) return { error: error.message };
   return { ok: true };

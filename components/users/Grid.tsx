@@ -19,11 +19,12 @@ import { SolidCarrot } from "../icons/Icons";
 function UserCard({ user: u }: {
   user: {
     user_id: string; username: string; display_name: string | null;
-    avatar_url: string | null; cover_url: string | null; accent_color: string | null; bio?: string | null; is_premium: boolean;
+    avatar_url: string | null; cover_url: string | null; accent_color: string | null; bio?: string | null; is_premium: boolean; banned_until?: string | null;
   }
 }) {
   const avatarAccentHex =
     u.accent_color || getAccentColorValue(generateAccentColor(u.username), 500);
+  const isSuspended = Boolean(u.banned_until && Date.parse(u.banned_until) > Date.now());
 
   return (
     <Link href={`/user/${u.username}`}>
@@ -32,7 +33,12 @@ function UserCard({ user: u }: {
       >
         {/* cover: fixed height */}
         <div className="relative h-24 sm:h-30 w-full overflow-hidden rounded-t-2xl">
-          {u.cover_url ? (
+          {u.banned_until && Date.parse(u.banned_until) > Date.now() && (
+            <div className="absolute inset-0 z-10 flex items-start justify-end p-2">
+              <span className="rounded-full bg-red-600/90 text-white text-[10px] px-2 py-1">Suspended</span>
+            </div>
+          )}
+          {!isSuspended && u.cover_url ? (
             /\.webm(\?|#|$)/i.test(u.cover_url) ? (
               <video
                 key={u.cover_url}
@@ -71,7 +77,7 @@ function UserCard({ user: u }: {
             <UserAvatar
               className="ring-2 ring-white size-14"
               username={u.username}
-              avatarUrl={u.avatar_url ? buildPublicUrl(u.avatar_url) : undefined}
+              avatarUrl={!isSuspended && u.avatar_url ? buildPublicUrl(u.avatar_url) : undefined}
               accentHex={avatarAccentHex}
             />
           </div>
@@ -136,6 +142,7 @@ export default function UsersGrid() {
               accent_color: u.accent_color ?? null,
               bio: (u as { bio?: string | null }).bio ?? null,
               is_premium: (u as { is_premium?: boolean }).is_premium ?? false,
+              banned_until: (u as { banned_until?: string | null }).banned_until ?? null,
             }} />
           ))}
         </div>

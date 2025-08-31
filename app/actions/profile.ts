@@ -99,6 +99,7 @@ export async function getUsersPage(input: unknown) {
   }
 
   const query = sb
+    .schema('social_art')
     .from("profiles")
     .select("user_id, username, display_name, bio, avatar_url, cover_url, accent_color, is_premium")
     .order("username", { ascending: true })
@@ -113,9 +114,24 @@ export async function getUsersPage(input: unknown) {
   const { data, error } = await query;
   if (error) return { error: error.message };
 
+  // fetch suspension info for listed users
+  const ids = (data ?? []).map(r => r.user_id).filter(Boolean);
+  let suspMap = new Map<string, string | null>();
+  if (ids.length > 0) {
+    const { data: susp } = await sb
+      .schema('social_art')
+      .from('suspended_users')
+      .select('user_id, banned_until')
+      .in('user_id', ids);
+    for (const row of (susp || []) as { user_id: string; banned_until: string | null }[]) {
+      suspMap.set(row.user_id, row.banned_until ?? null);
+    }
+  }
+
   const nextCursor = data && data.length
     ? Buffer.from(`${data[data.length - 1].username}|${data[data.length - 1].user_id}`).toString("base64")
     : null;
 
-  return { items: data ?? [], nextCursor };
+  const items = (data ?? []).map(r => ({ ...r, banned_until: suspMap.get(r.user_id) ?? null }));
+  return { items, nextCursor };
 }

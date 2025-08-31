@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { CreatePost, Cursor } from "@/lib/validation";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -11,6 +12,9 @@ export async function GET(req: NextRequest) {
     limit: Number(searchParams.get("limit") ?? "24"),
   });
   if (!parsed.success) return Response.json({ error: "bad cursor" }, { status: 400 });
+
+  // Get current user from request
+  const user = await getUser(req);
 
   const { cursor, limit } = parsed.data;
   const where: string[] = ["is_deleted = false"];
@@ -33,6 +37,18 @@ export async function GET(req: NextRequest) {
     idx += 1;
   }
 
+  // Fetch currently suspended users to exclude from feed
+  let suspendedIds: string[] = [];
+  try {
+    const nowIso = new Date().toISOString();
+    const { data: susp } = await supabaseAdmin
+      .schema('social_art')
+      .from('suspended_users')
+      .select('user_id')
+      .gt('banned_until', nowIso);
+    suspendedIds = (susp || []).map((r: { user_id: string }) => r.user_id).filter(Boolean);
+  } catch { /* ignore, treat as none suspended */ }
+
   // Use query builder instead of RPC here to avoid dynamic SQL and param mismatch
   let query = supabaseAdmin
     .from("posts")
@@ -42,6 +58,13 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(limit);
+
+  // Exclude suspended authors
+  if (suspendedIds.length > 0) {
+    // PostgREST expects an "in" list like: (uuid1,uuid2) without quotes for UUIDs
+    const list = `(${suspendedIds.join(',')})`;
+    query = query.not('author_id', 'in', list);
+  }
 
   if (userIdParam) {
     query = query.eq("author_id", userIdParam);
@@ -55,11 +78,41 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
-  const nextCursor = data && data.length
-    ? Buffer.from(`${data[data.length - 1].created_at}|${data[data.length - 1].id}`).toString("base64")
+    // Get current user's like status for each post if authenticated
+  let postsWithLikes = data || [];
+
+  if (user && postsWithLikes.length > 0) {
+    try {
+      const postIds = postsWithLikes.map(p => p.id);
+
+      const { data: likes } = await supabaseAdmin
+        .from('likes')
+        .select('post_id')
+        .eq('user_id', user.id)
+        .in('post_id', postIds);
+
+      // console.log('🔍 API Debug - Likes found:', likes);
+
+      const likedPostIds = new Set((likes || []).map(l => l.post_id));
+      postsWithLikes = postsWithLikes.map(post => ({
+        ...post,
+        is_liked: likedPostIds.has(post.id)
+      }));
+
+      // console.log('🔍 API Debug - Posts with like status:', postsWithLikes.map(p => ({ id: p.id, is_liked: p.is_liked })));
+    } catch (error) {
+      // If we can't get likes, continue without them
+      console.warn('Failed to fetch likes:', error);
+    }
+  } else {
+    console.log('🔍 API Debug - No user, posts will not have is_liked property');
+  }
+
+  const nextCursor = postsWithLikes.length
+    ? Buffer.from(`${postsWithLikes[postsWithLikes.length - 1].created_at}|${postsWithLikes[postsWithLikes.length - 1].id}`).toString("base64")
     : null;
 
-  return Response.json({ items: data ?? [], nextCursor });
+  return Response.json({ items: postsWithLikes, nextCursor });
 }
 
 export async function POST(req: NextRequest) {

@@ -9,10 +9,8 @@ import { ProfileBio } from "./ProfileBio";
 import { ProfileStats } from "./ProfileStats";
 import { getUserAccentStyles, getUserAccentStylesFromHex } from "@/lib/profile";
 import { useIsMobile } from "@/hooks/useMobile";
-import { adminBanUser, adminUnbanUser } from "@/app/actions/admin";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
+import { ModerationMenu } from "@/components/mod/ModerationMenu";
 import { useAuth } from "@/providers/AuthProvider";
-import { toast } from "sonner";
 import { PremiumBadge } from "./PremiumBadge";
 
 interface UserProfileData {
@@ -51,28 +49,7 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
 
   // No async admin check; rely on profiles.is_admin (same as is_premium path)
 
-  async function ban7Days() {
-    try {
-      setModBusy(true);
-      const until = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const r = await adminBanUser(profile.user_id, until);
-      const err = (r as unknown as { error?: string }).error;
-      if (err) { toast.error(err); return; }
-      toast.success("User banned for 7 days");
-      try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
-    } finally { setModBusy(false); }
-  }
-
-  async function unbanNow() {
-    try {
-      setModBusy(true);
-      const r = await adminUnbanUser(profile.user_id);
-      const err = (r as unknown as { error?: string }).error;
-      if (err) { toast.error(err); return; }
-      toast.success("User unbanned");
-      try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
-    } finally { setModBusy(false); }
-  }
+  // moderation actions moved to ModerationMenu
 
   // no longer needed since we reuse SettingsDialog's profile section
 
@@ -115,6 +92,16 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
           </div>
         )}
 
+        {isAdmin && !isOwnProfile && (
+          <div className="absolute bottom-4 right-0">
+            <ModerationMenu
+              targetUserId={profile.user_id}
+              isSuspended={isSuspended}
+              onAfter={() => { /* no-op; could refresh */ }}
+            />
+          </div>
+        )}
+
       </div>
 
       {/* Profile Info */}
@@ -127,21 +114,7 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
           <p className="text-neutral-600">@{profile.username}</p>
         </div>
 
-        {/* Admin moderation tools (visible only to admins on others' profiles) */}
-        {isAdmin && !isOwnProfile && (
-          <div className="mt-2 flex items-center justify-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">Moderator Actions</Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center">
-                <DropdownMenuLabel>Moderation</DropdownMenuLabel>
-                <DropdownMenuItem onClick={ban7Days} disabled={modBusy}>Ban 7 days</DropdownMenuItem>
-                <DropdownMenuItem onClick={unbanNow} disabled={modBusy}>Unban</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
+        {/* Admin moderation tools moved to header menu */}
 
         {!isSuspended ? (
           <ProfileBio bio={profile.bio || undefined} />
