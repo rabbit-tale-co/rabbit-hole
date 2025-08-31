@@ -252,3 +252,31 @@ export async function getUserFeedPage(input: unknown) {
 
   return { items: data ?? [], nextCursor };
 }
+
+// --- get post stats ---
+export async function getPostStats(postId: string) {
+  const sb = supabaseAdmin;
+
+  try {
+    const { data, error } = await sb
+      .from('posts_stats')
+      .select('views_total, unique_viewers, last_view_at')
+      .eq('post_id', postId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows found - post doesn't have stats yet
+        return {
+          stats: { views_total: 0, unique_viewers: 0, last_view_at: null }
+        };
+      }
+      return { error: error.message };
+    }
+
+    return { stats: data };
+  } catch (err) {
+    console.error('Failed to fetch post stats:', err);
+    return { error: 'Failed to fetch stats' };
+  }
+}

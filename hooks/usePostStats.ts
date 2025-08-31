@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getPostStats } from '@/app/actions/posts';
 
 interface PostStats {
   views_total: number;
@@ -13,53 +13,36 @@ interface UsePostStatsOptions {
 }
 
 export function usePostStats({ postId, enabled = true }: UsePostStatsOptions) {
-  const [stats, setStats] = useState<PostStats>({
-    views_total: 0,
-    unique_viewers: 0,
-    last_view_at: null
-  });
+  const [stats, setStats] = useState<PostStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || !postId) return;
+    if (!enabled || !postId) {
+      console.log('usePostStats: disabled or no postId', { enabled, postId });
+      return;
+    }
+
 
     const fetchStats = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // Próbuj pobrać statystyki z różnych możliwych tabel
-        const tables = ['social_art.posts_stats', 'posts_stats'];
+        // Use the server action to fetch stats
+        const result = await getPostStats(postId);
 
-        for (const table of tables) {
-          try {
-            const { data, error: fetchError } = await supabase
-              .from(table)
-              .select('views_total, unique_viewers, last_view_at')
-              .eq('post_id', postId)
-              .single();
-
-            if (!fetchError && data) {
-              setStats(data);
-              return; // Sukces - wyjdź z pętli
-            }
-
-            if (fetchError && fetchError.code === 'PGRST116') {
-              // Brak wierszy - post nie ma jeszcze statystyk
-              return;
-            }
-          } catch (tableError) {
-            // Tabela nie istnieje - spróbuj następną
-            continue;
-          }
+        if (result.error) {
+          setError(result.error);
+          setStats(null);
+        } else if (result.stats) {
+          setStats(result.stats);
         }
 
-        // Jeśli żadna tabela nie działa, zostaw domyślne wartości
-
       } catch (err) {
-        console.error('Failed to fetch post stats:', err);
-        // Nie ustawiamy błędu - zostawiamy domyślne wartości
+        console.error('usePostStats: unexpected error:', err);
+        setError('Failed to fetch stats');
+        setStats(null);
       } finally {
         setLoading(false);
       }
@@ -74,11 +57,7 @@ export function usePostStats({ postId, enabled = true }: UsePostStatsOptions) {
     error,
     refetch: () => {
       if (enabled && postId) {
-        setStats({
-          views_total: 0,
-          unique_viewers: 0,
-          last_view_at: null
-        });
+        setStats(null);
         setError(null);
         // Trigger re-fetch
         setStats(prev => prev);

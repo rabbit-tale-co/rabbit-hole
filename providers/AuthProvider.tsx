@@ -255,15 +255,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }), [user, session, loading, profile, refreshProfile]);
 
   // Dev logs for debugging auth state
-  useEffect(() => {
-    try {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[auth] session', session);
-        console.log('[auth] user', user);
-        console.log('[auth] profile', profile);
-      }
-    } catch { }
-  }, [session, user, profile]);
+  // useEffect(() => {
+  //   try {
+  //     if (process.env.NODE_ENV !== 'production') {
+  //       console.log('[auth] session', session);
+  //       console.log('[auth] user', user);
+  //       console.log('[auth] profile', profile);
+  //     }
+  //   } catch { }
+  // }, [session, user, profile]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

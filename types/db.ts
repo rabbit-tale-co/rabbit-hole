@@ -9,6 +9,7 @@ export type ProfileRow = {
   display_name: string;
   bio: string | null;
   is_premium: boolean;
+  is_admin: boolean;
   avatar_url: string | null;
   cover_url: string | null;
   accent_color: string | null; // "#RRGGBB"

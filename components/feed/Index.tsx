@@ -22,6 +22,7 @@ import { Badge } from "../ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRouter } from "next/navigation";
 import { OutlineCalendar } from "../icons/Icons";
+import { useAuth } from "@/providers/AuthProvider";
 
 // Local hover slideshow for multi-image posts
 function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; others: { src: string; alt?: string }[]; widthPx: number; alt?: string }) {
@@ -93,6 +94,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(initial, 24, { authorId });
   const router = useRouter();
   const { recordImpression } = useManualImpression();
+  const { profile: currentUserProfile } = useAuth();
 
   const publicUrl = (path: string) => buildPublicUrl(path);
 
@@ -121,6 +123,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
 
   // lazy profile cache: author_id -> minimal profile
   const [authorProfiles, setAuthorProfiles] = useState<Map<string, { username: string; display_name: string; avatar_url: string; cover_url?: string; is_premium?: boolean }>>(new Map());
+
   useEffect(() => {
     const missing = items
       .map((p) => p.author_id)
@@ -304,7 +307,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                     )}
 
                     {/* top-right date and stats */}
-                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 text-white flex flex-col items-end gap-2">
+                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-20 text-white flex flex-col items-end gap-2">
                       {/* Date */}
                       <TooltipProvider delayDuration={150}>
                         <Tooltip>
@@ -320,8 +323,12 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                         </Tooltip>
                       </TooltipProvider>
 
-                      {/* Post Stats */}
-                      <PostStats postId={p.tile.id} />
+                      {/* Post Stats - Only show for admin and premium users */}
+                      {(currentUserProfile?.is_admin || currentUserProfile?.is_premium) && (
+                        <Badge className="bg-black/50">
+                          <PostStats postId={p.tile.id} />
+                        </Badge>
+                      )}
                     </div>
                     {/* bottom gradient + actions row */}
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />

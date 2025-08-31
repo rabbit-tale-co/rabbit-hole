@@ -10,19 +10,46 @@ interface PostStatsProps {
 }
 
 export function PostStats({ postId, className = "" }: PostStatsProps) {
-  const { stats, loading } = usePostStats({ postId });
+  const { stats, loading, error } = usePostStats({ postId });
 
   if (loading) {
-    return null;
+    return (
+      <div className={`flex items-center gap-2 text-xs text-white/90 ${className}`}>
+        <div className="flex items-center gap-1">
+          <OutlineEye className="size-3" />
+          <span>...</span>
+        </div>
+      </div>
+    );
   }
 
-  if (!stats || (stats.views_total === 0 && stats.unique_viewers === 0)) {
-    return null;
+  // If there's an error (like table doesn't exist), show 0 stats instead of hiding
+  if (error || !stats) {
+    return (
+      <div className={`flex items-center gap-2 text-xs text-white/90 ${className}`}>
+        <div className="flex items-center gap-1">
+          <OutlineEye className="size-3" />
+          <span>0</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Only show stats if we have actual data
+  if (stats.views_total === 0 && stats.unique_viewers === 0) {
+    return (
+      <div className={`flex items-center gap-2 text-xs text-white/90 ${className}`}>
+        <div className="flex items-center gap-1">
+          <OutlineEye className="size-3" />
+          <span>0</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className={`flex items-center gap-3 text-xs text-white/80 ${className}`}>
+      <div className={`flex items-center gap-2 text-xs text-white/90 ${className}`}>
         {/* Total Views */}
         <Tooltip>
           <TooltipTrigger asChild>
