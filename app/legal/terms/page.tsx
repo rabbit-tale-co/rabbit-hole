@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { TypographyP } from '@/components/ui/typography/p';
 import { TypographyList } from '@/components/ui/typography/list';
-import { FileText, Link as LinkIcon } from 'lucide-react';
 import { SITE, COMPANY, CONTACT_EMAIL, EFFECTIVE_TERMS, TERMS_SECTIONS, TERMS_CONTENT, ADDRESS, ListItem } from '@/app/legal/data';
+import { OutlineFileText } from '@/components/icons/Icons';
 
 // constants moved to app/legal/data
 
@@ -55,7 +55,7 @@ export default function TermsPage() {
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full ring-1 ring-border px-3 py-1 text-xs text-muted-foreground">
-              <FileText className="h-3.5 w-3.5" />
+              <OutlineFileText className="h-3.5 w-3.5" />
               Legal • Terms of Service
             </div>
             <h1 className="text-left text-2xl font-bold">Terms of Service</h1>
@@ -142,14 +142,6 @@ function SectionHeading({ id, children }: { id: string; children: React.ReactNod
   return (
     <h2 className="scroll-mt-24 text-lg font-semibold" id={id}>
       {children}
-      <Link
-        href={`#${id}`}
-        onClick={(e) => smoothScrollTo(`#${id}`, e)}
-        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground"
-        aria-label="Copy link to section"
-      >
-        <LinkIcon className="h-4 w-4" />
-      </Link>
     </h2>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '../../button';
-import { CropIcon, RotateCcwIcon } from 'lucide-react';
 import { Slot } from 'radix-ui';
 import {
   type ComponentProps,
@@ -28,6 +27,7 @@ import { cn } from '@/lib/utils';
 
 import 'react-image-crop/dist/ReactCrop.css';
 import Image from 'next/image';
+import { OutlineCrop, OutlineRefreshCw } from '@/components/icons/Icons';
 
 const centerAspectCrop = (
   mediaWidth: number,
@@ -327,7 +327,7 @@ export const ImageCropApply = ({
 
   return (
     <Button onClick={handleClick} size={children ? 'default' : 'icon'} {...props}>
-      {children ?? <CropIcon className="size-4" />}
+      {children ?? <OutlineCrop />}
     </Button>
   );
 };
@@ -359,7 +359,7 @@ export const ImageCropReset = ({
 
   return (
     <Button onClick={handleClick} size={children ? 'default' : 'icon'} variant="ghost" {...props}>
-      {children ?? <RotateCcwIcon className="size-4" />}
+      {children ?? <OutlineRefreshCw />}
     </Button>
   );
 };

@@ -2,10 +2,10 @@
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useRef } from "react";
 import type { MouseEvent } from "react";
-import { OutlineBookmark, OutlineChat, OutlineHeart, OutlineRepeat, SolidHeart } from "@/components/icons/Icons";
 import { useLikeAction } from "@/hooks/useLikeAction";
 import { cn } from "@/lib/utils";
 import NumberFlow from "@number-flow/react";
+import { OutlineBookmark, OutlineChat, OutlineHeart, OutlineRepeat02, SolidHeart } from "@/components/icons/Icons";
 
 interface SocialActionsProps {
   postId: string; // required so the component can call the API
@@ -185,7 +185,7 @@ export function SocialActions({
             className={`hover:bg-white/12 hover:text-white ${isReposted ? 'text-green-500 hover:text-green-500 hover:bg-green-500/12' : 'text-white drop-shadow-[0_0px_2px_rgba(0,0,0,0.75)]'}`}
             onClick={onRepost}
           >
-            <OutlineRepeat />
+            <OutlineRepeat02 />
           </Button>
           {showRepostsCount && (
             <span

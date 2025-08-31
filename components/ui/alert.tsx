@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { X } from 'lucide-react';
+import { OutlineClose } from '../icons/Icons';
 
 const alertVariants = cva('flex items-stretch w-full gap-2 group-[.toaster]:w-(--width)', {
   variants: {
@@ -211,7 +211,7 @@ function Alert({ className, variant, size, icon, appearance, close = false, onCl
           data-slot="alert-close"
           className={cn('group shrink-0 size-4')}
         >
-          <X className="opacity-60 group-hover:opacity-100 size-4" />
+          <OutlineClose className="opacity-60 group-hover:opacity-100" />
         </Button>
       )}
     </div>

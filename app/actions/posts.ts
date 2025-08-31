@@ -1,7 +1,7 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getUserFromCookies, isBanned } from "@/lib/auth";
+import { getUserFromCookies } from "@/lib/auth";
 import { CreatePost, UpdatePost, PostIdUserId, CommentCreate, CommentDelete, FeedCursor } from "@/schemas/post";
 import { UUID } from "@/schemas/_shared";
 import { z } from "zod";
@@ -24,7 +24,7 @@ function encodeCursor(ts: string, id: string) {
 async function requireActiveUser(expectedUserId?: string): Promise<{ error?: string; me?: { id: string } }> {
   const me = await getUserFromCookies();
   if (!me) return { error: "Unauthorized" };
-  if (isBanned(me.bannedUntil)) return { error: "Banned" };
+  // Note: bannedUntil check moved to admin functions in admin.ts
   if (expectedUserId && me.id !== expectedUserId) return { error: "Forbidden" };
   return { me: { id: me.id } };
 }
@@ -110,26 +110,6 @@ export async function deletePost(post_id: string, author_id: string) {
     .eq("id", post_id);
   if (error) return { error: error.message };
   return { ok: true, images: post.images ?? [] };
-}
-
-// --- ADMIN ONLY: delete any post by id ---
-export async function adminDeletePost(post_id: string) {
-  const me = await getUserFromCookies();
-  if (!me || (!me.isSuperAdmin && !me.roles.includes("admin"))) return { error: "Forbidden" };
-  if (isBanned(me.bannedUntil)) return { error: "Banned" };
-  const { error } = await supabaseAdmin.from("posts").update({ is_deleted: true }).eq("id", post_id);
-  if (error) return { error: error.message };
-  return { ok: true };
-}
-
-// --- ADMIN ONLY: delete all posts (TEMP DEV TOOL) ---
-export async function adminDeleteAllPosts() {
-  const me = await getUserFromCookies();
-  if (!me || (!me.isSuperAdmin && !me.roles.includes("admin"))) return { error: "Forbidden" };
-  if (isBanned(me.bannedUntil)) return { error: "Banned" };
-  const { error } = await supabaseAdmin.from("posts").update({ is_deleted: true }).neq("id", "");
-  if (error) return { error: error.message };
-  return { ok: true };
 }
 
 // --- like / bookmark / repost (idempotent toggle) ---

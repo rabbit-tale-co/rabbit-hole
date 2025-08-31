@@ -52,10 +52,13 @@ export function usePostImpressions({ postId, minGapSeconds = 30 }: UsePostImpres
         p_min_gap_secs: minGapSeconds
       });
 
-      if (error) {
-        console.error('Failed to record post impression:', error);
-        return;
-      }
+             if (error) {
+         console.error('Failed to record post impression:', error);
+         if (error.message?.includes('relation') || error.message?.includes('schema')) {
+           console.info(`Post ${postId}: Stats table not available yet, skipping impression recording`);
+         }
+         return;
+       }
 
       if (data && data[0]) {
         const result = data[0] as PostImpressionResult;

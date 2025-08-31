@@ -1,15 +1,6 @@
 "use client"
 
 import * as React from "react"
-import {
-  Bell,
-  Paintbrush,
-  Settings,
-  User,
-  Shield,
-  Camera,
-  X,
-} from "lucide-react"
 
 import {
   Breadcrumb,
@@ -41,6 +32,7 @@ import { Profile, Privacy, Appearance, Notifications, Content } from "./index"
 import { useAuth } from "@/providers/AuthProvider"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { OutlineBell, OutlineBrush, OutlineClose, OutlineImage, OutlineSettings, OutlineShield, OutlineUser } from "../icons/Icons"
 
 // Unsaved changes provider API
 type SaveFn = (() => void | Promise<void>) | null;
@@ -64,11 +56,11 @@ type NavItem = { name: string; icon: React.ElementType; id: SettingsSection };
 
 const data: { nav: NavItem[] } = {
   nav: [
-    { name: "Profile & Settings", icon: User, id: "profile" },
-    { name: "Privacy", icon: Shield, id: "privacy" },
-    { name: "Appearance", icon: Paintbrush, id: "appearance" },
-    { name: "Notifications", icon: Bell, id: "notifications" },
-    { name: "Content", icon: Camera, id: "content" },
+    { name: "Profile & Settings", icon: OutlineUser, id: "profile" },
+    { name: "Privacy", icon: OutlineShield, id: "privacy" },
+    { name: "Appearance", icon: OutlineBrush, id: "appearance" },
+    { name: "Notifications", icon: OutlineBell, id: "notifications" },
+    { name: "Content", icon: OutlineImage, id: "content" },
   ],
 }
 
@@ -105,7 +97,7 @@ function SettingsContent({ activeSection, user }: SettingsContentProps) {
       return (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
-            <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <OutlineSettings className="size-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900">Select a setting</h3>
             <p className="text-sm text-gray-500">Choose a category from the sidebar to get started</p>
           </div>
@@ -331,7 +323,7 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
                   <div className="flex items-center gap-2">
                     <DialogClose asChild>
                       <Button variant="ghost" size="icon">
-                        <X className="size-4" />
+                        <OutlineClose />
                       </Button>
                     </DialogClose>
                   </div>

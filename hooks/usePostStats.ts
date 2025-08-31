@@ -13,7 +13,11 @@ interface UsePostStatsOptions {
 }
 
 export function usePostStats({ postId, enabled = true }: UsePostStatsOptions) {
-  const [stats, setStats] = useState<PostStats | null>(null);
+  const [stats, setStats] = useState<PostStats>({
+    views_total: 0,
+    unique_viewers: 0,
+    last_view_at: null
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,29 +29,37 @@ export function usePostStats({ postId, enabled = true }: UsePostStatsOptions) {
       setError(null);
 
       try {
-        const { data, error: fetchError } = await supabase
-          .from('social_art.posts_stats')
-          .select('views_total, unique_viewers, last_view_at')
-          .eq('post_id', postId)
-          .single();
+        // Próbuj pobrać statystyki z różnych możliwych tabel
+        const tables = ['social_art.posts_stats', 'posts_stats'];
 
-        if (fetchError) {
-          if (fetchError.code === 'PGRST116') {
-            // No rows returned - post has no stats yet
-            setStats({
-              views_total: 0,
-              unique_viewers: 0,
-              last_view_at: null
-            });
-          } else {
-            throw fetchError;
+        for (const table of tables) {
+          try {
+            const { data, error: fetchError } = await supabase
+              .from(table)
+              .select('views_total, unique_viewers, last_view_at')
+              .eq('post_id', postId)
+              .single();
+
+            if (!fetchError && data) {
+              setStats(data);
+              return; // Sukces - wyjdź z pętli
+            }
+
+            if (fetchError && fetchError.code === 'PGRST116') {
+              // Brak wierszy - post nie ma jeszcze statystyk
+              return;
+            }
+          } catch (tableError) {
+            // Tabela nie istnieje - spróbuj następną
+            continue;
           }
-        } else {
-          setStats(data);
         }
+
+        // Jeśli żadna tabela nie działa, zostaw domyślne wartości
+
       } catch (err) {
         console.error('Failed to fetch post stats:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        // Nie ustawiamy błędu - zostawiamy domyślne wartości
       } finally {
         setLoading(false);
       }
@@ -62,9 +74,13 @@ export function usePostStats({ postId, enabled = true }: UsePostStatsOptions) {
     error,
     refetch: () => {
       if (enabled && postId) {
-        setStats(null);
+        setStats({
+          views_total: 0,
+          unique_viewers: 0,
+          last_view_at: null
+        });
         setError(null);
-        // Trigger re-fetch by changing dependency
+        // Trigger re-fetch
         setStats(prev => prev);
       }
     }

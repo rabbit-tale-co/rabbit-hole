@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/AuthProvider";
 import { AuthModal } from "./auth/AuthModal";
-import { OutlineCrown, SolidLogo } from "@/components/icons/Icons";
+import { SolidLogo } from "@/components/icons/Icons";
 
 import { UserProfileMenu } from "./user/Menu";
 import PostButton from "./feed/upload/post-button";

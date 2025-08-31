@@ -116,7 +116,7 @@ export async function getUsersPage(input: unknown) {
 
   // fetch suspension info for listed users
   const ids = (data ?? []).map(r => r.user_id).filter(Boolean);
-  let suspMap = new Map<string, string | null>();
+  const suspMap = new Map<string, string | null>();
   if (ids.length > 0) {
     const { data: susp } = await sb
       .schema('social_art')

@@ -1,14 +1,6 @@
 'use client';
 
 import { useControllableState } from '@radix-ui/react-use-controllable-state';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Pause,
-  Play,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type {
   ComponentProps,
@@ -28,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { OutlineChevronLeft, OutlineChevronRight, OutlinePlay, OutlinePause, OutlineVolume01, OutlineVolumeMute } from '@/components/icons/Icons';
 
 // Explicit type for reel items
 export type ReelItem = {
@@ -554,7 +547,7 @@ export const ReelPreviousButton = ({ className, children, ...props }: ReelPrevio
       variant="ghost"
       {...props}
     >
-      {children || <ChevronLeft className="size-4" />}
+      {children || <OutlineChevronLeft />}
     </Button>
   );
 };
@@ -585,7 +578,7 @@ export const ReelNextButton = ({ className, children, ...props }: ReelNextButton
       variant="ghost"
       {...props}
     >
-      {children || <ChevronRight className="size-4" />}
+      {children || <OutlineChevronRight />}
     </Button>
   );
 };
@@ -604,7 +597,7 @@ export const ReelPlayButton = ({ className, children, ...props }: ReelPlayButton
       variant="ghost"
       {...props}
     >
-      {children || (isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />)}
+      {children || (isPlaying ? <OutlinePause /> : <OutlinePlay />)}
     </Button>
   );
 };
@@ -623,7 +616,7 @@ export const ReelMuteButton = ({ className, children, ...props }: ReelMuteButton
       variant="ghost"
       {...props}
     >
-      {children || (isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />)}
+      {children || (isMuted ? <OutlineVolumeMute /> : <OutlineVolume01 />)}
     </Button>
   );
 };

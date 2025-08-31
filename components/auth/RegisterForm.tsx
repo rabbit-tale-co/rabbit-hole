@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input, InputAddon, InputGroup } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Mail } from "lucide-react";
 import ShowPassword from "./ShowPassword";
+import { OutlineLoading, OutlineMail } from "../icons/Icons";
 
 export default function RegisterForm() {
   const [username, setUsername] = useState("");
@@ -109,7 +109,7 @@ export default function RegisterForm() {
     return (
       <div className={`text-center space-y-4 max-w-md`}>
         <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-          <Mail className="w-8 h-8 text-green-600" />
+          <OutlineMail className="w-8 h-8 text-green-600" />
         </div>
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Check your email</h3>
@@ -186,7 +186,7 @@ export default function RegisterForm() {
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating account…</>)
+        {loading ? (<><OutlineLoading className="mr-2 h-4 w-4 animate-spin" />Creating account…</>)
           : "Create account"}
       </Button>
     </form>

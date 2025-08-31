@@ -37,7 +37,6 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
   const isMobile = useIsMobile();
   const { profile: myProfile } = useAuth();
   const isAdmin = Boolean((myProfile as unknown as { is_admin?: boolean } | null)?.is_admin);
-  const [modBusy, setModBusy] = useState(false);
   // Use provided accentColor or generate one based on username
   const currentAccentColor = useMemo(() => generateAccentColor(profile.username), [profile.username]);
 

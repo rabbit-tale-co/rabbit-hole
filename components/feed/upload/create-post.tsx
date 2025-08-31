@@ -3,16 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { z } from 'zod';
-import {
-  Image as ImageIcon,
-  Video as VideoIcon,
-  X as XIcon,
-  Upload as UploadIcon,
-  Hash as HashIcon,
-  Sparkles,
-  BadgeCheck,
-  GripVertical,
-} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +13,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { Sortable, SortableItem, SortableItemHandle } from '@/components/ui/sortable';
 import { MediaPlayer as VideoPlayer, MediaPlayerVideo, MediaPlayerControls, MediaPlayerPlay, MediaPlayerSeek, MediaPlayerVolume, MediaPlayerFullscreen } from '@/components/ui/media-player';
 import { useFileUpload } from '@/hooks/use-file-upload';
+import { OutlineAI, OutlineClose, OutlineDragIndicator, OutlineExport, OutlineImage, OutlineVideo } from '@/components/icons/Icons';
 
 type OptimisticPost = {
   content?: string;
@@ -157,13 +148,23 @@ export function CreateMediaPost({
   fileSizeMbMax = 15,
   formId,
 }: CreatePostProps) {
-  const { user } = useAuth();
-  const isPremium = isPremiumProp ?? Boolean(user?.user_metadata?.is_premium);
+  const { user, profile } = useAuth();
+
+  // Use profile.is_premium from database instead of user_metadata
+  const isPremium = isPremiumProp ?? Boolean(profile?.is_premium);
+
+  // Debug log to see what's in profile
+  console.log('Profile:', profile);
+  console.log('Profile is_premium:', profile?.is_premium);
+  console.log('Final isPremium:', isPremium);
+  console.log('Profile loading state:', profile === null ? 'null' : 'loaded');
 
   const MAX_IMAGES = isPremium ? 10 : 5;
   const MAX_VIDEOS = 1;
   const MAX_CHARS = isPremium ? 1000 : 300;
-  const FILE_MAX = fileSizeMbMax * 1024 * 1024; // bytes
+  // Premium users get 50MB, free users get 15MB
+  const actualFileSizeMbMax = isPremium ? 50 : (fileSizeMbMax || 15);
+  const FILE_MAX = actualFileSizeMbMax * 1024 * 1024; // bytes
 
   const [caption, setCaption] = useState('');
   const [items, setItems] = useState<Item[]>([]);
@@ -427,7 +428,7 @@ export function CreateMediaPost({
     } as const;
     const meta = serverMeta ?? fallback;
     return meta;
-  }, []);
+  }, [user?.id]);
 
   // run uploads with small concurrency
   const uploadAll = useCallback(async (_items: Item[], postId: string, setOne: (id: string, patch: Partial<Item>) => void) => {
@@ -558,10 +559,6 @@ export function CreateMediaPost({
 
   // ---------- UI -------------------------------------------------------------
 
-  const headerHint = !isPremium
-    ? 'Free plan • up to 5 images, 1 video, 300 chars'
-    : 'Premium • up to 10 images, 1 video, 1000 chars';
-
   return (
     <form
       id={formId}
@@ -573,8 +570,9 @@ export function CreateMediaPost({
       <div className="flex flex-col gap-2 p-3">
         <div className="flex items-center justify-between gap-2 px-1">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {isPremium ? <BadgeCheck className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-            <span className="truncate">{headerHint}</span>
+            <OutlineAI className='size-[1.5em]' />
+            <span className="truncate">{isPremium ? 'Premium' : 'Free plan'} • up to {MAX_IMAGES} images, 1 video, {MAX_CHARS} chars, {actualFileSizeMbMax}MB files</span>
+            {profile === null && <span className="text-orange-500">(Loading profile...)</span>}
           </div>
           <div className="text-[11px] text-muted-foreground">{caption.trim().length}/{MAX_CHARS}</div>
         </div>
@@ -582,15 +580,7 @@ export function CreateMediaPost({
         <Textarea
           value={caption}
           onChange={(e) => setCaption(e.target.value.slice(0, MAX_CHARS))}
-          placeholder={(() => {
-            const options = [
-              'What are you working on right now?',
-              "I'm working on…",
-              'Share a quick note about your media…',
-              'WIP thoughts, tools, brushes…',
-            ];
-            return options[Math.floor(Math.random() * options.length)];
-          })()}
+          placeholder="I'm working on…"
           className="min-h-[84px] shadow-none p-3 resize-none border-0 bg-transparent focus-visible:ring-0 text-[15px] leading-6"
           disabled={posting}
         />
@@ -615,13 +605,13 @@ export function CreateMediaPost({
             tabIndex={0}
           >
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background/80">
-              <UploadIcon className="h-5 w-5 text-muted-foreground" />
+              <OutlineExport className="size-[1.5em] text-muted-foreground" />
             </div>
             <div className="text-sm text-muted-foreground">
               Drag & drop images or a video, paste (Ctrl/Cmd+V), or <span className="underline underline-offset-2">browse</span>
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground/80">
-              {MAX_IMAGES} images max • {MAX_VIDEOS} video max • {fileSizeMbMax}MB each
+              {MAX_IMAGES} images max • {MAX_VIDEOS} video max • {actualFileSizeMbMax}MB each
             </div>
           </div>
         ) : (
@@ -633,7 +623,7 @@ export function CreateMediaPost({
               </div>
               <div className="flex items-center gap-1.5">
                 <Button type="button" size="sm" variant="ghost" className="hover:bg-neutral-200" onClick={uploadActions.openFileDialog}>
-                  <UploadIcon className="h-4 w-4 mr-1" />
+                  <OutlineExport />
                   Add
                 </Button>
                 <Button type="button" size="sm" variant="ghost" className="hover:bg-neutral-200" onClick={clearAll} disabled={posting || items.length === 0}>
@@ -677,25 +667,27 @@ export function CreateMediaPost({
 
                     {/* type badge (no counter) */}
                     <div className="absolute bottom-1.5 left-1.5 text-[10px] rounded-full bg-background/80 border border-border p-1 flex items-center gap-1">
-                      {it.kind === 'video' ? <VideoIcon className="size-3" /> : <ImageIcon className="size-3" />}
+                      {it.kind === 'video' ? <OutlineVideo size={16} /> : <OutlineImage size={16} />}
                     </div>
 
                     <SortableItemHandle className="absolute top-1.5 left-1.5">
                       <div className="inline-flex size-6 items-center justify-center rounded-full bg-background/80
-                        border border-border text-muted-foreground">
-                        <GripVertical className="size-4" />
+                        border border-border">
+                        <OutlineDragIndicator size={16} />
                       </div>
                     </SortableItemHandle>
 
                     {/* remove */}
-                    <button
+                    <Button
                       type="button"
+                      size="icon"
+                      variant="ghost"
                       onClick={(e) => { e.stopPropagation(); removeById(it.id); }}
                       className="absolute top-1.5 right-1.5 z-10 inline-flex size-6 items-center justify-center rounded-full bg-background/80 border border-border text-muted-foreground hover:text-foreground transition-opacity opacity-0 group-hover:opacity-100"
                       aria-label="Remove"
                     >
-                      <XIcon className="size-3.5" />
-                    </button>
+                      <OutlineClose className="size-3.5" />
+                    </Button>
 
                     {/* per-item progress */}
                     {(it.status === 'processing' || it.status === 'uploading') && (
@@ -742,7 +734,7 @@ export function CreateMediaPost({
           <div className="space-y-3">
             <div>
               <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                <HashIcon className="h-3.5 w-3.5" />
+                {/* <HashIcon className="h-3.5 w-3.5" /> */}
                 Alt text ({MAX_ALT})
               </label>
               <input
@@ -777,7 +769,7 @@ export function CreateMediaPost({
               className="w-full hover:bg-neutral-200"
               onClick={() => removeById(selected.id)}
             >
-              <XIcon className="h-4 w-4 mr-2" />
+              <OutlineClose />
               Remove media
             </Button>
           </div>

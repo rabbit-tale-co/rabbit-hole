@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import Link from 'next/link'
 import { SettingsDialog } from '@/components/settings/Dialog'
-import { OutlineCarrot, OutlineCrown, OutlineLogout, OutlineSettings, OutlineUser, SolidCarrot } from '../icons/Icons'
+import { OutlineCarrot, OutlineCrown, OutlineLogout, OutlineSettings, OutlineUser } from '../icons/Icons'
 import { Badge } from '@/components/ui/badge'
 import { PremiumBadge } from './PremiumBadge'
 

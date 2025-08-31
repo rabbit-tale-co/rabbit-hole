@@ -11,22 +11,9 @@ import {
 import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  CloudUpload,
-  FileArchiveIcon,
-  FileSpreadsheetIcon,
-  FileTextIcon,
-  HeadphonesIcon,
-  ImageIcon,
-  RefreshCwIcon,
-  Trash2,
-  TriangleAlert,
-  Upload,
-  VideoIcon,
-  XIcon,
-} from 'lucide-react';
 import { toAbsoluteUrl } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
+import { OutlineClose, OutlineCloudUplaod, OutlineExport, OutlineFileArchive, OutlineFileText, OutlineFileText2, OutlineHeadphones, OutlineImage, OutlineRefreshCw, OutlineTrash, OutlineVideo, OutlineWarning } from './icons/Icons';
 
 // Extend FileWithPreview to include upload status and progress
 interface FileUploadItem extends FileWithPreview {
@@ -191,14 +178,14 @@ export default function CardUpload({
 
   const getFileIcon = (file: File | FileMetadata) => {
     const type = file instanceof File ? file.type : file.type;
-    if (type.startsWith('image/')) return <ImageIcon className="size-6" />;
-    if (type.startsWith('video/')) return <VideoIcon className="size-6" />;
-    if (type.startsWith('audio/')) return <HeadphonesIcon className="size-6" />;
-    if (type.includes('pdf')) return <FileTextIcon className="size-6" />;
-    if (type.includes('word') || type.includes('doc')) return <FileTextIcon className="size-6" />;
-    if (type.includes('excel') || type.includes('sheet')) return <FileSpreadsheetIcon className="size-6" />;
-    if (type.includes('zip') || type.includes('rar')) return <FileArchiveIcon className="size-6" />;
-    return <FileTextIcon className="size-6" />;
+    if (type.startsWith('image/')) return <OutlineImage className="size-6" />;
+    if (type.startsWith('video/')) return <OutlineVideo className="size-6" />;
+    if (type.startsWith('audio/')) return <OutlineHeadphones className="size-6" />;
+    if (type.includes('pdf')) return <OutlineFileText className="size-6" />;
+    if (type.includes('word') || type.includes('doc')) return <OutlineFileText className="size-6" />;
+    if (type.includes('excel') || type.includes('sheet')) return <OutlineFileText2 className="size-6" />;
+    if (type.includes('zip') || type.includes('rar')) return <OutlineFileArchive className="size-6" />;
+    return <OutlineFileText2 className="size-6" />;
   };
 
   return (
@@ -223,7 +210,7 @@ export default function CardUpload({
               isDragging ? 'border-primary bg-primary/10' : 'border-muted-foreground/25',
             )}
           >
-            <Upload className="h-5 w-5 text-muted-foreground" />
+            <OutlineExport className="h-5 w-5 text-muted-foreground" />
           </div>
 
           <div className="space-y-2">
@@ -251,11 +238,11 @@ export default function CardUpload({
             <h3 className="text-sm font-medium">Files ({uploadFiles.length})</h3>
             <div className="flex gap-2">
               <Button onClick={openFileDialog} variant="outline" size="sm">
-                <CloudUpload />
+                <OutlineCloudUplaod />
                 Add files
               </Button>
               <Button onClick={clearFiles} variant="outline" size="sm">
-                <Trash2 />
+                <OutlineTrash />
                 Remove all
               </Button>
             </div>
@@ -271,7 +258,7 @@ export default function CardUpload({
                   size="icon"
                   className="absolute -end-2 -top-2 z-10 size-6 rounded-full opacity-0 transition-opacity group-hover:opacity-100"
                 >
-                  <XIcon className="size-3" />
+                  <OutlineClose className="size-3" />
                 </Button>
 
                 {/* Wrapper */}
@@ -368,7 +355,7 @@ export default function CardUpload({
                                 size="icon"
                                 className="absolute end-0 -top-1.25 size-6 text-destructive hover:bg-destructive/10 hover:text-destructive"
                               >
-                                <RefreshCwIcon className="size-3 opacity-100" />
+                                <OutlineRefreshCw className="size-3 opacity-100" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>Upload failed. Retry</TooltipContent>
@@ -388,7 +375,7 @@ export default function CardUpload({
       {errors.length > 0 && (
         <Alert variant="destructive" appearance="light" className="mt-5">
           <AlertIcon>
-            <TriangleAlert />
+            <OutlineWarning />
           </AlertIcon>
           <AlertContent>
             <AlertTitle>File upload error(s)</AlertTitle>

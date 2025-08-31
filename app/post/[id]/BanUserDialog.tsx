@@ -18,8 +18,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { adminBanUser } from "@/app/actions/admin";
 import { supabase } from "@/lib/supabase";
-import { OutlineClose } from "@/components/icons/Icons";
-import { Loader2 } from "lucide-react";
+import { OutlineClose, OutlineLoading } from "@/components/icons/Icons";
 
 type Mode = "duration" | "until" | "permanent";
 
@@ -337,7 +336,7 @@ export function BanUserDialog({ open, onOpenChange, userId }: BanUserDialogProps
           >
             {busy ? (
               <span className="inline-flex items-center gap-2">
-                <Loader2 className="size-4 animate-spin" />
+                <OutlineLoading className="size-4 animate-spin" />
                 Applying…
               </span>
             ) : (

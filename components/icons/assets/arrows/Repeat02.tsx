@@ -1,7 +1,7 @@
 import type React from 'react'
 import type { IconProps } from '../../IconProps'
 
-export const OutlineRepeat: React.FC<IconProps> = ({ className, size = 24 }) => (
+export const OutlineRepeat02: React.FC<IconProps> = ({ className, size = 24 }) => (
   <svg
     width={size}
     height={size}
@@ -31,7 +31,7 @@ export const OutlineRepeat: React.FC<IconProps> = ({ className, size = 24 }) => 
   </svg>
 )
 
-export const SolidRepeat: React.FC<IconProps> = ({ className, size = 24 }) => (
+export const SolidRepeat02: React.FC<IconProps> = ({ className, size = 24 }) => (
   <svg
     width={size}
     height={size}
@@ -61,7 +61,7 @@ export const SolidRepeat: React.FC<IconProps> = ({ className, size = 24 }) => (
   </svg>
 )
 
-export const DuotoneRepeat: React.FC<IconProps> = ({ className, size = 24 }) => (
+export const DuotoneRepeat02: React.FC<IconProps> = ({ className, size = 24 }) => (
   <svg
     width={size}
     height={size}

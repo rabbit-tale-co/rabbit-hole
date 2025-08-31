@@ -1,8 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { AtSign, CropIcon, HelpCircle, RotateCcwIcon, User, X } from "lucide-react"
-import { OutlineImage } from "@/components/icons/Icons"
+import { OutlineAt, OutlineClose, OutlineCrop, OutlineImage, OutlineQestionMarkCrFr, OutlineRefreshCw, OutlineUser } from "@/components/icons/Icons"
 import { Button } from "@/components/ui/button"
 import { Input, InputWrapper } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -285,7 +284,7 @@ export function Profile({ user }: ProfileProps) {
                         className="absolute size-8 top-2 right-2 z-10 opacity-0 group-hover/cover:opacity-100 focus:opacity-100 transition-opacity"
                         onClick={async (e) => { e.stopPropagation(); await removeCoverSafely(); }}
                       >
-                        <X className="size-4" />
+                        <OutlineClose />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="left" align="center">Remove cover</TooltipContent>
@@ -351,7 +350,7 @@ export function Profile({ user }: ProfileProps) {
                     className="w-full h-full overflow-hidden flex items-center justify-center text-2xl font-bold"
                     style={accentHex ? getStyleFromHexShade(accentHex, '200', 'backgroundColor') : getAccentColorStyle(currentAccentColor, 200, 'backgroundColor')}
                   >
-                    <User size={48} />
+                    <OutlineUser size={48} />
                     {/* hover overlay sliding from bottom */}
                     <div className="absolute bottom-0 left-0 w-full h-full pointer-events-none overflow-hidden rounded-full">
                       <div className="absolute bottom-0 left-0 w-full h-1/3 translate-y-full group-hover/avatar:translate-y-0 transition-transform duration-200 ease-out bg-neutral-950/30" />
@@ -375,7 +374,7 @@ export function Profile({ user }: ProfileProps) {
                         className="absolute size-8 -bottom-1.5 -right-1.5 z-50 opacity-0 group-hover/avatar:opacity-100 focus:opacity-100 transition-opacity"
                         onClick={async (e) => { e.preventDefault(); e.stopPropagation(); await removeAvatarSafely(); }}
                       >
-                        <X className="size-4" />
+                        <OutlineClose />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top" align="center">Remove avatar</TooltipContent>
@@ -398,7 +397,7 @@ export function Profile({ user }: ProfileProps) {
             <DialogTitle>{cropping === 'avatar' ? 'Crop avatar' : 'Crop cover'}</DialogTitle>
             <DialogClose asChild>
               <Button variant="ghost" size="icon">
-                <X className="size-4" />
+                <OutlineClose />
               </Button>
             </DialogClose>
           </DialogHeader>
@@ -421,12 +420,12 @@ export function Profile({ user }: ProfileProps) {
                   <Button variant="ghost" onClick={() => { setCropping(null); setCropAvatarFile(null); }}>Cancel</Button>
                 </div>
                 <ImageCropReset>
-                  <RotateCcwIcon className="size-4" />
+                  <OutlineRefreshCw />
                   Restart
                 </ImageCropReset>
                 {cropping === 'avatar' ? (
                   <ImageCropApply>
-                    <CropIcon className="size-4" />
+                    <OutlineCrop />
                     Crop
                   </ImageCropApply>
                 ) : (
@@ -454,7 +453,7 @@ export function Profile({ user }: ProfileProps) {
                       setCropping(null); setCropAvatarFile(null);
                     } catch { }
                   }}>
-                    <CropIcon className="size-4" />
+                    <OutlineCrop />
                     Crop
                   </ImageCropApply>
                 )}
@@ -479,12 +478,12 @@ export function Profile({ user }: ProfileProps) {
                   <Button variant="ghost" onClick={() => { setCropping(null); setCropCoverFile(null); }}>Cancel</Button>
                 </div>
                 <ImageCropReset>
-                  <RotateCcwIcon className="size-4" />
+                  <OutlineRefreshCw />
                   Restart
                 </ImageCropReset>
                 {cropping === 'cover' ? (
                   <ImageCropApply>
-                    <CropIcon className="size-4" />
+                    <OutlineCrop />
                     Crop
                   </ImageCropApply>
                 ) : (
@@ -512,7 +511,7 @@ export function Profile({ user }: ProfileProps) {
                       setCropping(null); setCropCoverFile(null);
                     } catch { }
                   }}>
-                    <CropIcon className="size-4" />
+                    <OutlineCrop />
                     Crop
                   </ImageCropApply>
                 )}
@@ -541,7 +540,7 @@ export function Profile({ user }: ProfileProps) {
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
             <InputWrapper variant={'md'}>
-              <AtSign />
+              <OutlineAt />
               <Input
                 id="username"
                 placeholder="username"
@@ -562,7 +561,7 @@ export function Profile({ user }: ProfileProps) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <HelpCircle className="h-4 w-4 text-gray-500" />
+                    <OutlineQestionMarkCrFr />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="">

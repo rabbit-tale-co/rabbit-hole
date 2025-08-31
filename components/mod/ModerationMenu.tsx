@@ -3,11 +3,11 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
 import { BanUserDialog } from "@/app/post/[id]/BanUserDialog";
 import { adminUnbanUser } from "@/app/actions/admin";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { OutlineMore } from "../icons/Icons";
 
 export function ModerationMenu({ targetUserId, isSuspended, onAfter }: { targetUserId: string; isSuspended: boolean; onAfter?: (action: "suspend" | "unban") => void; }) {
   const [openSuspend, setOpenSuspend] = React.useState(false);
@@ -34,7 +34,7 @@ export function ModerationMenu({ targetUserId, isSuspended, onAfter }: { targetU
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="icon" aria-label="Moderator actions">
-            <MoreHorizontal className="size-4" />
+            <OutlineMore />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

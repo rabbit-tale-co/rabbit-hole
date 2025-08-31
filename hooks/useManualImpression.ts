@@ -25,10 +25,13 @@ export function useManualImpression({ minGapSeconds = 30 }: UseManualImpressionO
         p_min_gap_secs: minGapSeconds
       });
 
-      if (error) {
-        console.error('Failed to record manual post impression:', error);
-        return false;
-      }
+             if (error) {
+         console.error('Failed to record manual post impression:', error);
+         if (error.message?.includes('relation') || error.message?.includes('schema')) {
+           console.info(`Post ${postId}: Stats table not available yet, skipping manual impression`);
+         }
+         return false;
+       }
 
       if (data && data[0]) {
         const result = data[0] as { inserted: boolean; views_total: number; unique_viewers: number };
