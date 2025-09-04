@@ -98,7 +98,7 @@ function UserCard({ user: u }: {
                 disabled={followLoading}
                 className="absolute right-2 top-2"
               >
-                {followLoading ? "…" : isFollowing ? "Following" : "Follow"}
+                {isFollowing ? "Following" : "Follow"}
               </Button>
             )}
           </div>

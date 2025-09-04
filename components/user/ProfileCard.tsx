@@ -156,7 +156,7 @@ export function UserChipHoverCard({
                   onClick={handleFollow}
                   disabled={followLoading || !canFollow}
                 >
-                  {followLoading ? "…" : isFollowing ? "Following" : "Follow"}
+                  {isFollowing ? "Following" : "Follow"}
                 </Button>
               </div>
             </div>
