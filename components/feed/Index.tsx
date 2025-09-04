@@ -18,7 +18,6 @@ import { PostStats } from "@/components/feed/PostStats";
 import { Progress } from "@/components/ui/progress";
 import { UserChipHoverCard } from "../user/ProfileCard";
 import { useManualImpression } from "@/hooks/useManualImpression";
-import { PremiumBadge } from "../user/PremiumBadge";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRouter } from "next/navigation";
@@ -124,7 +123,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   }, [items]);
 
   // lazy profile cache: author_id -> minimal profile
-  const [authorProfiles, setAuthorProfiles] = useState<Map<string, { username: string; display_name: string; avatar_url: string; cover_url?: string; is_premium?: boolean }>>(new Map());
+  const [authorProfiles, setAuthorProfiles] = useState<Map<string, { user_id: string; username: string; display_name: string; avatar_url: string; cover_url?: string; is_premium?: boolean }>>(new Map());
 
   useEffect(() => {
     const missing = items
@@ -140,7 +139,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
       if (!data) return;
       setAuthorProfiles((prev) => {
         const next = new Map(prev);
-        for (const row of data) next.set(row.user_id, { username: row.username, avatar_url: row.avatar_url, cover_url: row.cover_url, display_name: row.display_name, is_premium: (row as { is_premium?: boolean }).is_premium });
+        for (const row of data) next.set(row.user_id, { user_id: row.user_id, username: row.username, avatar_url: row.avatar_url, cover_url: row.cover_url, display_name: row.display_name, is_premium: (row as { is_premium?: boolean }).is_premium });
         return next;
       });
     })();
@@ -293,19 +292,15 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                         onClick={(e) => { e.stopPropagation(); }}
                       >
                         <UserChipHoverCard user={{
+                          user_id: profile.user_id,
                           username: profile.username,
                           avatarUrl: profile.avatar_url,
-                          displayName: (
-                            <span className="inline-flex items-center gap-1">
-                              <span className="truncate">{profile.display_name}</span>
-                              <PremiumBadge show={Boolean(profile.is_premium)} />
-                            </span>
-                          ),
+                          displayName: profile.display_name,
                           coverUrl: profile.cover_url ? publicUrl(profile.cover_url) : undefined,
                           stats: {
-                            followers: post?.like_count ?? 0,
-                            following: post?.comment_count ?? 0,
-                          }
+                            posts: post?.like_count ?? 0, // This should be post count, not like count
+                          },
+                          isPremium: profile.is_premium
                         }} size={'sm'} insideLink />
                       </div>
                     )}

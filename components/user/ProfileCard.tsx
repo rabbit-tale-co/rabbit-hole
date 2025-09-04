@@ -10,15 +10,17 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { generateAccentColor, getAccentColorStyle, getStyleFromHexShade, getAccentColorValue } from "@/lib/accent-colors";
 import { cn } from "@/lib/utils";
 import { PremiumBadge } from "./PremiumBadge";
+import { useFollow } from "@/hooks/useFollow";
 
 type MiniUser = {
+  user_id: string;
   username: string;
   displayName?: string | React.ReactNode | null;
   avatarUrl?: string | null;
   coverUrl?: string | null;
-  accentColor?: string | null; // hex (preferred) else we’ll derive from username
+  accentColor?: string | null; // hex (preferred) else we'll derive from username
   bio?: string | null;
-  stats?: { followers?: number; following?: number; posts?: number };
+  stats?: { posts?: number }; // Only posts count, followers/following from useFollow
   isPremium?: boolean;
 };
 
@@ -26,9 +28,6 @@ type Props = {
   user: MiniUser;
   className?: string;
   size?: "sm" | "md"; // trigger size
-  isFollowing?: boolean;
-  pending?: boolean;
-  onToggleFollow?: (next: boolean) => Promise<void> | void;
   insideLink?: boolean; // if rendered inside a clickable parent (e.g., Link), use button trigger to avoid nested <a>
 };
 
@@ -36,18 +35,19 @@ export function UserChipHoverCard({
   user,
   className,
   size = "md",
-  isFollowing = false,
-  pending = false,
-  onToggleFollow,
 }: Props) {
-  const { username, displayName, avatarUrl, coverUrl, accentColor, bio, stats } = user;
+  const { user_id, username, displayName, avatarUrl, coverUrl, accentColor, bio, stats } = user;
   const accent500 =
     accentColor || getAccentColorValue(generateAccentColor(username), 500);
 
+  // Use the same follow hook as Profile component
+  const { loading: followLoading, isFollowing, followers, following, canFollow, toggleFollow } =
+    useFollow(user_id);
+
   const handleFollow = async (e: React.MouseEvent) => {
     e.preventDefault(); // prevent link navigation on button click
-    if (pending || !onToggleFollow) return;
-    await onToggleFollow(!isFollowing);
+    if (followLoading || !canFollow) return;
+    toggleFollow();
   };
 
   return (
@@ -125,7 +125,7 @@ export function UserChipHoverCard({
         </div>
 
         {/* header row */}
-        <div className="p-4 pb-3">
+        <div className="p-4 pb-3 relative">
           <div className="flex flex-col items-start gap-3">
             <Link href={`/user/${username}`}>
               <UserAvatar
@@ -149,15 +149,16 @@ export function UserChipHoverCard({
                   <Link href={`/user/${username}`}>@{username}</Link>
                 </div>
               </div>
-              <Button
-                variant={isFollowing ? "default" : "secondary"}
-                onClick={handleFollow}
-                disabled={pending}
-                className="rounded-lg absolute right-3 mb-18"
-
-              >
-                {pending ? "…" : isFollowing ? "Following" : "Follow"}
-              </Button>
+              <div className="flex-shrink-0 ml-2 absolute right-2 top-2">
+                <Button
+                  size="sm"
+                  variant={isFollowing ? "secondary" : "default"}
+                  onClick={handleFollow}
+                  disabled={followLoading || !canFollow}
+                >
+                  {followLoading ? "…" : isFollowing ? "Following" : "Follow"}
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -169,10 +170,10 @@ export function UserChipHoverCard({
           )}
 
           {/* stats */}
-          <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
-            <span><strong className="text-foreground">{stats?.followers ?? 0}</strong> Followers</span>
+          <div className="mt-3 flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span><strong className="text-foreground">{followers}</strong> Followers</span>
             <span>•</span>
-            <span><strong className="text-foreground">{stats?.following ?? 0}</strong> Following</span>
+            <span><strong className="text-foreground">{following}</strong> Following</span>
             {typeof stats?.posts === "number" && (
               <>
                 <span>•</span>
