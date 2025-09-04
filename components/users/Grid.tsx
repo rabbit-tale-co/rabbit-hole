@@ -14,6 +14,8 @@ import {
 } from "@/lib/accent-colors";
 import { renderBioContent } from "@/lib/profile";
 import { SolidCarrot } from "../icons/Icons";
+import { useFollow } from "@/hooks/useFollow";
+import { Button } from "@/components/ui/button";
 
 /** Minimal card with bg-white, ring-1, rounded, no shadows. */
 function UserCard({ user: u }: {
@@ -26,10 +28,14 @@ function UserCard({ user: u }: {
     u.accent_color || getAccentColorValue(generateAccentColor(u.username), 500);
   const isSuspended = Boolean(u.banned_until && Date.parse(u.banned_until) > Date.now());
 
+  // Use follow hook to get real follow data
+  const { loading: followLoading, isFollowing, followers, following, canFollow, toggleFollow } =
+    useFollow(u.user_id);
+
   return (
     <Link href={`/user/${u.username}`}>
       <article
-        className="group h-[300px] sm:h-[300px] lg:h-[300px] ring-1 ring-border flex flex-col rounded-2xl bg-white transition-transform hover:scale-105 duration-150"
+        className="group h-[300px] sm:h-[300px] lg:h-[300px] ring-1 ring-border flex flex-col rounded-2xl bg-white hover:bg-neutral-50 transition-colors duration-150"
       >
         {/* cover: fixed height */}
         <div className="relative h-24 sm:h-30 w-full overflow-hidden rounded-t-2xl">
@@ -72,7 +78,7 @@ function UserCard({ user: u }: {
         </div>
 
         {/* content area grows */}
-        <div className="p-4 flex-1 flex flex-col">
+        <div className="p-4 flex-1 flex flex-col relative">
           <div className="-mt-11">
             <UserAvatar
               className="ring-2 ring-white size-14"
@@ -80,6 +86,21 @@ function UserCard({ user: u }: {
               avatarUrl={!isSuspended && u.avatar_url ? buildPublicUrl(u.avatar_url) : undefined}
               accentHex={avatarAccentHex}
             />
+            {canFollow && !isSuspended && (
+              <Button
+                variant={isFollowing ? "secondary" : "default"}
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleFollow();
+                }}
+                disabled={followLoading}
+                className="absolute right-2 top-2"
+              >
+                {followLoading ? "…" : isFollowing ? "Following" : "Follow"}
+              </Button>
+            )}
           </div>
 
           <div className="mt-2 min-w-0">
@@ -104,7 +125,9 @@ function UserCard({ user: u }: {
 
           {/* footer pinned to bottom */}
           <div className="mt-auto pt-3 flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">Followers 0 • Following 0</span>
+            <span className="text-[11px] text-muted-foreground">
+              {followers} Followers • {following} Following
+            </span>
           </div>
         </div>
       </article>
