@@ -58,8 +58,6 @@ export const viewport: Viewport = {
   themeColor: "#000000",
 };
 
-// FIXME: follows count on liked posts show like number instead of follows number
-// TODO: add number flow to post stats
 // TODO: add to cropping function presets (full square), rectangle, 16:9, 4:3, 3:4, 9:16, 1:1
 // TODO: svg in button mt-.5? to center vertically?
 
