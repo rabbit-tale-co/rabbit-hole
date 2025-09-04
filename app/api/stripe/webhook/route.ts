@@ -209,6 +209,12 @@ async function handleSubscriptionDeleted(subscription: Record<string, unknown>) 
     return;
   }
 
+  // Skip manual subscriptions
+  if (subscription.id && String(subscription.id).startsWith('sub_manual_')) {
+    console.log('⏭️  Skipping manual subscription deletion:', subscription.id);
+    return;
+  }
+
   console.log(`✅ Subscription deleted for user ${userId}`);
 
   try {
