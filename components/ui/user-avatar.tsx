@@ -1,6 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User } from "lucide-react";
 import { generateAccentColor, getAccentColorStyle, type AccentColor, getStyleFromHexShade } from "@/lib/accent-colors";
+import { OutlineUser } from "../icons/Icons";
 
 interface UserAvatarProps {
   username: string;
@@ -48,15 +48,32 @@ export function UserAvatar({
   const fallbackSize = fallbackSizes[size];
   const borderClass = showBorder ? 'border-4 border-white' : '';
 
+  const isWebm = Boolean(avatarUrl && /\.webm(\?|#|$)/i.test(avatarUrl));
+
   return (
     <Avatar className={`${sizeClass} ${borderClass} ${className}`}>
-      <AvatarImage src={avatarUrl} alt={`${username} avatar`} style={avatarBgStyle} />
-      <AvatarFallback
-        className="font-bold rounded-md"
-        style={{ ...avatarBgStyle, ...avatarForegroundStyle }}
-      >
-        <User size={fallbackSize} />
-      </AvatarFallback>
+      {isWebm ? (
+        <video
+          key={avatarUrl}
+          src={avatarUrl}
+          className="size-full object-cover"
+          muted
+          playsInline
+          autoPlay
+          loop
+          style={avatarBgStyle as React.CSSProperties}
+        />
+      ) : (
+        <AvatarImage key={avatarUrl} src={avatarUrl} alt={`${username} avatar`} style={avatarBgStyle} />
+      )}
+      {!isWebm && (
+        <AvatarFallback
+          className="font-bold rounded-md"
+          style={{ ...avatarBgStyle, ...avatarForegroundStyle }}
+        >
+          <OutlineUser size={fallbackSize} />
+        </AvatarFallback>
+      )}
     </Avatar>
   );
 }

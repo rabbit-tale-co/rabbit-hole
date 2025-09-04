@@ -9,6 +9,9 @@ import { ProfileBio } from "./ProfileBio";
 import { ProfileStats } from "./ProfileStats";
 import { getUserAccentStyles, getUserAccentStylesFromHex } from "@/lib/profile";
 import { useIsMobile } from "@/hooks/useMobile";
+import { ModerationMenu } from "@/components/mod/ModerationMenu";
+import { useAuth } from "@/providers/AuthProvider";
+import { PremiumBadge } from "./PremiumBadge";
 
 interface UserProfileData {
   user_id: string;
@@ -18,6 +21,8 @@ interface UserProfileData {
   avatar_url?: string | null;
   cover_url?: string | null;
   accent_color?: string | null;
+  banned_until?: string | null;
+  is_premium?: boolean | null;
 }
 
 interface UserProfileProps {
@@ -30,6 +35,8 @@ interface UserProfileProps {
 export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const isMobile = useIsMobile();
+  const { profile: myProfile } = useAuth();
+  const isAdmin = Boolean((myProfile as unknown as { is_admin?: boolean } | null)?.is_admin);
   // Use provided accentColor or generate one based on username
   const currentAccentColor = useMemo(() => generateAccentColor(profile.username), [profile.username]);
 
@@ -39,19 +46,28 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
     return getUserAccentStyles(currentAccentColor);
   }, [currentAccentColor, profile.accent_color]);
 
+  // No async admin check; rely on profiles.is_admin (same as is_premium path)
+
+  // moderation actions moved to ModerationMenu
+
   // no longer needed since we reuse SettingsDialog's profile section
+
+  const isSuspended = Boolean(profile.banned_until && Date.parse(profile.banned_until) > Date.now());
 
   return (
     <>
-      {/* Cover Image or Pastel Background */}
-      <ProfileCover coverImage={profile.cover_url || undefined} coverBgStyle={coverBgStyle} />
+      {/* Cover Image or Pastel Background; for suspended force default (no image) */}
+      <ProfileCover
+        coverImage={(!isSuspended || isOwnProfile) ? (profile.cover_url || undefined) : undefined}
+        coverBgStyle={coverBgStyle}
+      />
 
       {/* Profile Picture */}
       <div className="flex justify-center -mt-16 relative z-10">
 
         <UserAvatar
           username={profile.username}
-          avatarUrl={profile.avatar_url || undefined}
+          avatarUrl={(!isSuspended || isOwnProfile) ? (profile.avatar_url || undefined) : undefined}
           size="2xl"
           accentColor={currentAccentColor}
           accentHex={profile.accent_color || undefined}
@@ -75,23 +91,44 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
           </div>
         )}
 
+        {isAdmin && !isOwnProfile && (
+          <div className="absolute bottom-4 right-0">
+            <ModerationMenu
+              targetUserId={profile.user_id}
+              isSuspended={isSuspended}
+              onAfter={() => { /* no-op; could refresh */ }}
+            />
+          </div>
+        )}
+
       </div>
 
       {/* Profile Info */}
       <div className="text-center mt-2 px-4 space-y-2">
         <div className="relative inline-block">
-          <h3 className="text-2xl font-bold text-neutral-950">{profile.display_name}</h3>
+          <h3 className="text-2xl font-bold text-neutral-950 inline-flex items-center gap-2">
+            <span>{profile.display_name}</span>
+            <PremiumBadge show={Boolean(profile.is_premium)} />
+          </h3>
           <p className="text-neutral-600">@{profile.username}</p>
         </div>
 
-        <ProfileBio bio={profile.bio || undefined} />
+        {/* Admin moderation tools moved to header menu */}
+
+        {!isSuspended ? (
+          <ProfileBio bio={profile.bio || undefined} />
+        ) : (
+          !isOwnProfile && <p className="text-sm text-muted-foreground">This account is suspended.</p>
+        )}
 
         {/* Stats Grid */}
-        <ProfileStats
-          posts={stats.posts}
-          following={stats.following}
-          followers={stats.followers}
-        />
+        {!isSuspended && (
+          <ProfileStats
+            posts={stats.posts}
+            following={stats.following}
+            followers={stats.followers}
+          />
+        )}
 
       </div>
 

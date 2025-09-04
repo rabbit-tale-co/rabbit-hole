@@ -7,6 +7,7 @@ import Footer from "@/components/footer";
 import AuthProvider from "@/providers/AuthProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,14 +52,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   width: "device-width",
+  minimumScale: 1,
   initialScale: 1,
   viewportFit: "cover",
   themeColor: "#000000",
 };
 
-// FIXME: grid is not pushing 1x1 to bottom of page (it sticks to top of page)
-// + it's not from newest (top left) to oldest (bottom right)
-// FIXME: sometimes uplaod post stuck at 0%
+// FIXME: follows count on liked posts show like number instead of follows number
+// TODO: add number flow to post stats
+// TODO: add to cropping function presets (full square), rectangle, 16:9, 4:3, 3:4, 9:16, 1:1
 
 //TODO: replace all <video> with media-player component
 
@@ -72,12 +74,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <SpeedInsights />
         <Analytics />
         <div className="flex flex-col min-h-screen">
           <Container>
             <AuthProvider>
               <Header />
-              <div className="flex-1 min-h-dvh sm:py-10">
+              <div className="flex-1 min-h-dvh sm:pb-5">
                 {children}
               </div>
               <Footer />

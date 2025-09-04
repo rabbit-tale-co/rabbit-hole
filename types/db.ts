@@ -9,6 +9,7 @@ export type ProfileRow = {
   display_name: string;
   bio: string | null;
   is_premium: boolean;
+  is_admin: boolean;
   avatar_url: string | null;
   cover_url: string | null;
   accent_color: string | null; // "#RRGGBB"
@@ -23,7 +24,7 @@ export type ImageMetaRow = {
   width: number;
   height: number;
   size_bytes: number;
-  mime: "image/jpeg" | "image/png" | "image/webp";
+  mime: "image/jpeg" | "image/png" | "image/webp" | "video/webm" | "video/mp4";
 };
 
 export type PostRow = {
@@ -38,6 +39,7 @@ export type PostRow = {
   repost_count: number;
   comment_count: number;
   bookmark_count: number;
+  is_liked?: boolean;  // Added by API when fetching posts
 };
 
 export type CommentRow = {

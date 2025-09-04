@@ -5,8 +5,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { UnsavedChangesContext } from '@/components/settings/Dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Trash } from 'lucide-react';
-import { OutlineImage } from '@/components/icons/Icons';
+import { OutlineImage, OutlineTrash } from '@/components/icons/Icons';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
@@ -292,7 +291,7 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
                       onClick={handleRemoveAvatar}
                       className="shadow-lg"
                     >
-                      <Trash size={14} />
+                      <OutlineTrash size={14} />
                     </Button>
                   )}
                 </div>
@@ -329,7 +328,7 @@ export function EditProfileDialog({ user, onClose, onProfileUpdated }: EditProfi
                       variant="destructive"
                       onClick={handleRemoveCover}
                     >
-                      <Trash size={16} />
+                      <OutlineTrash size={16} />
                     </Button>
                   )}
                 </div>

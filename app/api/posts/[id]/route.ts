@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
   // fetch author profile (public fields)
   const { data: author, error: pErr } = await supabaseAdmin
     .from("profiles")
-    .select("username, display_name, avatar_url")
+    .select("username, display_name, avatar_url, is_premium")
     .eq("user_id", data.author_id)
     .single();
   if (pErr) return Response.json({ error: pErr.message }, { status: 500 });

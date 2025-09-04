@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PostRow } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 
 
@@ -37,9 +38,19 @@ export function useInfiniteFeed(initial?: { items: PostRow[]; nextCursor: string
     const url = `/api/posts${qs.toString() ? `?${qs.toString()}` : ""}`;
     let res: { error?: string; items?: PostRow[]; nextCursor?: string | null } = {};
     try {
-      const r = await fetch(url, { cache: "no-store" });
+            // Get the current session from Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      const headers: HeadersInit = { cache: "no-store" };
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+
+      const r = await fetch(url, { headers });
       res = await r.json();
       if (!r.ok) res = { error: res?.error || `status_${r.status}` };
+
     } catch (e: unknown) {
       console.log(e);
       res = { error: "network_error" };

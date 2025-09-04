@@ -6,5 +6,6 @@ export const supabaseAdmin = createClient(
   {
     // use public schema (PostgREST exposes public by default); we hit public views
     auth: { persistSession: false, autoRefreshToken: false },
+    db: { schema: 'social_art' },
   }
 );

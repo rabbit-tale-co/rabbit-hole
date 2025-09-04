@@ -2,18 +2,18 @@
 
 import * as React from "react"
 import { useTheme } from "next-themes"
-import { Sun, Moon, Monitor } from "lucide-react"
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { OutlineClearNight, OutlineMonitor, OutlineSunny } from "./icons/Icons"
 
 type ThemeId = "light" | "dark" | "system"
 
 const opts = [
-  { id: "light" as ThemeId, label: "Light", icon: Sun, hint: "Bright & clean" },
-  { id: "dark" as ThemeId, label: "Dark", icon: Moon, hint: "Easy on eyes" },
-  { id: "system" as ThemeId, label: "System", icon: Monitor, hint: "Follow OS" },
+  { id: "light" as ThemeId, label: "Light", icon: OutlineSunny, hint: "Bright & clean" },
+  { id: "dark" as ThemeId, label: "Dark", icon: OutlineClearNight, hint: "Easy on eyes" },
+  { id: "system" as ThemeId, label: "System", icon: OutlineMonitor, hint: "Follow OS" },
 ]
 
 /**

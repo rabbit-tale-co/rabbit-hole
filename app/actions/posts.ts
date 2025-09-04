@@ -1,6 +1,7 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getUserFromCookies } from "@/lib/auth";
 import { CreatePost, UpdatePost, PostIdUserId, CommentCreate, CommentDelete, FeedCursor } from "@/schemas/post";
 import { UUID } from "@/schemas/_shared";
 import { z } from "zod";
@@ -19,10 +20,24 @@ function encodeCursor(ts: string, id: string) {
   return Buffer.from(`${ts}|${id}`).toString("base64");
 }
 
+// Require logged-in and not-banned user. Optionally assert the userId matches the current user.
+async function requireActiveUser(expectedUserId?: string): Promise<{ error?: string; me?: { id: string } }> {
+  const me = await getUserFromCookies();
+  if (!me) return { error: "Unauthorized" };
+  // Note: bannedUntil check moved to admin functions in admin.ts
+  if (expectedUserId && me.id !== expectedUserId) return { error: "Forbidden" };
+  return { me: { id: me.id } };
+}
+
 // --- create post (images must be already uploaded to Storage with those paths) ---
 export async function createPost(input: unknown) {
   const parsed = CreatePost.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  {
+    const auth = await requireActiveUser(parsed.data.author_id);
+    if (auth.error) return { error: auth.error };
+  }
 
   const sb = supabaseAdmin;
   const { data, error } = await sb
@@ -43,6 +58,11 @@ export async function createPost(input: unknown) {
 export async function updatePost(input: unknown) {
   const parsed = UpdatePost.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  {
+    const auth = await requireActiveUser(parsed.data.author_id);
+    if (auth.error) return { error: auth.error };
+  }
 
   const sb = supabaseAdmin;
   const { data: post, error: fetchErr } = await sb
@@ -70,6 +90,10 @@ export async function updatePost(input: unknown) {
 
 // --- delete post (soft delete + return paths for caller to purge if needed) ---
 export async function deletePost(post_id: string, author_id: string) {
+  {
+    const auth = await requireActiveUser(author_id);
+    if (auth.error) return { error: auth.error };
+  }
   const sb = supabaseAdmin;
   const { data: post, error: getErr } = await sb
     .from("posts")
@@ -105,16 +129,28 @@ async function toggle(table: "likes" | "bookmarks" | "reposts", post_id: string,
 export async function setLike(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+  {
+    const auth = await requireActiveUser(parsed.data.user_id);
+    if (auth.error) return { error: auth.error };
+  }
   return toggle("likes", parsed.data.post_id, parsed.data.user_id, on);
 }
 export async function setBookmark(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+  {
+    const auth = await requireActiveUser(parsed.data.user_id);
+    if (auth.error) return { error: auth.error };
+  }
   return toggle("bookmarks", parsed.data.post_id, parsed.data.user_id, on);
 }
 export async function setRepost(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+  {
+    const auth = await requireActiveUser(parsed.data.user_id);
+    if (auth.error) return { error: auth.error };
+  }
   return toggle("reposts", parsed.data.post_id, parsed.data.user_id, on);
 }
 
@@ -122,6 +158,10 @@ export async function setRepost(input: unknown, on: boolean) {
 export async function addComment(input: unknown) {
   const parsed = CommentCreate.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+  {
+    const auth = await requireActiveUser(parsed.data.author_id);
+    if (auth.error) return { error: auth.error };
+  }
   const sb = supabaseAdmin;
   const { data, error } = await sb.from("comments").insert(parsed.data).select().single();
   if (error) return { error: error.message };
@@ -130,6 +170,10 @@ export async function addComment(input: unknown) {
 export async function removeComment(input: unknown) {
   const parsed = CommentDelete.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+  {
+    const auth = await requireActiveUser(parsed.data.author_id);
+    if (auth.error) return { error: auth.error };
+  }
   const sb = supabaseAdmin;
   // authorize: author only
   const { data: c, error: e1 } = await sb.from("comments").select("author_id").eq("id", parsed.data.comment_id).single();
@@ -207,4 +251,32 @@ export async function getUserFeedPage(input: unknown) {
       : null;
 
   return { items: data ?? [], nextCursor };
+}
+
+// --- get post stats ---
+export async function getPostStats(postId: string) {
+  const sb = supabaseAdmin;
+
+  try {
+    const { data, error } = await sb
+      .from('posts_stats')
+      .select('views_total, unique_viewers, last_view_at')
+      .eq('post_id', postId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows found - post doesn't have stats yet
+        return {
+          stats: { views_total: 0, unique_viewers: 0, last_view_at: null }
+        };
+      }
+      return { error: error.message };
+    }
+
+    return { stats: data };
+  } catch (err) {
+    console.error('Failed to fetch post stats:', err);
+    return { error: 'Failed to fetch stats' };
+  }
 }

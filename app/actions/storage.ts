@@ -39,9 +39,21 @@ export async function presignAvatarUpload(userId: string, ext: "jpg"|"jpeg"|"png
   return { data: { path, url: data.signedUrl, token: data.token, imageId: "avatar" } };
 }
 
-export async function finalizeAvatar(userId: string, path: string) {
+export async function finalizeAvatar(userId: string, pathOrUrl: string) {
   const sb = supabaseAdmin;
-  const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+  const isFull = /^(https?:)?\/\//i.test(pathOrUrl);
+  const s3Endpoint = (process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.SOCIAL_S3_ENDPOINT || "").replace(/\/$/, "");
+  const s3Bucket = process.env.NEXT_PUBLIC_S3_BUCKET || process.env.SOCIAL_S3_BUCKET || "";
+  let publicUrl = isFull
+    ? pathOrUrl
+    : (s3Endpoint && s3Bucket)
+      ? `${s3Endpoint}/${s3Bucket}/${pathOrUrl}`
+      : pathOrUrl;
+  try {
+    const u = new URL(publicUrl.startsWith('http') ? publicUrl : `https://${publicUrl}`);
+    u.searchParams.set('v', String(Date.now()));
+    publicUrl = u.toString();
+  } catch { }
   const { error } = await sb.from("profiles").update({ avatar_url: publicUrl }).eq("user_id", userId);
   if (error) return { error: error.message };
   return { ok: true, avatar_url: publicUrl };
@@ -63,9 +75,21 @@ export async function presignCoverUpload(userId: string, ext: "jpg"|"jpeg"|"png"
   return { data: { path, url: data.signedUrl, token: data.token, imageId: "cover" } };
 }
 
-export async function finalizeCover(userId: string, path: string) {
+export async function finalizeCover(userId: string, pathOrUrl: string) {
   const sb = supabaseAdmin;
-  const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+  const isFull = /^(https?:)?\/\//i.test(pathOrUrl);
+  const s3Endpoint = (process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.SOCIAL_S3_ENDPOINT || "").replace(/\/$/, "");
+  const s3Bucket = process.env.NEXT_PUBLIC_S3_BUCKET || process.env.SOCIAL_S3_BUCKET || "";
+  let publicUrl = isFull
+    ? pathOrUrl
+    : (s3Endpoint && s3Bucket)
+      ? `${s3Endpoint}/${s3Bucket}/${pathOrUrl}`
+      : pathOrUrl;
+  try {
+    const u = new URL(publicUrl.startsWith('http') ? publicUrl : `https://${publicUrl}`);
+    u.searchParams.set('v', String(Date.now()));
+    publicUrl = u.toString();
+  } catch { }
   const { error } = await sb.from("profiles").update({ cover_url: publicUrl }).eq("user_id", userId);
   if (error) return { error: error.message };
   return { ok: true, cover_url: publicUrl };

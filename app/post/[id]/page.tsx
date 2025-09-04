@@ -5,13 +5,19 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { ImageZoom } from "@/components/ui/kibo-ui/image-zoom";
 import Link from "next/link";
-import { CalendarDays, Trash2, Pencil, ArrowLeft } from "lucide-react";
+import { buildPublicUrl } from "@/lib/publicUrl";
+import { PremiumBadge } from "@/components/user/PremiumBadge";
 import { useAuth } from "@/providers/AuthProvider";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import Center from "@/components/Center";
 import { toast } from "sonner";
 import { ConfirmDelete } from "./ConfirmDelete";
+// admin state derived from auth profile
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { adminUnbanUser } from "@/app/actions/admin";
+import { BanUserDialog } from "./BanUserDialog";
+import { OutlineArrowLeft, OutlineCalendar, OutlineMore } from "@/components/icons/Icons";
 
 type Post = {
   id: string;
@@ -20,12 +26,12 @@ type Post = {
   images: { id: string; path: string; alt?: string; width?: number; height?: number }[];
   created_at: string;
 };
-type Author = { username: string; display_name?: string | null; avatar_url?: string | null };
+type Author = { username: string; display_name?: string | null; avatar_url?: string | null; is_premium?: boolean };
 
 export default function PostPage() {
   const params = useParams();
   const id = params.id as string;
-  const { user } = useAuth();
+  const { user, profile: myProfile } = useAuth();
   const router = useRouter();
   const [post, setPost] = React.useState<Post | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -33,6 +39,8 @@ export default function PostPage() {
   const [author, setAuthor] = React.useState<Author | null>(null);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const isAdmin = Boolean((myProfile as unknown as { is_admin?: boolean } | null)?.is_admin);
+  const [banOpen, setBanOpen] = React.useState(false);
 
   React.useEffect(() => {
     let alive = true;
@@ -51,11 +59,21 @@ export default function PostPage() {
     return () => { alive = false; };
   }, [id]);
 
-  const publicUrl = React.useCallback((path: string) => (
-    /^https?:\/\//.test(path) ? path : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/social-art/${path}`
-  ), []);
+  // admin derived above
+
+  const publicUrl = React.useCallback((path: string) => buildPublicUrl(path), []);
 
   const myPost = post && user?.id === post.author_id;
+
+  const copyLink = React.useCallback(async () => {
+    try {
+      const url = `${window.location.origin}/post/${id}`;
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Failed to copy link");
+    }
+  }, [id]);
 
   async function handleDelete() {
     if (!post) return;
@@ -74,13 +92,18 @@ export default function PostPage() {
     }
   }
 
+  // admin delete helper kept for future use in contextual menus
+
   if (loading) return <Center><div>Loading…</div></Center>;
   if (error || !post) return <Center><div className="text-sm text-muted-foreground">Post not found.</div></Center>;
 
   return (
     <>
       <div className="mb-3">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-2"><ArrowLeft className="size-4" />Back</Button>
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-2">
+          <OutlineArrowLeft className="size-4" />
+          Back
+        </Button>
       </div>
 
       {/* header */}
@@ -92,20 +115,57 @@ export default function PostPage() {
           </Link>
           <div className="min-w-0">
             {/* author chip */}
-            <Link href={`/user/${author?.username || post.author_id}`} className="font-semibold hover:underline">
-              {author?.display_name?.trim() || author?.username || "View author"}
+            <Link href={`/user/${author?.username || post.author_id}`} className="font-semibold hover:underline inline-flex items-center gap-1">
+              <span className="truncate">{author?.display_name?.trim() || author?.username || "View author"}</span>
+              <PremiumBadge show={Boolean(author?.is_premium ?? (author as unknown as { isPremium?: boolean })?.isPremium)} />
             </Link>
             <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <CalendarDays className="size-3" />
+              <OutlineCalendar className="size-3" />
               {new Date(post.created_at).toLocaleString()}
             </div>
           </div>
         </div>
-        {myPost && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-1" onClick={() => toast("Edit coming soon")}> <Pencil className="size-4" /> Edit</Button>
-            <Button variant="destructive" size="sm" className="gap-1" onClick={() => setConfirmOpen(true)}> <Trash2 className="size-4" /> Delete</Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <OutlineMore className="size-4" />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={copyLink}>Copy link</DropdownMenuItem>
+              {myPost && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => toast("Edit coming soon")}>Edit</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={() => setConfirmOpen(true)}>
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+              {isAdmin && post && user?.id !== post.author_id && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Admin</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => setBanOpen(true)}>Suspend…</DropdownMenuItem>
+                  <DropdownMenuItem onClick={async () => {
+                    try {
+                      const r = await adminUnbanUser(post.author_id);
+                      const err = (r as unknown as { error?: string }).error;
+                      if (err) { toast.error(err); return; }
+                      toast.success("User unbanned");
+                    } catch { toast.error("Failed to unban user"); }
+                  }}>Unban</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={() => setConfirmOpen(true)}>Delete post</DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {isAdmin && post && user?.id !== post.author_id && (
+          <BanUserDialog open={banOpen} onOpenChange={setBanOpen} userId={post.author_id} />
         )}
       </div>
 

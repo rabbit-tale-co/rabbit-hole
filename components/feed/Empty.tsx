@@ -2,12 +2,14 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { ImagePlus, UploadCloud, Palette, Wand2, Sparkles, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Center from "@/components/Center";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { OutlineImage } from "@/components/icons/Icons";
+import { OutlineAI, OutlineEdit, OutlineImage, OutlineVideo } from "@/components/icons/Icons";
+import dynamic from "next/dynamic";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import Link from "next/link";
 
 /**
  * Empty gallery states for profile & home feed
@@ -33,6 +35,9 @@ export default function ProfileEmptyGallery({
 }: ProfileEmptyGalleryProps) {
   const [isDragging, setIsDragging] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [openComposer, setOpenComposer] = React.useState(false);
+
+  const CreatePostDialog = React.useMemo(() => dynamic(() => import("@/components/feed/upload/create-post").then(m => m.CreatePost), { ssr: false }), []);
 
   const defaultDescription = isOwnProfile
     ? "Share your first piece — images, process shots or short reels."
@@ -66,7 +71,7 @@ export default function ProfileEmptyGallery({
                 transition={{ duration: 0.4 }}
                 className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-muted-foreground"
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <OutlineAI className="h-3.5 w-3.5" />
                 Make your first impression count
               </motion.div>
 
@@ -96,11 +101,8 @@ export default function ProfileEmptyGallery({
               >
                 {isOwnProfile ? (
                   <>
-                    <Button onClick={onCreate ?? openFileDialog} className="gap-2">
-                      <Wand2 className="h-4 w-4" /> Create post
-                    </Button>
-                    <Button variant="secondary" className="gap-2" onClick={openFileDialog}>
-                      <UploadCloud className="h-4 w-4" /> Upload images
+                    <Button onClick={onCreate ? onCreate : () => setOpenComposer(true)} className="gap-2">
+                      <OutlineEdit className="siz-4" /> Create post
                     </Button>
                     <input
                       ref={fileInputRef}
@@ -113,9 +115,9 @@ export default function ProfileEmptyGallery({
                   </>
                 ) : (
                   <Button variant="secondary" asChild>
-                    <a href="/explore" className="gap-2">
-                      <Palette className="h-4 w-4" /> Explore creators
-                    </a>
+                    <Link href="/explore" className="gap-2">
+                      Explore creators
+                    </Link>
                   </Button>
                 )}
               </motion.div>
@@ -179,8 +181,8 @@ export default function ProfileEmptyGallery({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
-                <Badge icon={<Camera className="h-3 w-3" />} label="WIP shots" />
-                <Badge icon={<Wand2 className="h-3 w-3" />} label="Timelapse" />
+                <Badge icon={<OutlineImage className="size-3" />} label="WIP shots" />
+                <Badge icon={<OutlineVideo className="siz-3" />} label="Timelapse" />
               </motion.div>
             </div>
           </div>
@@ -193,22 +195,32 @@ export default function ProfileEmptyGallery({
               <Tip
                 title="Show your process"
                 desc="Upload sketches or progress shots — people love seeing how art evolves."
-                icon={<ImagePlus className="h-4 w-4" />}
+                icon={<OutlineImage className="size-4" />}
               />
               <Tip
                 title="Describe the piece"
                 desc="Add tools, brushes & goods. Good metadata helps discovery."
-                icon={<Palette className="h-4 w-4" />}
+                icon={<OutlineEdit className="size-4" />}
               />
               <Tip
                 title="Post consistently"
                 desc="Small, regular updates build audience faster than rare big drops."
-                icon={<Sparkles className="h-4 w-4" />}
+                icon={<OutlineAI className="size-4" />}
               />
             </div>
           </div>
         </CardContent>
       </Card>
+      <Dialog open={isOwnProfile && openComposer} onOpenChange={setOpenComposer}>
+        <DialogContent className="p-0 sm:max-w-[640px] rounded-3xl overflow-hidden bg-background">
+          <DialogHeader className="px-5 pt-5 pb-3">
+            <DialogTitle className="text-base">Create a post</DialogTitle>
+          </DialogHeader>
+          <div className="px-5 pb-5">
+            <CreatePostDialog onPostCreated={() => setOpenComposer(false)} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -224,7 +236,7 @@ export function HomeEmptyFeed() {
           className="flex flex-col items-center"
         >
           <div className="mb-6 rounded-full bg-muted/50">
-            <Palette className="size-16 text-muted-foreground" />
+            <OutlineImage className="size-16 text-muted-foreground" />
           </div>
           <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Nothing here yet
@@ -235,12 +247,12 @@ export function HomeEmptyFeed() {
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Button asChild>
-              <a href="/explore" className="gap-2">
-                <Sparkles className="h-4 w-4" /> Explore creators
-              </a>
+              <Link href="/explore" className="gap-2">
+                <OutlineAI className="size-4" /> Explore creators
+              </Link>
             </Button>
             <Button variant="secondary" asChild>
-              <a href="/tags/trending">Discover tags</a>
+              <Link href="/tags/trending">Discover tags</Link>
             </Button>
           </div>
         </motion.div>

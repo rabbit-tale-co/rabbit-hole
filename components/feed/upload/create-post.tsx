@@ -3,16 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { z } from 'zod';
-import {
-  Image as ImageIcon,
-  Video as VideoIcon,
-  X as XIcon,
-  Upload as UploadIcon,
-  Hash as HashIcon,
-  Sparkles,
-  BadgeCheck,
-  GripVertical,
-} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +13,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { Sortable, SortableItem, SortableItemHandle } from '@/components/ui/sortable';
 import { MediaPlayer as VideoPlayer, MediaPlayerVideo, MediaPlayerControls, MediaPlayerPlay, MediaPlayerSeek, MediaPlayerVolume, MediaPlayerFullscreen } from '@/components/ui/media-player';
 import { useFileUpload } from '@/hooks/use-file-upload';
+import { OutlineAI, OutlineClose, OutlineDragIndicator, OutlineExport, OutlineImage, OutlineVideo } from '@/components/icons/Icons';
 
 type OptimisticPost = {
   content?: string;
@@ -77,6 +68,47 @@ const fmt = (n: number) => {
   return `${v.toFixed(v < 10 ? 1 : 0)} ${u[i]}`;
 };
 
+// Probe media dimensions for images/gifs/videos using browser APIs
+async function probeDimensions(file: File, kind: Kind): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    // Videos: use a <video> element to read metadata
+    if (kind === 'video') {
+      let url = '';
+      try { url = URL.createObjectURL(file); } catch { /* noop */ }
+      const v = document.createElement('video');
+      v.preload = 'metadata';
+      v.onloadedmetadata = () => {
+        const width = v.videoWidth || 1;
+        const height = v.videoHeight || 1;
+        resolve({ width, height });
+        try { if (url) { URL.revokeObjectURL(url); } } catch { }
+      };
+      v.onerror = () => {
+        resolve({ width: 1, height: 1 });
+        try { if (url) { URL.revokeObjectURL(url); } } catch { }
+      };
+      v.src = url;
+      return;
+    }
+
+    // Images/GIFs: use an Image element to read natural size
+    let url = '';
+    try { url = URL.createObjectURL(file); } catch { /* noop */ }
+    const imgEl = new window.Image();
+    imgEl.onload = () => {
+      const width = imgEl.naturalWidth || 1;
+      const height = imgEl.naturalHeight || 1;
+      resolve({ width, height });
+      try { if (url) { URL.revokeObjectURL(url); } } catch { }
+    };
+    imgEl.onerror = () => {
+      resolve({ width: 1, height: 1 });
+      try { if (url) { URL.revokeObjectURL(url); } } catch { }
+    };
+    imgEl.src = url;
+  });
+}
+
 // Local components to safely create/revoke fresh blob URLs
 function VideoBlob({ file, className, controls = false }: { file: File; className?: string; controls?: boolean }) {
   const [url, setUrl] = useState<string>('');
@@ -116,13 +148,23 @@ export function CreateMediaPost({
   fileSizeMbMax = 15,
   formId,
 }: CreatePostProps) {
-  const { user } = useAuth();
-  const isPremium = isPremiumProp ?? Boolean(user?.user_metadata?.is_premium);
+  const { user, profile } = useAuth();
+
+  // Use profile.is_premium from database instead of user_metadata
+  const isPremium = isPremiumProp ?? Boolean(profile?.is_premium);
+
+  // Debug log to see what's in profile
+  console.log('Profile:', profile);
+  console.log('Profile is_premium:', profile?.is_premium);
+  console.log('Final isPremium:', isPremium);
+  console.log('Profile loading state:', profile === null ? 'null' : 'loaded');
 
   const MAX_IMAGES = isPremium ? 10 : 5;
   const MAX_VIDEOS = 1;
   const MAX_CHARS = isPremium ? 1000 : 300;
-  const FILE_MAX = fileSizeMbMax * 1024 * 1024; // bytes
+  // Premium users get 50MB, free users get 15MB
+  const actualFileSizeMbMax = isPremium ? 50 : (fileSizeMbMax || 15);
+  const FILE_MAX = actualFileSizeMbMax * 1024 * 1024; // bytes
 
   const [caption, setCaption] = useState('');
   const [items, setItems] = useState<Item[]>([]);
@@ -195,6 +237,7 @@ export function CreateMediaPost({
   const [postId, setPostId] = useState<string | null>(null);
   type Meta = { id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: NonNullable<Item['mime']>; is_cover: boolean };
   const [uploadedMetas, setUploadedMetas] = useState<Meta[]>([]);
+  type UploadResp = { path?: string; mime?: NonNullable<Item['mime']> };
 
   const canSubmit = useMemo(() => {
     const res = payloadSchema.safeParse({
@@ -271,89 +314,72 @@ export function CreateMediaPost({
 
     // dims bedzie liczony po stronie serwera
 
-    // if video, probe dims on client (server will use provided values)
+    // Probe dims on client for all kinds (image/gif/video). Server may also verify.
     let probeW = 0, probeH = 0;
-    if (it.kind === 'video') {
-      try {
-        const url = URL.createObjectURL(it.file);
-        await new Promise<void>((resolve) => {
-          const v = document.createElement('video');
-          v.preload = 'metadata';
-          v.onloadedmetadata = () => { probeW = v.videoWidth || 0; probeH = v.videoHeight || 0; resolve(); };
-          v.onerror = () => resolve();
-          v.src = url;
-        });
-        try { URL.revokeObjectURL(url); } catch { }
-      } catch { }
-    }
+    try {
+      const dim = await probeDimensions(it.file, it.kind);
+      probeW = dim.width || 0;
+      probeH = dim.height || 0;
+    } catch { /* noop */ }
 
     const imageId = randomUUIDv7();
     const key = `posts/${postId}/${imageId}.${ext}`;
     console.debug('[uploadOne] prepared id', { key, mime, size: blob.size });
 
+    const MEDIA_API = process.env.NEXT_PUBLIC_BACKEND || process.env.NEXT_PUBLIC_MEDIA_API_URL || 'https://api.rabbittale.co';
+
     // Direct upload for videos or payloads that may exceed serverless limits
     if (it.kind === 'video' || blob.size > 4 * 1024 * 1024) {
-      const baseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object`;
-      const bucket = 'social-art';
-      const url = `${baseUrl}/${bucket}/${key}`;
-      const { data: { session } } = await supabase.auth.getSession();
-      const bearer = session?.access_token || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', url);
-        xhr.setRequestHeader('authorization', `Bearer ${bearer}`);
-        xhr.setRequestHeader('x-upsert', 'true');
-        xhr.upload.onprogress = (ev) => {
-          const total = (ev.lengthComputable && ev.total) ? ev.total : blob.size;
-          const loaded = ev.loaded || 0;
-          const pct = total > 0 ? Math.max(1, Math.min(99, Math.round((loaded / total) * 100))) : 1;
-          onProgress(pct);
-        };
-        xhr.onerror = () => reject(new Error('storage_upload_failed'));
-        xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error(`storage_upload_status_${xhr.status}`)); };
-        const fd = new FormData();
-        fd.append('file', blob, `${imageId}.${ext}`);
-        xhr.send(fd);
-      });
-
-      // compute dims for image if not probed already
-      let w = probeW || 1, h = probeH || 1;
-      if (it.kind !== 'video' && (w === 0 || h === 0)) {
+      let serverMeta: Meta | null = null;
+      await new Promise<void>(async (resolve, reject) => {
         try {
-          const iurl = URL.createObjectURL(it.file);
-          await new Promise<void>((resolve) => {
-            const im = new window.Image();
-            im.onload = () => { w = im.naturalWidth || 1; h = im.naturalHeight || 1; resolve(); };
-            im.onerror = () => resolve();
-            im.src = iurl;
-          });
-          try { URL.revokeObjectURL(iurl); } catch { }
-        } catch { }
-      }
-
-      const meta = {
-        id: imageId,
-        path: key,
-        alt: it.alt || '',
-        width: Math.max(1, w || 1),
-        height: Math.max(1, h || 1),
-        size_bytes: blob.size,
-        mime: mime as NonNullable<Item['mime']>,
-        is_cover: Boolean(it.isCover),
-      } as const;
-      // persist dims locally for UI
-      try { patchItem(it.id, { width: meta.width, height: meta.height, serverPath: meta.path, serverId: meta.id }); } catch { }
-      return meta;
+          const fd = new FormData();
+          fd.append('file', blob, `${imageId}.${ext}`);
+          fd.append('postId', postId);
+          fd.append('userId', user?.id || '');
+          fd.append('kind', it.kind);
+          fd.append('isCover', String(Boolean(it.isCover)));
+          fd.append('alt', it.alt || '');
+          if (probeW && probeH) {
+            fd.append('width', String(probeW));
+            fd.append('height', String(probeH));
+          }
+          onProgress(1);
+          const res = await fetch(`${MEDIA_API}/social/v1/post/upload`, { method: 'POST', body: fd });
+          if (!res.ok) {
+            const t = await res.text().catch(() => '');
+            console.error('[uploadOne] server upload failed', res.status, t);
+            reject(new Error('server_upload_failed'));
+            return;
+          }
+          const json: UploadResp = await res.json();
+          serverMeta = {
+            id: imageId,
+            path: json.path || key,
+            alt: it.alt || '',
+            width: probeW || 1,
+            height: probeH || 1,
+            size_bytes: Number(blob.size || 1),
+            mime: (json.mime || 'video/webm') as NonNullable<Item['mime']>,
+            is_cover: Boolean(it.isCover),
+          } as Meta;
+          try { patchItem(it.id, { width: serverMeta.width, height: serverMeta.height, serverPath: serverMeta.path, serverId: serverMeta.id }); } catch { }
+          resolve();
+        } catch (e) { reject(e); }
+      });
+      return (serverMeta as unknown) as {
+        id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: NonNullable<Item['mime']>; is_cover: boolean
+      };
     }
 
     // Upload to our server endpoint which converts (sharp/ffmpeg) and pushes to storage
-    let serverMeta: { id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: NonNullable<Item['mime']>; is_cover: boolean } | null = null;
+    let serverMeta: Meta | null = null;
     await new Promise<void>(async (resolve, reject) => {
       try {
         const fd = new FormData();
         fd.append('file', blob, `${imageId}.${ext}`);
         fd.append('postId', postId);
+        fd.append('userId', user?.id || '');
         fd.append('kind', it.kind);
         fd.append('isCover', String(Boolean(it.isCover)));
         fd.append('alt', it.alt || '');
@@ -362,18 +388,28 @@ export function CreateMediaPost({
           fd.append('height', String(probeH));
         }
         onProgress(1);
-        const res = await fetch('/api/uploads', { method: 'POST', body: fd });
+        const res = await fetch(`${MEDIA_API}/social/v1/post/upload`, { method: 'POST', body: fd });
         if (!res.ok) {
           const t = await res.text().catch(() => '');
           console.error('[uploadOne] server upload failed', res.status, t);
           reject(new Error('server_upload_failed'));
           return;
         }
-        const json: { id: string; path: string; alt: string; width: number; height: number; size_bytes: number; mime: NonNullable<Item['mime']>; is_cover: boolean } = await res.json();
-        ext = (json.path?.split('.').pop() || ext);
-        mime = json.mime || mime;
-        serverMeta = json;
-        try { patchItem(it.id, { width: json.width, height: json.height, serverPath: json.path, serverId: json.id }); } catch { }
+        const json: UploadResp = await res.json();
+        const built = {
+          id: imageId,
+          path: json.path || key,
+          alt: it.alt || '',
+          width: probeW || 1,
+          height: probeH || 1,
+          size_bytes: Number(blob.size || 1),
+          mime: (json.mime || (it.kind === 'gif' || it.kind === 'video' ? 'video/webm' : 'image/webp')) as NonNullable<Item['mime']>,
+          is_cover: Boolean(it.isCover),
+        } as Meta;
+        ext = (built.path?.split('.').pop() || ext);
+        mime = built.mime || mime;
+        serverMeta = built;
+        try { patchItem(it.id, { width: built.width, height: built.height, serverPath: built.path, serverId: built.id }); } catch { }
         resolve();
       } catch (e) {
         reject(e);
@@ -392,7 +428,7 @@ export function CreateMediaPost({
     } as const;
     const meta = serverMeta ?? fallback;
     return meta;
-  }, []);
+  }, [user?.id]);
 
   // run uploads with small concurrency
   const uploadAll = useCallback(async (_items: Item[], postId: string, setOne: (id: string, patch: Partial<Item>) => void) => {
@@ -523,10 +559,6 @@ export function CreateMediaPost({
 
   // ---------- UI -------------------------------------------------------------
 
-  const headerHint = !isPremium
-    ? 'Free plan • up to 5 images, 1 video, 300 chars'
-    : 'Premium • up to 10 images, 1 video, 1000 chars';
-
   return (
     <form
       id={formId}
@@ -538,8 +570,9 @@ export function CreateMediaPost({
       <div className="flex flex-col gap-2 p-3">
         <div className="flex items-center justify-between gap-2 px-1">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {isPremium ? <BadgeCheck className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-            <span className="truncate">{headerHint}</span>
+            <OutlineAI className='size-[1.5em]' />
+            <span className="truncate">{isPremium ? 'Premium' : 'Free plan'} • up to {MAX_IMAGES} images, 1 video, {MAX_CHARS} chars, {actualFileSizeMbMax}MB files</span>
+            {profile === null && <span className="text-orange-500">(Loading profile...)</span>}
           </div>
           <div className="text-[11px] text-muted-foreground">{caption.trim().length}/{MAX_CHARS}</div>
         </div>
@@ -547,15 +580,7 @@ export function CreateMediaPost({
         <Textarea
           value={caption}
           onChange={(e) => setCaption(e.target.value.slice(0, MAX_CHARS))}
-          placeholder={(() => {
-            const options = [
-              'What are you working on right now?',
-              "I'm working on…",
-              'Share a quick note about your media…',
-              'WIP thoughts, tools, brushes…',
-            ];
-            return options[Math.floor(Math.random() * options.length)];
-          })()}
+          placeholder="I'm working on…"
           className="min-h-[84px] shadow-none p-3 resize-none border-0 bg-transparent focus-visible:ring-0 text-[15px] leading-6"
           disabled={posting}
         />
@@ -580,13 +605,13 @@ export function CreateMediaPost({
             tabIndex={0}
           >
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background/80">
-              <UploadIcon className="h-5 w-5 text-muted-foreground" />
+              <OutlineExport className="size-[1.5em] text-muted-foreground" />
             </div>
             <div className="text-sm text-muted-foreground">
               Drag & drop images or a video, paste (Ctrl/Cmd+V), or <span className="underline underline-offset-2">browse</span>
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground/80">
-              {MAX_IMAGES} images max • {MAX_VIDEOS} video max • {fileSizeMbMax}MB each
+              {MAX_IMAGES} images max • {MAX_VIDEOS} video max • {actualFileSizeMbMax}MB each
             </div>
           </div>
         ) : (
@@ -598,7 +623,7 @@ export function CreateMediaPost({
               </div>
               <div className="flex items-center gap-1.5">
                 <Button type="button" size="sm" variant="ghost" className="hover:bg-neutral-200" onClick={uploadActions.openFileDialog}>
-                  <UploadIcon className="h-4 w-4 mr-1" />
+                  <OutlineExport />
                   Add
                 </Button>
                 <Button type="button" size="sm" variant="ghost" className="hover:bg-neutral-200" onClick={clearAll} disabled={posting || items.length === 0}>
@@ -642,25 +667,27 @@ export function CreateMediaPost({
 
                     {/* type badge (no counter) */}
                     <div className="absolute bottom-1.5 left-1.5 text-[10px] rounded-full bg-background/80 border border-border p-1 flex items-center gap-1">
-                      {it.kind === 'video' ? <VideoIcon className="size-3" /> : <ImageIcon className="size-3" />}
+                      {it.kind === 'video' ? <OutlineVideo size={16} /> : <OutlineImage size={16} />}
                     </div>
 
                     <SortableItemHandle className="absolute top-1.5 left-1.5">
                       <div className="inline-flex size-6 items-center justify-center rounded-full bg-background/80
-                        border border-border text-muted-foreground">
-                        <GripVertical className="size-4" />
+                        border border-border">
+                        <OutlineDragIndicator size={16} />
                       </div>
                     </SortableItemHandle>
 
                     {/* remove */}
-                    <button
+                    <Button
                       type="button"
+                      size="icon"
+                      variant="ghost"
                       onClick={(e) => { e.stopPropagation(); removeById(it.id); }}
                       className="absolute top-1.5 right-1.5 z-10 inline-flex size-6 items-center justify-center rounded-full bg-background/80 border border-border text-muted-foreground hover:text-foreground transition-opacity opacity-0 group-hover:opacity-100"
                       aria-label="Remove"
                     >
-                      <XIcon className="size-3.5" />
-                    </button>
+                      <OutlineClose className="size-3.5" />
+                    </Button>
 
                     {/* per-item progress */}
                     {(it.status === 'processing' || it.status === 'uploading') && (
@@ -707,7 +734,7 @@ export function CreateMediaPost({
           <div className="space-y-3">
             <div>
               <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                <HashIcon className="h-3.5 w-3.5" />
+                {/* <HashIcon className="h-3.5 w-3.5" /> */}
                 Alt text ({MAX_ALT})
               </label>
               <input
@@ -742,7 +769,7 @@ export function CreateMediaPost({
               className="w-full hover:bg-neutral-200"
               onClick={() => removeById(selected.id)}
             >
-              <XIcon className="h-4 w-4 mr-2" />
+              <OutlineClose />
               Remove media
             </Button>
           </div>

@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input, InputAddon, InputGroup } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2 } from "lucide-react";
 import ShowPassword from "./ShowPassword";
 import Link from "next/link";
+import { OutlineLoading } from "../icons/Icons";
 
 export default function LoginForm({ onSuccess, onForgot }: { onSuccess?: () => void; onForgot?: () => void }) {
   const [email, setEmail] = useState("");
@@ -70,7 +70,7 @@ export default function LoginForm({ onSuccess, onForgot }: { onSuccess?: () => v
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in…</>) : "Sign in"}
+        {loading ? (<><OutlineLoading className="mr-2 h-4 w-4 animate-spin" />Signing in…</>) : "Sign in"}
       </Button>
 
       <div className="flex items-center justify-end text-xs">

@@ -1,15 +1,6 @@
 "use client"
 
 import * as React from "react"
-import {
-  Bell,
-  Paintbrush,
-  Settings,
-  User,
-  Shield,
-  Camera,
-  X,
-} from "lucide-react"
 
 import {
   Breadcrumb,
@@ -41,38 +32,35 @@ import { Profile, Privacy, Appearance, Notifications, Content } from "./index"
 import { useAuth } from "@/providers/AuthProvider"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { OutlineBell, OutlineBrush, OutlineClose, OutlineImage, OutlineSettings, OutlineShield, OutlineUser } from "../icons/Icons"
 
-// Context for managing unsaved changes across settings components
-export const UnsavedChangesContext = React.createContext<{
-  markAsChanged: () => void;
+// Unsaved changes provider API
+type SaveFn = (() => void | Promise<void>) | null;
+type Ctx = {
+  isDirty: boolean;
+  checkForChanges: (values: unknown) => void;
   markAsSaved: () => void;
   resetChanges: () => void;
-  checkForChanges: (currentValues: {
-    displayName: string;
-    username: string;
-    bio: string;
-  }) => void;
-  registerSaveFunction: (saveFn: () => Promise<void>) => void;
-}>({
-  markAsChanged: () => { },
-  markAsSaved: () => { },
-  resetChanges: () => { },
-  checkForChanges: () => { },
-  registerSaveFunction: () => { },
-})
-
-export const useUnsavedChanges = () => React.useContext(UnsavedChangesContext)
+  registerSaveFunction: (fn: NonNullable<SaveFn>) => void;
+  runSave: () => Promise<void>;
+};
+export const UnsavedChangesContext = React.createContext<Ctx | null>(null)
+export const useUnsavedChanges = () => {
+  const ctx = React.useContext(UnsavedChangesContext)
+  if (!ctx) throw new Error("useUnsavedChanges must be used inside SettingsDialog")
+  return ctx
+}
 
 type SettingsSection = "profile" | "privacy" | "appearance" | "notifications" | "content";
 type NavItem = { name: string; icon: React.ElementType; id: SettingsSection };
 
 const data: { nav: NavItem[] } = {
   nav: [
-    { name: "Profile & Settings", icon: User, id: "profile" },
-    { name: "Privacy", icon: Shield, id: "privacy" },
-    { name: "Appearance", icon: Paintbrush, id: "appearance" },
-    { name: "Notifications", icon: Bell, id: "notifications" },
-    { name: "Content", icon: Camera, id: "content" },
+    { name: "Profile & Settings", icon: OutlineUser, id: "profile" },
+    { name: "Privacy", icon: OutlineShield, id: "privacy" },
+    { name: "Appearance", icon: OutlineBrush, id: "appearance" },
+    { name: "Notifications", icon: OutlineBell, id: "notifications" },
+    { name: "Content", icon: OutlineImage, id: "content" },
   ],
 }
 
@@ -109,7 +97,7 @@ function SettingsContent({ activeSection, user }: SettingsContentProps) {
       return (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
-            <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <OutlineSettings className="size-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900">Select a setting</h3>
             <p className="text-sm text-gray-500">Choose a category from the sidebar to get started</p>
           </div>
@@ -134,50 +122,46 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
   const open = controlledOpen ?? internalOpen
   const setOpen = onOpenChange ?? setInternalOpen
 
-  // Track original values for comparison
-  const [originalValues, setOriginalValues] = React.useState({
-    displayName: '',
-    username: '',
-    bio: ''
-  })
+  // Canonicalization and baseline tracking for unsaved changes
+  const baselineKeyRef = React.useRef<string>("")
+  const currentKeyRef = React.useRef<string>("")
+  const canonDeep = React.useCallback((v: unknown): unknown => {
+    const canonValue = (x: unknown): unknown => typeof x === "string" ? x.normalize("NFC").replace(/\r\n/g, "\n").trim() : x
+    if (Array.isArray(v)) return v.map(canonDeep)
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>
+      const out: Record<string, unknown> = {}
+      for (const k of Object.keys(o).sort()) out[k] = canonDeep(o[k])
+      return out
+    }
+    return canonValue(v)
+  }, [])
 
   // Track save function from active component
   const [activeSaveFunction, setActiveSaveFunction] = React.useState<(() => Promise<void>) | null>(null)
 
-  // Update original values when user changes or dialog opens
-  React.useEffect(() => {
-    if (profile && open) {
-      setOriginalValues({
-        displayName: profile.display_name,
-        username: profile.username,
-        bio: ''
-      })
-    }
-  }, [profile, open])
-
-  // Simple functions to manage unsaved changes
-  const markAsChanged = React.useCallback(() => {
-    setHasUnsavedChanges(true)
-  }, [])
+  // Unsaved changes API implemented with canonical keys
+  const checkForChanges = React.useCallback((values: unknown) => {
+    currentKeyRef.current = JSON.stringify(canonDeep(values))
+    setHasUnsavedChanges(currentKeyRef.current !== baselineKeyRef.current)
+  }, [canonDeep])
 
   const markAsSaved = React.useCallback(() => {
+    baselineKeyRef.current = currentKeyRef.current
     setHasUnsavedChanges(false)
-    // Update original values to current values
-    setOriginalValues({
-      displayName: profile?.display_name ?? '',
-      username: profile?.username ?? 'username',
-      bio: ''
-    })
-  }, [profile])
+  }, [])
 
   const resetChanges = React.useCallback(() => {
+    baselineKeyRef.current = currentKeyRef.current
     setHasUnsavedChanges(false)
   }, [])
 
-  // Function to register save function from active component
-  const registerSaveFunction = React.useCallback((saveFn: () => Promise<void>) => {
-    setActiveSaveFunction(() => saveFn)
-  }, [])
+  // Update baseline when profile changes or dialog opens
+  React.useEffect(() => {
+    if (profile && open) {
+      resetChanges()
+    }
+  }, [profile, open, resetChanges])
 
   // Reset unsaved changes when dialog closes
   React.useEffect(() => {
@@ -193,20 +177,6 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
     window.addEventListener('settings:requestClose', onRequestClose)
     return () => window.removeEventListener('settings:requestClose', onRequestClose)
   }, [setOpen])
-
-  // Function to check if there are actual changes
-  const checkForChanges = React.useCallback((currentValues: {
-    displayName: string;
-    username: string;
-    bio: string;
-  }) => {
-    const hasChanges =
-      currentValues.displayName !== originalValues.displayName ||
-      currentValues.username !== originalValues.username ||
-      currentValues.bio !== originalValues.bio
-
-    setHasUnsavedChanges(hasChanges)
-  }, [originalValues])
 
   // Handle save from toast
   const handleSaveFromToast = React.useCallback(async () => {
@@ -295,11 +265,12 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
           </DialogDescription>
 
           <UnsavedChangesContext.Provider value={{
-            markAsChanged,
+            isDirty: hasUnsavedChanges,
             markAsSaved,
             resetChanges,
             checkForChanges,
-            registerSaveFunction,
+            registerSaveFunction: (fn) => setActiveSaveFunction(() => fn as unknown as () => Promise<void>),
+            runSave: handleSaveFromToast,
           }}>
             <SidebarProvider className="items-start">
               {!singleSectionOnly && (
@@ -352,7 +323,7 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
                   <div className="flex items-center gap-2">
                     <DialogClose asChild>
                       <Button variant="ghost" size="icon">
-                        <X className="size-4" />
+                        <OutlineClose />
                       </Button>
                     </DialogClose>
                   </div>

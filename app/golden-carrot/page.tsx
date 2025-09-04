@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
-import { Carrot, Check, Minus, Shield } from 'lucide-react';
+import { OutlineCheck, OutlineMinus, OutlineShield, SolidCarrot } from '@/components/icons/Icons';
 
 const USD = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 
@@ -29,7 +29,7 @@ export default function GoldenCarrotPage() {
       {/* Header */}
       <section className="text-center space-y-3">
         <div className="mx-auto inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-muted-foreground">
-          <Carrot className="h-3.5 w-3.5" />
+          <SolidCarrot className="size-[1.5em]" />
           Golden Carrot — Premium
         </div>
         <h1 className="text-3xl font-bold tracking-tight">Do more with Golden Carrot</h1>
@@ -99,15 +99,15 @@ export default function GoldenCarrotPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <Row label="Animated avatar & cover" free={<Minus className="inline h-4 w-4 text-muted-foreground" />} pro={<Check className="inline h-4 w-4" />} />
+              <Row label="Animated avatar & cover" free={<OutlineMinus className="inline h-4 w-4 text-muted-foreground" />} pro={<OutlineCheck className="inline h-4 w-4" />} />
               <Row label="Max file size" free="15 MB" pro="50 MB" />
               <Row label="Caption length" free="300 chars" pro="1,000 chars" />
               <Row label="Media per post" free="5" pro="10" />
-              <Row label="Profile folders / collections" free={<Minus className="inline h-4 w-4 text-muted-foreground" />} pro={<Check className="inline h-4 w-4" />} />
-              <Row label="Carrot badge next to username" free={<Minus className="inline h-4 w-4 text-muted-foreground" />} pro={<Check className="inline h-4 w-4" />} />
+              <Row label="Profile folders / collections" free={<OutlineMinus className="inline h-4 w-4 text-muted-foreground" />} pro={<OutlineCheck className="inline h-4 w-4" />} />
+              <Row label="Carrot badge next to username" free={<OutlineMinus className="inline h-4 w-4 text-muted-foreground" />} pro={<OutlineCheck className="inline h-4 w-4" />} />
               <Row
                 label="Profile music (up to 30s) — soon"
-                free={<Minus className="inline h-4 w-4 text-muted-foreground" />}
+                free={<OutlineMinus className="inline h-4 w-4 text-muted-foreground" />}
                 pro={<Badge variant="secondary" className="text-[11px]">Soon</Badge>}
               />
             </TableBody>
@@ -149,7 +149,7 @@ export default function GoldenCarrotPage() {
         <div className="rounded-xl ring-1 ring-border p-4 sm:p-5">
           <h3 className="text-base font-semibold mb-2">Security &amp; Billing</h3>
           <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1.5 prose">
-            <li>Payments are processed securely by Stripe <Shield className="inline ml-1 h-4 w-4 align-text-bottom" />.</li>
+            <li>Payments are processed securely by Stripe <OutlineShield className="inline ml-1 h-4 w-4 align-text-bottom" />.</li>
             <li>You can request a copy or deletion of your data—see our <a className="underline underline-offset-4" href="/legal/privacy">Privacy Policy</a>.</li>
             <li>By subscribing you agree to our <a className="underline underline-offset-4" href="/legal/terms">Terms of Service</a>.</li>
           </ul>
@@ -165,18 +165,17 @@ function PerksBlock() {
   return (
     <div>
       <h2 className="text-xl font-semibold flex items-center gap-2">
-        What you get <Badge className="h-5 px-2"><Carrot className="h-3.5 w-3.5" /></Badge>
+        What you get <SolidCarrot className="size-[1.5em]" />
       </h2>
       <ul className="mt-3 space-y-1.5 text-sm prose">
-        <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4" />Animated avatar & cover (GIF/WebP)</li>
+        <li className="flex gap-2"><OutlineCheck className="mt-0.5 h-4 w-4" />Animated avatar & cover (GIF/WebP)</li>
         <li className="flex gap-2">
-          <Check className="mt-0.5 h-4 w-4" />
+          <OutlineCheck className="mt-0.5 h-4 w-4" />
           Higher limits: bigger file size, longer captions, more media per post
-          <span className="text-muted-foreground">{' '}— e.g. 50 MB, 1,000 chars, 10 media</span>
         </li>
-        <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4" />Carrot badge next to your username</li>
-        <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4" />Profile folders/collections for organization</li>
-        <li className="flex gap-2"><Check className="mt-0.5 h-4 w-4" />Soon: 30-second profile music (subject to ToS & moderation)</li>
+        <li className="flex gap-2"><OutlineCheck className="mt-0.5 h-4 w-4" />Carrot badge next to your username</li>
+        <li className="flex gap-2"><OutlineCheck className="mt-0.5 h-4 w-4" />Profile folders/collections for organization</li>
+        <li className="flex gap-2"><OutlineCheck className="mt-0.5 h-4 w-4" />Soon: 30-second profile music (subject to ToS & moderation)</li>
       </ul>
     </div>
   );

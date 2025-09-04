@@ -1,63 +1,13 @@
 "use client";
 
 import { toast } from "sonner";
-import { finalizeAvatar, finalizeCover, presignAvatarUpload, presignCoverUpload, removeAvatar, removeCover } from "@/app/actions/storage";
+import { finalizeAvatar, finalizeCover, removeAvatar, removeCover } from "@/app/actions/storage";
+import { useMedia, type UploadResp } from "./useMedia";
 
-// Utility: convert non-GIF images to WebP before upload
-type ImageExt = "webp" | "gif" | "jpg" | "jpeg" | "png";
-
-async function maybeConvertToWebP(file: File): Promise<{ blob: Blob; ext: ImageExt; mime: string }> {
-  const type = (file.type || "").toLowerCase();
-  const nameExt = (file.name.split(".").pop() || "").toLowerCase();
-  const isGif = type === "image/gif" || nameExt === "gif";
-  if (isGif) {
-    return { blob: file, ext: "gif", mime: "image/gif" };
-  }
-
-  // Only convert raster images we can draw on canvas
-  const img = document.createElement("img");
-  const reader = new FileReader();
-  const dataUrl: string = await new Promise<string>((resolve, reject) => {
-    reader.onerror = () => reject(new Error("read_error"));
-    reader.onload = () => resolve(String(reader.result));
-    reader.readAsDataURL(file);
-  });
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error("image_load_error"));
-    img.src = dataUrl;
-  });
-  const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth || img.width;
-  canvas.height = img.naturalHeight || img.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return { blob: file, ext: (nameExt as ImageExt) || "jpg", mime: file.type || "image/jpeg" };
-  ctx.drawImage(img, 0, 0);
-  const quality = 0.9;
-  const webpBlob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-  if (!webpBlob) return { blob: file, ext: (nameExt as ImageExt) || "jpg", mime: file.type || "image/jpeg" };
-  return { blob: webpBlob, ext: "webp", mime: "image/webp" };
-}
+// Backend handles all conversions; no client-side type mapping needed
 
 export function useProfileMedia(userId?: string | null, onRefreshed?: () => Promise<void> | void) {
-  // Upload using XHR to report progress for toasts
-  function putWithProgress(url: string, body: Blob, contentType: string, onProgress?: (pct: number) => void): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", url, true);
-      xhr.setRequestHeader("Content-Type", contentType);
-      xhr.upload.onprogress = (evt) => {
-        if (!evt.lengthComputable) return;
-        const pct = Math.min(100, Math.round((evt.loaded / evt.total) * 100));
-        onProgress?.(pct);
-      };
-      xhr.onerror = () => reject(new Error("upload_error"));
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error(`status_${xhr.status}`));
-      };
-      xhr.send(body);
-    });
-  }
+  const { uploadProfileAvatar, uploadProfileCover } = useMedia();
 
   async function uploadCoverViaPicker() {
     if (!userId) return;
@@ -67,20 +17,42 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      const converted = await maybeConvertToWebP(file);
-      const { data, error } = await presignCoverUpload(userId, converted.ext as ImageExt);
-      if (!data || error) { toast.error(error || "upload failed"); return; }
+      const isGif = (file.type || "").toLowerCase() === "image/gif" || (file.name || "").toLowerCase().endsWith(".gif");
+      if (isGif) {
+        const fd = new FormData();
+        fd.append("userId", userId);
+        fd.append("file", file, file.name || "cover.gif");
+        const toastId = toast.loading("Uploading cover… 0%");
+        let json: UploadResp;
+        try {
+          json = await uploadProfileCover(fd, (pct) => {
+            toast(`Uploading cover… ${pct}%`, { id: toastId });
+          });
+        } catch {
+          toast.error("Upload failed", { id: toastId });
+          return;
+        }
+        const fin = await finalizeCover(userId, json.url || json.path || "");
+        if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
+        await Promise.resolve(onRefreshed?.());
+        try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
+        toast.success("Cover updated", { id: toastId });
+        return;
+      }
+      const fd = new FormData();
+      fd.append("userId", userId);
+      fd.append("file", file, file.name || "cover");
       const toastId = toast.loading("Uploading cover… 0%");
+      let json: UploadResp;
       try {
-        await putWithProgress(data.url, converted.blob, converted.mime, (pct) => {
+        json = await uploadProfileCover(fd, (pct) => {
           toast(`Uploading cover… ${pct}%`, { id: toastId });
         });
       } catch {
         toast.error("Upload failed", { id: toastId });
         return;
       }
-      toast("Finalizing…", { id: toastId });
-      const fin = await finalizeCover(userId, data.path);
+      const fin = await finalizeCover(userId, json.url || json.path || "");
       if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
       await Promise.resolve(onRefreshed?.());
       try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
@@ -97,20 +69,42 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      const converted = await maybeConvertToWebP(file);
-      const { data, error } = await presignAvatarUpload(userId, converted.ext as ImageExt);
-      if (!data || error) { toast.error(error || "upload failed"); return; }
+      const isGif = (file.type || "").toLowerCase() === "image/gif" || (file.name || "").toLowerCase().endsWith(".gif");
+      if (isGif) {
+        const fd = new FormData();
+        fd.append("userId", userId);
+        fd.append("file", file, file.name || "avatar.gif");
+        const toastId = toast.loading("Uploading avatar… 0%");
+        let json: UploadResp;
+        try {
+          json = await uploadProfileAvatar(fd, (pct) => {
+            toast(`Uploading avatar… ${pct}%`, { id: toastId });
+          });
+        } catch {
+          toast.error("Upload failed", { id: toastId });
+          return;
+        }
+        const fin = await finalizeAvatar(userId, json.url || json.path || "");
+        if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
+        await Promise.resolve(onRefreshed?.());
+        try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
+        toast.success("Avatar updated", { id: toastId });
+        return;
+      }
+      const fd = new FormData();
+      fd.append("userId", userId);
+      fd.append("file", file, file.name || "avatar");
       const toastId = toast.loading("Uploading avatar… 0%");
+      let json: UploadResp;
       try {
-        await putWithProgress(data.url, converted.blob, converted.mime, (pct) => {
+        json = await uploadProfileAvatar(fd, (pct) => {
           toast(`Uploading avatar… ${pct}%`, { id: toastId });
         });
       } catch {
         toast.error("Upload failed", { id: toastId });
         return;
       }
-      toast("Finalizing…", { id: toastId });
-      const fin = await finalizeAvatar(userId, data.path);
+      const fin = await finalizeAvatar(userId, json.url || json.path || "");
       if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
       await Promise.resolve(onRefreshed?.());
       try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
@@ -119,31 +113,120 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     input.click();
   }
 
-  // Upload from a cropped Data URL (PNG) coming from the ImageCrop component
-  async function uploadAvatarFromCropped(dataUrl: string) {
+  // Direct upload from a File (bypasses picker) — preserves GIF if provided
+  async function uploadAvatarFromFile(file: File) {
     if (!userId) return;
-    // Convert dataURL -> Blob -> File so we can reuse conversion pipeline
-    const resp = await fetch(dataUrl);
-    const blobPng = await resp.blob();
-    const file = new File([blobPng], "avatar.png", { type: blobPng.type || "image/png" });
-    const converted = await maybeConvertToWebP(file);
-    const { data, error } = await presignAvatarUpload(userId, converted.ext as ImageExt);
-    if (!data || error) { toast.error(error || "upload failed"); return; }
+    const isGif = (file.type || "").toLowerCase() === "image/gif" || (file.name || "").toLowerCase().endsWith(".gif");
+    if (isGif) {
+      const fd = new FormData();
+      fd.append("userId", userId);
+      fd.append("file", file, file.name || "avatar.gif");
+      const toastId = toast.loading("Uploading avatar… 0%");
+      let json: UploadResp;
+      try {
+        json = await uploadProfileAvatar(fd, (pct) => {
+          toast(`Uploading avatar… ${pct}%`, { id: toastId });
+        });
+      } catch {
+        toast.error("Upload failed", { id: toastId });
+        return;
+      }
+      const fin = await finalizeAvatar(userId, json.url || json.path || "");
+      if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
+      await Promise.resolve(onRefreshed?.());
+      try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
+      toast.success("Avatar updated", { id: toastId });
+      return;
+    }
+    const fd = new FormData();
+    fd.append("userId", userId);
+    fd.append("file", file, file.name || "avatar");
     const toastId = toast.loading("Uploading avatar… 0%");
+    let json: UploadResp;
     try {
-      await putWithProgress(data.url, converted.blob, converted.mime, (pct) => {
+      json = await uploadProfileAvatar(fd, (pct) => {
         toast(`Uploading avatar… ${pct}%`, { id: toastId });
       });
     } catch {
       toast.error("Upload failed", { id: toastId });
       return;
     }
-    toast("Finalizing…", { id: toastId });
-    const fin = await finalizeAvatar(userId, data.path);
+    const fin = await finalizeAvatar(userId, json.url || json.path || "");
     if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
     await Promise.resolve(onRefreshed?.());
     try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
     toast.success("Avatar updated", { id: toastId });
+  }
+
+  // Upload from a cropped Data URL (PNG) coming from the ImageCrop component
+  async function uploadAvatarFromCropped(dataUrl: string) {
+    if (!userId) return;
+    // Convert dataURL -> Blob -> File and send to backend for processing
+    const resp = await fetch(dataUrl);
+    const blobPng = await resp.blob();
+    const file = new File([blobPng], "avatar.png", { type: blobPng.type || "image/png" });
+    const fd = new FormData();
+    fd.append("userId", userId);
+    fd.append("file", file, file.name);
+    const toastId = toast.loading("Uploading avatar… 0%");
+    let json: UploadResp;
+    try {
+      json = await uploadProfileAvatar(fd, (pct) => {
+        toast(`Uploading avatar… ${pct}%`, { id: toastId });
+      });
+    } catch {
+      toast.error("Upload failed", { id: toastId });
+      return;
+    }
+    const fin = await finalizeAvatar(userId, json.url || json.path || "");
+    if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
+    await Promise.resolve(onRefreshed?.());
+    try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
+    toast.success("Avatar updated", { id: toastId });
+  }
+
+  async function uploadCoverFromFile(file: File) {
+    if (!userId) return;
+    const isGif = (file.type || "").toLowerCase() === "image/gif" || (file.name || "").toLowerCase().endsWith(".gif");
+    if (isGif) {
+      const fd = new FormData();
+      fd.append("userId", userId);
+      fd.append("file", file, file.name || "cover.gif");
+      const toastId = toast.loading("Uploading cover… 0%");
+      let json: UploadResp;
+      try {
+        json = await uploadProfileCover(fd, (pct) => {
+          toast(`Uploading cover… ${pct}%`, { id: toastId });
+        });
+      } catch {
+        toast.error("Upload failed", { id: toastId });
+        return;
+      }
+      const fin = await finalizeCover(userId, json.url || json.path || "");
+      if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
+      await Promise.resolve(onRefreshed?.());
+      try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
+      toast.success("Cover updated", { id: toastId });
+      return;
+    }
+    const fd = new FormData();
+    fd.append("userId", userId);
+    fd.append("file", file, file.name || "cover");
+    const toastId = toast.loading("Uploading cover… 0%");
+    let json: UploadResp;
+    try {
+      json = await uploadProfileCover(fd, (pct) => {
+        toast(`Uploading cover… ${pct}%`, { id: toastId });
+      });
+    } catch {
+      toast.error("Upload failed", { id: toastId });
+      return;
+    }
+    const fin = await finalizeCover(userId, json.url || json.path || "");
+    if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
+    await Promise.resolve(onRefreshed?.());
+    try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
+    toast.success("Cover updated", { id: toastId });
   }
 
   async function uploadCoverFromCropped(dataUrl: string) {
@@ -151,20 +234,20 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     const resp = await fetch(dataUrl);
     const blobPng = await resp.blob();
     const file = new File([blobPng], "cover.png", { type: blobPng.type || "image/png" });
-    const converted = await maybeConvertToWebP(file);
-    const { data, error } = await presignCoverUpload(userId, converted.ext as ImageExt);
-    if (!data || error) { toast.error(error || "upload failed"); return; }
+    const fd = new FormData();
+    fd.append("userId", userId);
+    fd.append("file", file, file.name);
     const toastId = toast.loading("Uploading cover… 0%");
+    let json: UploadResp;
     try {
-      await putWithProgress(data.url, converted.blob, converted.mime, (pct) => {
+      json = await uploadProfileCover(fd, (pct) => {
         toast(`Uploading cover… ${pct}%`, { id: toastId });
       });
     } catch {
       toast.error("Upload failed", { id: toastId });
       return;
     }
-    toast("Finalizing…", { id: toastId });
-    const fin = await finalizeCover(userId, data.path);
+    const fin = await finalizeCover(userId, json.url || json.path || "");
     if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
     await Promise.resolve(onRefreshed?.());
     try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
@@ -193,5 +276,57 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     }
   }
 
-  return { uploadCoverViaPicker, uploadAvatarViaPicker, removeCoverSafely, removeAvatarSafely, uploadAvatarFromCropped, uploadCoverFromCropped };
+  async function uploadGifAvatarWithCrop(file: File, crop: { x: number; y: number; w: number; h: number }) {
+    if (!userId) return;
+    const fd = new FormData();
+    fd.append("userId", userId);
+    fd.append("file", file, file.name || "avatar.gif");
+    fd.append("crop_x", String(Math.max(0, Math.floor(crop.x))));
+    fd.append("crop_y", String(Math.max(0, Math.floor(crop.y))));
+    fd.append("crop_w", String(Math.max(1, Math.floor(crop.w))));
+    fd.append("crop_h", String(Math.max(1, Math.floor(crop.h))));
+    const toastId = toast.loading("Uploading avatar… 0%");
+    let json: UploadResp;
+    try {
+      json = await uploadProfileAvatar(fd, (pct) => {
+        toast(`Uploading avatar… ${pct}%`, { id: toastId });
+      });
+    } catch {
+      toast.error("Upload failed", { id: toastId });
+      return;
+    }
+    const fin = await finalizeAvatar(userId, json.url || json.path || "");
+    if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
+    await Promise.resolve(onRefreshed?.());
+    try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
+    toast.success("Avatar updated", { id: toastId });
+  }
+
+  async function uploadGifCoverWithCrop(file: File, crop: { x: number; y: number; w: number; h: number }) {
+    if (!userId) return;
+    const fd = new FormData();
+    fd.append("userId", userId);
+    fd.append("file", file, file.name || "cover.gif");
+    fd.append("crop_x", String(Math.max(0, Math.floor(crop.x))));
+    fd.append("crop_y", String(Math.max(0, Math.floor(crop.y))));
+    fd.append("crop_w", String(Math.max(1, Math.floor(crop.w))));
+    fd.append("crop_h", String(Math.max(1, Math.floor(crop.h))));
+    const toastId = toast.loading("Uploading cover… 0%");
+    let json: UploadResp;
+    try {
+      json = await uploadProfileCover(fd, (pct) => {
+        toast(`Uploading cover… ${pct}%`, { id: toastId });
+      });
+    } catch {
+      toast.error("Upload failed", { id: toastId });
+      return;
+    }
+    const fin = await finalizeCover(userId, json.url || json.path || "");
+    if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
+    await Promise.resolve(onRefreshed?.());
+    try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
+    toast.success("Cover updated", { id: toastId });
+  }
+
+  return { uploadCoverViaPicker, uploadAvatarViaPicker, removeCoverSafely, removeAvatarSafely, uploadAvatarFromCropped, uploadCoverFromCropped, uploadAvatarFromFile, uploadCoverFromFile, uploadGifAvatarWithCrop, uploadGifCoverWithCrop };
 }

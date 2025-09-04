@@ -7,10 +7,11 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Link, Palette, X } from "lucide-react";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
 import ForgotForm from "./ForgotForm";
+import Link from "next/link";
+import { OutlineClose } from "../icons/Icons";
 
 type AuthTab = "login" | "register";
 
@@ -44,7 +45,7 @@ export function AuthModal({
             />
             <div className="absolute inset-0 bg-black/50 rounded-r-lg" />
             <div className="flex flex-col gap-2 z-10 text-white">
-              <Palette className="size-6" />
+              {/* TODO: add image */}
               <div className="space-y-1">
                 <h3 className="text-sm font-semibold">Social Art</h3>
                 <p className="text-xs opacity-80">Sign in to share your work and follow creators.</p>
@@ -58,7 +59,7 @@ export function AuthModal({
               <DialogTitle className="text-base">Welcome</DialogTitle>
               <DialogClose asChild className="absolute top-2 right-2">
                 <Button variant="ghost" size="icon" aria-label="Close">
-                  <X className="size-4" />
+                  <OutlineClose className="size-4" />
                 </Button>
               </DialogClose>
             </DialogHeader>
@@ -78,7 +79,7 @@ export function AuthModal({
             </Tabs>
 
             <p className="mt-3 text-[10px] text-muted-foreground">
-              By continuing you agree to our <Link href="/legal/terms">Terms</Link> and <Link href="/legal/privacy">Privacy Policy</Link>.
+              By continuing you agree to our <Link href="/legal/terms" target="_blank" className="underline">Terms</Link> and <Link href="/legal/privacy" target="_blank" className="underline">Privacy Policy</Link>.
             </p>
           </section>
         </div>

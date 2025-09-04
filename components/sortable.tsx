@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Sortable, SortableItem, SortableItemHandle } from '@/components/ui/sortable';
-import { CircleX, CloudUpload, GripVertical, ImageIcon, TriangleAlert, XIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { OutlineClose, OutlineCloudUplaod, OutlineDragIndicator, OutlineImage, OutlineWarning } from './icons/Icons';
 
 interface ImageFile {
   id: string;
@@ -275,7 +275,7 @@ export default function SortableImageUpload({
                 {/* Drag Handle */}
                 <SortableItemHandle className="absolute top-2 start-2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing">
                   <Button variant="outline" size="icon" className="size-6 rounded-full">
-                    <GripVertical className="size-3.5" />
+                    <OutlineDragIndicator className="size-3.5" />
                   </Button>
                 </SortableItemHandle>
 
@@ -286,7 +286,7 @@ export default function SortableImageUpload({
                   size="icon"
                   className="shadow-sm absolute top-2 end-2 size-6 opacity-0 group-hover:opacity-100 rounded-full"
                 >
-                  <XIcon className="size-3.5" />
+                  <OutlineClose className="size-3.5" />
                 </Button>
               </div>
             </SortableItem>
@@ -307,7 +307,7 @@ export default function SortableImageUpload({
       >
         <CardContent className="text-center">
           <div className="flex items-center justify-center size-[32px] rounded-full border border-border mx-auto mb-3">
-            <CloudUpload className="size-4" />
+            <OutlineCloudUplaod />
           </div>
           <h3 className="text-2sm text-foreground font-semibold mb-0.5">Choose a file or drag & drop here.</h3>
           <span className="text-xs text-secondary-foreground font-normal block mb-3">
@@ -326,7 +326,7 @@ export default function SortableImageUpload({
             <Card key={imageFile.id} className="shadow-none rounded-md">
               <CardContent className="flex items-center gap-2 p-3">
                 <div className="flex items-center justify-center size-[32px] rounded-md border border-border shrink-0">
-                  <ImageIcon className="size-4 text-muted-foreground" />
+                  <OutlineImage className="text-muted-foreground" />
                 </div>
                 <div className="flex flex-col gap-1.5 w-full">
                   <div className="flex items-center justify-between gap-2.5 -mt-2 w-full">
@@ -340,7 +340,7 @@ export default function SortableImageUpload({
                       )}
                     </div>
                     <Button onClick={() => removeImage(imageFile.id)} variant="ghost" size="icon" className="size-6">
-                      <CircleX className="size-3.5" />
+                      <OutlineClose className="size-3.5" />
                     </Button>
                   </div>
 
@@ -359,7 +359,7 @@ export default function SortableImageUpload({
       {errors.length > 0 && (
         <Alert variant="destructive" appearance="light" className="mt-5">
           <AlertIcon>
-            <TriangleAlert />
+            <OutlineWarning />
           </AlertIcon>
           <AlertContent>
             <AlertTitle>File upload error(s)</AlertTitle>

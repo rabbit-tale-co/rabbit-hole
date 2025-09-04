@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { buildPublicUrl } from "@/lib/publicUrl";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
 import { useBento } from "@/hooks/useBento";
 import { bucketFromWH } from "@/lib/bento";
@@ -9,14 +10,19 @@ import type { Tile } from "@/types";
 import { BentoSkeleton } from "@/components/feed/Loading";
 import ProfileEmptyGallery, { HomeEmptyFeed } from "@/components/feed/Empty";
 import { useIntersection } from "@/hooks/useIntersection";
-import { CalendarDays } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { SocialActions } from "@/components/feed/interactions/social-actions";
+import { PostImpressionTracker } from "@/components/feed/PostImpressionTracker";
+import { PostStats } from "@/components/feed/PostStats";
 import { Progress } from "@/components/ui/progress";
 import { UserChipHoverCard } from "../user/ProfileCard";
+import { useManualImpression } from "@/hooks/useManualImpression";
+import { PremiumBadge } from "../user/PremiumBadge";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRouter } from "next/navigation";
+import { OutlineCalendar } from "../icons/Icons";
+import { useAuth } from "@/providers/AuthProvider";
 
 // Local hover slideshow for multi-image posts
 function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; others: { src: string; alt?: string }[]; widthPx: number; alt?: string }) {
@@ -87,8 +93,10 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   // data
   const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(initial, 24, { authorId });
   const router = useRouter();
+  const { recordImpression } = useManualImpression();
+  const { profile: currentUserProfile } = useAuth();
 
-  const publicUrl = (path: string) => (/^https?:\/\//.test(path) ? path : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/social-art/${path}`);
+  const publicUrl = (path: string) => buildPublicUrl(path);
 
   // map posts -> tiles (first image per post as cover)
   const tiles: Tile[] = useMemo(() => {
@@ -114,7 +122,8 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   }, [items]);
 
   // lazy profile cache: author_id -> minimal profile
-  const [authorProfiles, setAuthorProfiles] = useState<Map<string, { username: string; display_name: string; avatar_url: string; cover_url?: string }>>(new Map());
+  const [authorProfiles, setAuthorProfiles] = useState<Map<string, { username: string; display_name: string; avatar_url: string; cover_url?: string; is_premium?: boolean }>>(new Map());
+
   useEffect(() => {
     const missing = items
       .map((p) => p.author_id)
@@ -124,12 +133,12 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("user_id,username,avatar_url,cover_url,display_name")
+        .select("user_id,username,avatar_url,cover_url,display_name,is_premium")
         .in("user_id", missing as string[]);
       if (!data) return;
       setAuthorProfiles((prev) => {
         const next = new Map(prev);
-        for (const row of data) next.set(row.user_id, { username: row.username, avatar_url: row.avatar_url, cover_url: row.cover_url, display_name: row.display_name });
+        for (const row of data) next.set(row.user_id, { username: row.username, avatar_url: row.avatar_url, cover_url: row.cover_url, display_name: row.display_name, is_premium: (row as { is_premium?: boolean }).is_premium });
         return next;
       });
     })();
@@ -173,6 +182,23 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   const rows = placed.length ? Math.max(...placed.map((p) => p.y + p.h)) : 0;
   const containerHeight = rows > 0 ? rows * cell + (rows - 1) * gap : Math.max(cell, 240);
 
+  // bramka animacji: włącz po dwóch rAF (po paint/layout)
+  const feedReady = !loading && items.length > 0 && cell > 0;
+  const [animateGate, setAnimateGate] = useState(false);
+  useEffect(() => {
+    if (!feedReady) { setAnimateGate(false); return; }
+    const id1 = requestAnimationFrame(() => {
+      const id2 = requestAnimationFrame(() => setAnimateGate(true));
+      // cleanup drugiego rAF:
+      (setAnimateGate as { _id2?: number })._id2 = id2;
+    });
+    return () => {
+      cancelAnimationFrame(id1);
+      const id2 = (setAnimateGate as { _id2?: number })._id2;
+      if (id2) cancelAnimationFrame(id2);
+    };
+  }, [feedReady]);
+
   // initial loading (no items yet) or container not measured
   const firstLoad = (items.length === 0 && loading);
 
@@ -202,16 +228,23 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
           return (
             <article
               key={p.tile.id}
-              onClick={() => { router.push(`/post/${p.tile.id}`); }}
+              data-post-id={p.tile.id}
+              onClick={async () => {
+                await recordImpression(p.tile.id);
+                router.push(`/post/${p.tile.id}`);
+              }}
               className="group absolute bg-neutral-100 rounded-2xl overflow-hidden cursor-pointer"
               style={{ top, left, width, height, minWidth: 160, minHeight: 160 }}
             >
+              {/* Track impressions for this post */}
+              <PostImpressionTracker postId={p.tile.id} />
+
               {(() => {
                 const post = idToPost.get(p.tile.id);
                 const medias = post?.images || [];
                 const first = medias[0];
                 if (!first) return null;
-                const firstUrl = publicUrl(first.path);
+                const firstUrl = publicUrl(first.path || "");
                 const isVideo = String(first.mime || '').startsWith('video/');
                 if (isVideo) {
                   return (
@@ -233,8 +266,8 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                   .filter(im => !String((im as { mime?: string }).mime || '').startsWith('video/'));
                 return (
                   <HoverSlideshow
-                    firstSrc={firstUrl}
-                    others={restImageMedias.map(im => ({ src: publicUrl(im.path), alt: im.alt || '' }))}
+                    firstSrc={firstUrl || ""}
+                    others={restImageMedias.map(im => ({ src: publicUrl(im.path || ""), alt: im.alt || '' }))}
                     widthPx={Math.ceil(width)}
                     alt={p.tile.cover.alt || ''}
                   />
@@ -258,7 +291,12 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                         <UserChipHoverCard user={{
                           username: profile.username,
                           avatarUrl: profile.avatar_url,
-                          displayName: profile.display_name,
+                          displayName: (
+                            <span className="inline-flex items-center gap-1">
+                              <span className="truncate">{profile.display_name}</span>
+                              <PremiumBadge show={Boolean(profile.is_premium)} />
+                            </span>
+                          ),
                           coverUrl: profile.cover_url ? publicUrl(profile.cover_url) : undefined,
                           stats: {
                             followers: post?.like_count ?? 0,
@@ -268,13 +306,14 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                       </div>
                     )}
 
-                    {/* top-right date with tooltip */}
-                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 text-white">
+                    {/* top-right date and stats */}
+                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-20 text-white flex flex-col items-end gap-2">
+                      {/* Date */}
                       <TooltipProvider delayDuration={150}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Badge className="bg-black/50">
-                              <CalendarDays />
+                              <OutlineCalendar />
                               {dateLabel}
                             </Badge>
                           </TooltipTrigger>
@@ -283,19 +322,29 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
+
+                      {/* Post Stats - Only show for admin and premium users */}
+                      {(currentUserProfile?.is_admin || currentUserProfile?.is_premium) && (
+                        <Badge className="bg-black/50">
+                          <PostStats postId={p.tile.id} />
+                        </Badge>
+                      )}
                     </div>
                     {/* bottom gradient + actions row */}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3">
                       <SocialActions
+                        postId={p.tile.id}
                         likes={post?.like_count ?? 0}
                         comments={post?.comment_count ?? 0}
                         reposts={post?.repost_count ?? 0}
                         bookmarks={post?.bookmark_count ?? 0}
-                        isLiked={false}
+                        isLiked={post?.is_liked ?? false}
                         isReposted={false}
                         isBookmarked={false}
                         showBookmarksCount={false}
+                        animateGate={animateGate}
                         onLike={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         onComment={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         onRepost={(e) => { e.preventDefault(); e.stopPropagation(); }}

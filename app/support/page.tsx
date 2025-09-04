@@ -8,8 +8,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Check, Sparkles, Star } from 'lucide-react';
 import Link from 'next/link';
+import { OutlineAI, OutlineCheck, OutlineStar } from '@/components/icons/Icons';
 
 /* ---------- Model ---------- */
 
@@ -175,7 +175,7 @@ export default function SupportPage() {
       {/* Header */}
       <section className="space-y-3 text-center">
         <Badge variant="outline" className="mx-auto px-3 py-1 text-xs">
-          <Sparkles className="size-3.5" />
+          <OutlineAI className="size-3.5" />
           Community-funded
         </Badge>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Support RabbitHole</h1>
@@ -338,7 +338,7 @@ export default function SupportPage() {
               <ul className="mt-3 space-y-1.5 text-sm">
                 {g.bullets.map((b) => (
                   <li key={b} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 text-foreground/80" />
+                    <OutlineCheck className="mt-0.5 h-4 w-4 text-foreground/80" />
                     <span>{b}</span>
                   </li>
                 ))}
@@ -355,7 +355,7 @@ export default function SupportPage() {
             <ul className="mt-3 space-y-1.5 text-sm">
               {STRETCH.bullets.map((b) => (
                 <li key={b} className="flex items-start gap-2">
-                  <Check className="mt-0.5 h-4 w-4 text-foreground/80" />
+                  <OutlineCheck className="mt-0.5 h-4 w-4 text-foreground/80" />
                   <span>{b}</span>
                 </li>
               ))}
@@ -459,7 +459,7 @@ function TierRow({ tier, active }: { tier: OneTimeTier; active: boolean }) {
           <h4 className="text-lg font-semibold">{tier.name}</h4>
           {tier.highlight && (
             <Badge className="gap-1">
-              <Star className="size-3.5" />
+              <OutlineStar className="size-3.5" />
               Highlight
             </Badge>
           )}
@@ -471,13 +471,13 @@ function TierRow({ tier, active }: { tier: OneTimeTier; active: boolean }) {
         <ul className="mt-3 space-y-1.5 text-sm">
           {tier.perks.map((p) => (
             <li key={p} className="flex items-start gap-2">
-              <Check className="mt-0.5 h-4 w-4 text-foreground/80" />
+              <OutlineCheck className="mt-0.5 h-4 w-4 text-foreground/80" />
               <span>{p}</span>
             </li>
           ))}
           {tier.discordRole && (
             <li className="flex items-start gap-2">
-              <Check className="mt-0.5 h-4 w-4 text-foreground/80" />
+              <OutlineCheck className="mt-0.5 h-4 w-4 text-foreground/80" />
               <span>
                 Discord role:{' '}
                 <span className="font-medium">{tier.discordRole}</span>

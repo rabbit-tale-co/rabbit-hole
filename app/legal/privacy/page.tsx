@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { TypographyP } from '@/components/ui/typography/p';
 import { TypographyList } from '@/components/ui/typography/list';
-import { ShieldCheck, Link as LinkIcon } from 'lucide-react';
 import { SITE, CONTACT_EMAIL, COMPANY, ADDRESS, EFFECTIVE_PRIVACY, PRIVACY_SECTIONS, PRIVACY_CONTENT, ListItem } from '@/app/legal/data';
+import { OutlineShield } from '@/components/icons/Icons';
 
 // constants moved to app/legal/data
 
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full ring-1 ring-border px-3 py-1 text-xs text-muted-foreground">
-              <ShieldCheck className="h-3.5 w-3.5" />
+              <OutlineShield className="size-3.5" />
               Legal • Privacy Policy
             </div>
             <h1 className="text-left text-2xl font-bold">Privacy Policy</h1>
@@ -116,14 +116,6 @@ function Section({ id, title, children }: { id: string; title: string; children:
     <section id={id} className="scroll-mt-24 space-y-3">
       <h2 className="group flex items-center gap-2 mt-2 text-lg font-semibold">
         {title}
-        <Link
-          href={`#${id}`}
-          onClick={(e) => smoothScrollTo(`#${id}`, e)}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground"
-          aria-label="Copy link to section"
-        >
-          <LinkIcon className="h-4 w-4" />
-        </Link>
       </h2>
       <div className="space-y-3">{children}</div>
     </section>

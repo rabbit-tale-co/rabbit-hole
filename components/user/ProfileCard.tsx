@@ -2,21 +2,24 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { buildPublicUrl } from "@/lib/publicUrl";
 import * as React from "react";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { generateAccentColor, getAccentColorStyle, getStyleFromHexShade, getAccentColorValue } from "@/lib/accent-colors";
 import { cn } from "@/lib/utils";
+import { PremiumBadge } from "./PremiumBadge";
 
 type MiniUser = {
   username: string;
-  displayName?: string | null;
+  displayName?: string | React.ReactNode | null;
   avatarUrl?: string | null;
   coverUrl?: string | null;
   accentColor?: string | null; // hex (preferred) else we’ll derive from username
   bio?: string | null;
   stats?: { followers?: number; following?: number; posts?: number };
+  isPremium?: boolean;
 };
 
 type Props = {
@@ -69,8 +72,9 @@ export function UserChipHoverCard({
             accentHex={accent500}
           />
           <span className="flex flex-col items-start justify-center leading-tight">
-            <span className="block font-semibold truncate">
-              {displayName?.trim() || username}
+            <span className="font-semibold flex items-center gap-1 min-w-0">
+              <span className="truncate">{typeof displayName === 'string' ? (String(displayName).trim() || username) : (displayName ?? username)}</span>
+              <PremiumBadge show={Boolean((user as { isPremium?: boolean }).isPremium)} />
             </span>
             <span className="block text-[11px] opacity-70 truncate">@{username}</span>
           </span>
@@ -95,7 +99,19 @@ export function UserChipHoverCard({
         {/* cover */}
         <div className="relative h-20 w-full overflow-hidden">
           {coverUrl ? (
-            <Image src={coverUrl} alt={`${username} cover`} fill className="object-cover" unoptimized />
+            /\.webm(\?|#|$)/i.test(coverUrl) ? (
+              <video
+                key={coverUrl}
+                src={buildPublicUrl(coverUrl)}
+                className="absolute inset-0 size-full object-cover"
+                muted
+                playsInline
+                autoPlay
+                loop
+              />
+            ) : (
+              <Image src={buildPublicUrl(coverUrl)} alt={`${username} cover`} fill className="object-cover" unoptimized />
+            )
           ) : (
             <div
               className="absolute inset-0"
@@ -115,7 +131,7 @@ export function UserChipHoverCard({
               <UserAvatar
                 size={'xl'}
                 username={username}
-                avatarUrl={avatarUrl || undefined}
+                avatarUrl={avatarUrl ? buildPublicUrl(avatarUrl) : undefined}
                 className="-mt-12 ring-2 ring-white rounded-full"
                 accentHex={accent500}
               />
@@ -124,7 +140,9 @@ export function UserChipHoverCard({
               <div className="flex flex-col items-start">
                 <div className="font-semibold truncate">
                   <Link href={`/user/${username}`} className="hover:underline">
-                    {displayName?.trim() || username}
+                    {typeof displayName === 'string'
+                      ? (<span className="truncate">{String(displayName).trim() || username}</span>)
+                      : (displayName ?? <span className="truncate">{username}</span>)}
                   </Link>
                 </div>
                 <div className="text-xs text-muted-foreground truncate">

@@ -3,10 +3,11 @@
 import { useParams } from 'next/navigation';
 import { UserProfile } from '@/components/user/Profile';
 import Feed from '@/components/feed/Index';
-import { User } from 'lucide-react';
+import { EmptyState } from '@/components/feed/Empty';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/providers/AuthProvider';
 import Center from '@/components/Center';
+import { OutlineUser } from '@/components/icons/Icons';
 
 // Local view-only state no longer needed; we render directly from hook
 
@@ -33,7 +34,7 @@ export default function UserProfilePage() {
       <Center>
         <div className="text-center flex flex-col items-center gap-2">
           <div className="size-24 rounded-full bg-neutral-100 text-neutral-950 flex items-center justify-center">
-            <User size={48} />
+            <OutlineUser size={48} />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">User not found</h1>
           <p className="text-gray-600">The user you&apos;re looking for doesn&apos;t exist.</p>
@@ -41,6 +42,15 @@ export default function UserProfilePage() {
       </Center>
     );
   }
+
+  // Dev: log current viewer and viewed profile
+  try {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[profile:view] username', username, 'isOwn', isOwn, 'profile', profile);
+    }
+  } catch { }
+
+  const isSuspended = Boolean(profile.banned_until && Date.parse(profile.banned_until) > Date.now());
 
   return (
     <>
@@ -51,17 +61,25 @@ export default function UserProfilePage() {
         isOwnProfile={isOwn}
       />
 
-
-      <Feed
-        authorId={profile.user_id}
-        isOwnProfile={isOwn}
-        onCountChange={(n) => {
-          try {
-            const el = document.querySelector('[data-profile-posts-count]');
-            if (el) el.textContent = String(n);
-          } catch { }
-        }}
-      />
+      {!isSuspended ? (
+        <Feed
+          authorId={profile.user_id}
+          isOwnProfile={isOwn}
+          onCountChange={(n) => {
+            try {
+              const el = document.querySelector('[data-profile-posts-count]');
+              if (el) el.textContent = String(n);
+            } catch { }
+          }}
+        />
+      ) : (
+        <EmptyState
+          variant="profile"
+          isOwnProfile={false}
+          message="This account is suspended"
+          description="Posts are hidden while the account is under review."
+        />
+      )}
 
     </>
   );
