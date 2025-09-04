@@ -84,7 +84,7 @@ export function UserProfileMenu() {
                 {item.icon && <item.icon />}
                 <span>{item.label}</span>
                 {item.label === 'Upgrade' && (
-                  <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200 px-2 py-0.5 text-[10px] font-semibold">-40%</Badge>
+                  <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200 px-2 py-0.5 text-[10px] font-semibold">-42%</Badge>
                 )}
               </DropdownMenuItem>
             )
