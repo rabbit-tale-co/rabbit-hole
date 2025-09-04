@@ -21,6 +21,8 @@ const SUBSCRIPTION_CHECK_ROUTES = [
 
 export async function checkSubscriptionStatus(userId: string) {
   try {
+    // console.log(`🔍 [MIDDLEWARE] Checking subscription for user: ${userId}`);
+
     // Get user profile
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
@@ -28,17 +30,27 @@ export async function checkSubscriptionStatus(userId: string) {
       .eq('user_id', userId)
       .single();
 
+    // console.log(`🔍 [MIDDLEWARE] Profile data:`, {
+    //   user_id: profile?.user_id,
+    //   stripe_customer_id: profile?.stripe_customer_id,
+    //   is_premium: profile?.is_premium,
+    //   updated_at: profile?.updated_at
+    // });
+
     if (profileError || !profile) {
+      // console.log(`❌ [MIDDLEWARE] No profile found for user: ${userId}`);
       return { isPremium: false, status: 'no_profile' };
     }
 
     // If no Stripe customer ID, user is not premium
     if (!profile.stripe_customer_id) {
+      // console.log(`❌ [MIDDLEWARE] No stripe_customer_id for user: ${userId}`);
       return { isPremium: false, status: 'no_customer' };
     }
 
     // Check for manual subscription (starts with 'manual_')
     if (profile.stripe_customer_id.startsWith('manual_')) {
+      // console.log(`✅ [MIDDLEWARE] Manual subscription detected for user: ${userId}, is_premium: ${profile.is_premium}`);
       // For manual subscriptions, just return the is_premium status from the database
       return {
         isPremium: profile.is_premium,
@@ -72,7 +84,22 @@ export async function checkSubscriptionStatus(userId: string) {
     const activeSubscription = subscriptions.data[0];
 
     if (!activeSubscription) {
-      // No active subscription found, update profile
+      // console.log(`⚠️ [MIDDLEWARE] No active Stripe subscription found for user: ${userId}`);
+
+      // No active subscription found, but check if it's a manual subscription first
+      if (profile.stripe_customer_id && profile.stripe_customer_id.startsWith('manual_')) {
+        // console.log(`✅ [MIDDLEWARE] Manual subscription detected in fallback check for user: ${userId}, is_premium: ${profile.is_premium}`);
+        // For manual subscriptions, don't reset is_premium
+        return {
+          isPremium: profile.is_premium,
+          status: profile.is_premium ? 'active' : 'inactive',
+          plan: 'manual',
+          subscriptionId: 'manual',
+        };
+      }
+
+      // console.log(`❌ [MIDDLEWARE] Resetting is_premium to false for user: ${userId} (no manual subscription detected)`);
+      // Only reset for real Stripe subscriptions
       await supabaseAdmin
         .from('profiles')
         .update({

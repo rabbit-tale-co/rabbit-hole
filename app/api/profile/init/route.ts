@@ -12,6 +12,26 @@ const stripe = new Stripe(process.env.SECRET_STRIPE_KEY!, {
 // Function to sync premium status with Stripe
 async function syncPremiumStatus(userId: string) {
   try {
+    // Get profile data first to check for manual subscriptions
+    const { data: profile } = await supabaseAdmin
+      .schema('social_art')
+      .from('profiles')
+      .select('stripe_customer_id, is_premium')
+      .eq('user_id', userId)
+      .single();
+
+    // console.log(`🔍 [SYNC PREMIUM] Profile data for user ${userId}:`, {
+    //   stripe_customer_id: profile?.stripe_customer_id,
+    //   is_premium: profile?.is_premium
+    // });
+
+    // Check for manual subscription first
+    if (profile?.stripe_customer_id && profile.stripe_customer_id.startsWith('manual_')) {
+      // console.log(`✅ [SYNC PREMIUM] Manual subscription detected, returning current is_premium: ${profile.is_premium} for user: ${userId}`);
+      // For manual subscriptions, return the current is_premium status
+      return profile.is_premium;
+    }
+
     // Search for Stripe customer by metadata
     const customers = await stripe.customers.search({
       query: `metadata['user_id']:'${userId}'`,
@@ -19,6 +39,9 @@ async function syncPremiumStatus(userId: string) {
     });
 
     if (customers.data.length === 0) {
+      // console.log(`🔍 [SYNC PREMIUM] No Stripe customer found for user: ${userId}`);
+
+      // console.log(`❌ [SYNC PREMIUM] No manual subscription detected, setting is_premium to false for user: ${userId}`);
       // No customer found, ensure is_premium is false
       await supabaseAdmin
         .schema('social_art')
@@ -138,9 +161,12 @@ export async function POST(req: NextRequest) {
         }
 
         // Sync premium status with Stripe (this happens on every login)
+        // console.log(`🔍 [PROFILE INIT] Syncing premium status for user: ${user_id}`);
         const syncedPremiumStatus = await syncPremiumStatus(user_id);
+        // console.log(`🔍 [PROFILE INIT] Synced premium status: ${syncedPremiumStatus} for user: ${user_id}`);
         if (syncedPremiumStatus !== null) {
           updates.is_premium = syncedPremiumStatus;
+          // console.log(`🔍 [PROFILE INIT] Will update is_premium to: ${syncedPremiumStatus} for user: ${user_id}`);
         }
 
         if (Object.keys(updates).length > 0) {

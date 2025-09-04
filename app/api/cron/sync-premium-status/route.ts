@@ -113,6 +113,14 @@ export async function POST(request: NextRequest) {
 
 async function syncUserPremiumStatus(userId: string, username?: string) {
   try {
+    // Get profile data first to check for manual subscriptions
+    const { data: profile } = await supabaseAdmin
+      .schema('social_art')
+      .from('profiles')
+      .select('stripe_customer_id, is_premium')
+      .eq('user_id', userId)
+      .single();
+
     // Search for Stripe customer by metadata
     const customers = await stripe.customers.search({
       query: `metadata['user_id']:'${userId}'`,
@@ -120,6 +128,17 @@ async function syncUserPremiumStatus(userId: string, username?: string) {
     });
 
     if (customers.data.length === 0) {
+      // Check if it's a manual subscription before setting to false
+      if (profile?.stripe_customer_id && profile.stripe_customer_id.startsWith('manual_')) {
+        // Skip manual subscriptions - don't reset their premium status
+        return {
+          success: true,
+          updated: false,
+          action: 'skipped_manual',
+          message: 'Manual subscription detected, skipping sync'
+        };
+      }
+
       // No customer found, ensure is_premium is false
       const { error } = await supabaseAdmin
         .schema('social_art')

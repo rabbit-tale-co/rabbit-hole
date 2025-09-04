@@ -104,8 +104,6 @@ export async function GET(req: NextRequest) {
       // If we can't get likes, continue without them
       console.warn('Failed to fetch likes:', error);
     }
-  } else {
-    console.log('🔍 API Debug - No user, posts will not have is_liked property');
   }
 
   const nextCursor = postsWithLikes.length

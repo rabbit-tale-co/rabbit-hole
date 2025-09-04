@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { PremiumBadge } from "./PremiumBadge";
 import { useFollow } from "@/hooks/useFollow";
 
+// FIXME: posts have different numbers for same user
+
 type MiniUser = {
   user_id: string;
   username: string;
