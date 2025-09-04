@@ -24,7 +24,7 @@ export async function checkSubscriptionStatus(userId: string) {
     // Get user profile
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('user_id, stripe_customer_id, premium_plan, premium_status, stripe_subscription_id, updated_at')
+      .select('user_id, stripe_customer_id, is_premium, updated_at')
       .eq('user_id', userId)
       .single();
 
@@ -41,13 +41,13 @@ export async function checkSubscriptionStatus(userId: string) {
     const lastCheck = profile.updated_at;
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-    if (lastCheck && new Date(lastCheck) > fiveMinutesAgo && profile.premium_status) {
+    if (lastCheck && new Date(lastCheck) > fiveMinutesAgo && profile.is_premium) {
       // Use cached data if recent
       return {
-        isPremium: profile.premium_status === 'active',
-        status: profile.premium_status,
-        plan: profile.premium_plan,
-        subscriptionId: profile.stripe_subscription_id,
+        isPremium: profile.is_premium,
+        status: profile.is_premium ? 'active' : 'inactive',
+        plan: 'premium',
+        subscriptionId: 'manual',
       };
     }
 
@@ -65,10 +65,7 @@ export async function checkSubscriptionStatus(userId: string) {
       await supabaseAdmin
         .from('profiles')
         .update({
-          premium_plan: null,
-          premium_status: 'inactive',
-          premium_started_at: null,
-          stripe_subscription_id: null,
+          is_premium: false,
         })
         .eq('user_id', userId);
 
@@ -80,12 +77,7 @@ export async function checkSubscriptionStatus(userId: string) {
     await supabaseAdmin
       .from('profiles')
       .update({
-        premium_plan: plan,
-        premium_status: activeSubscription.status,
-        premium_started_at: activeSubscription.created
-          ? new Date(activeSubscription.created * 1000).toISOString()
-          : null,
-        stripe_subscription_id: activeSubscription.id,
+        is_premium: activeSubscription.status === 'active',
       })
       .eq('user_id', userId);
 
