@@ -43,13 +43,6 @@ export default function UserProfilePage() {
     );
   }
 
-  // Dev: log current viewer and viewed profile
-  try {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[profile:view] username', username, 'isOwn', isOwn, 'profile', profile);
-    }
-  } catch { }
-
   const isSuspended = Boolean(profile.banned_until && Date.parse(profile.banned_until) > Date.now());
 
   return (
@@ -57,7 +50,7 @@ export default function UserProfilePage() {
       {/* UserProfile component */}
       <UserProfile
         profile={profile}
-        stats={{ followers: 0, following: 0, posts: 0 }}
+        stats={{ posts: 0 }}
         isOwnProfile={isOwn}
       />
 

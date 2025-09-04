@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
-import { OutlineEdit } from "@/components/icons/Icons";
 import { SettingsDialog } from "@/components/settings/Dialog";
 import { generateAccentColor } from "@/lib/accent-colors";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -8,10 +7,10 @@ import { ProfileCover } from "./ProfileCover";
 import { ProfileBio } from "./ProfileBio";
 import { ProfileStats } from "./ProfileStats";
 import { getUserAccentStyles, getUserAccentStylesFromHex } from "@/lib/profile";
-import { useIsMobile } from "@/hooks/useMobile";
 import { ModerationMenu } from "@/components/mod/ModerationMenu";
 import { useAuth } from "@/providers/AuthProvider";
 import { PremiumBadge } from "./PremiumBadge";
+import { useFollow } from "@/hooks/useFollow";
 
 interface UserProfileData {
   user_id: string;
@@ -27,18 +26,19 @@ interface UserProfileData {
 
 interface UserProfileProps {
   profile: UserProfileData;
-  stats: { followers: number; following: number; posts: number };
+  stats: { posts: number }; // Only posts count from props, followers/following from useFollow
   isOwnProfile: boolean;
   onEditProfile?: () => void;
 }
 
 export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const isMobile = useIsMobile();
   const { profile: myProfile } = useAuth();
   const isAdmin = Boolean((myProfile as unknown as { is_admin?: boolean } | null)?.is_admin);
   // Use provided accentColor or generate one based on username
   const currentAccentColor = useMemo(() => generateAccentColor(profile.username), [profile.username]);
+  const { loading: followLoading, isFollowing, followers, following, canFollow, toggleFollow } =
+    useFollow(profile.user_id);
 
   // Get color styles for colors
   const { coverBgStyle } = useMemo(() => {
@@ -76,35 +76,34 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
         />
 
         {/* Avatar Actions - Floating like UserProfile */}
-        {isOwnProfile && (
-          <div className="absolute bottom-4 right-0">
-            <Button
-              variant="outline"
-              size={isMobile ? "icon" : "default"}
-              onClick={() => setIsEditDialogOpen(true)}
-            >
-              <OutlineEdit size={14} />
-              <span className="hidden md:block">
-                Edit Profile
-              </span>
+        <div className="absolute bottom-4 right-0 flex items-center gap-2">
+          {isOwnProfile ? (
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
+              Edit Profile
             </Button>
-          </div>
-        )}
-
-        {isAdmin && !isOwnProfile && (
-          <div className="absolute bottom-4 right-0">
+          ) : canFollow ? (
+            <Button
+              variant={isFollowing ? 'secondary' : 'default'}
+              disabled={followLoading}
+              onClick={toggleFollow}
+              aria-pressed={isFollowing}
+            >
+              {isFollowing ? 'Following' : 'Follow'}
+            </Button>
+          ) : null}
+          {isAdmin && !isOwnProfile && (
             <ModerationMenu
               targetUserId={profile.user_id}
               isSuspended={isSuspended}
-              onAfter={() => { /* no-op; could refresh */ }}
+              onAfter={() => { }}
             />
-          </div>
-        )}
+          )}
+        </div>
 
-      </div>
+      </div >
 
       {/* Profile Info */}
-      <div className="text-center mt-2 px-4 space-y-2">
+      <div className="text-center mt-2 px-4 space-y-2" >
         <div className="relative inline-block">
           <h3 className="text-2xl font-bold text-neutral-950 inline-flex items-center gap-2">
             <span>{profile.display_name}</span>
@@ -113,23 +112,26 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
           <p className="text-neutral-600">@{profile.username}</p>
         </div>
 
-        {/* Admin moderation tools moved to header menu */}
-
-        {!isSuspended ? (
-          <ProfileBio bio={profile.bio || undefined} />
-        ) : (
-          !isOwnProfile && <p className="text-sm text-muted-foreground">This account is suspended.</p>
-        )}
+        {
+          !isSuspended ? (
+            <ProfileBio bio={profile.bio || undefined} />
+          ) : (
+            !isOwnProfile && <p className="text-sm text-muted-foreground">This account is suspended.</p>
+          )
+        }
 
         {/* Stats Grid */}
-        {!isSuspended && (
-          <ProfileStats
-            posts={stats.posts}
-            following={stats.following}
-            followers={stats.followers}
-          />
-        )}
-
+        {
+          !isSuspended && (
+            <ProfileStats
+              posts={stats.posts}
+              following={following}
+              followers={followers}
+              targetUserId={profile.user_id}
+              targetUsername={profile.username}
+            />
+          )
+        }
       </div>
 
       {isEditDialogOpen && (
@@ -139,7 +141,8 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
           initialSection="profile"
           sections={["profile"]}
         />
-      )}
+      )
+      }
     </>
   );
 }

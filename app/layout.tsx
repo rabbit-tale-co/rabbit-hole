@@ -61,6 +61,7 @@ export const viewport: Viewport = {
 // FIXME: follows count on liked posts show like number instead of follows number
 // TODO: add number flow to post stats
 // TODO: add to cropping function presets (full square), rectangle, 16:9, 4:3, 3:4, 9:16, 1:1
+// TODO: svg in button mt-.5? to center vertically?
 
 //TODO: replace all <video> with media-player component
 
@@ -80,6 +81,7 @@ export default function RootLayout({
           <Container>
             <AuthProvider>
               <Header />
+              {/* TODO: for profile page mx-auto max-w-xl */}
               <div className="flex-1 min-h-dvh sm:pb-5">
                 {children}
               </div>

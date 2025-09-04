@@ -1,5 +1,6 @@
 import type React from 'react'
 import type { IconProps } from '../../IconProps'
+import { getIconClassName } from '../../IconProps'
 
 export const SolidLogo: React.FC<IconProps> = ({ className, size = 24 }) => (
   <svg
@@ -8,7 +9,7 @@ export const SolidLogo: React.FC<IconProps> = ({ className, size = 24 }) => (
     viewBox='0 0 1041 1627.42'
     fill='none'
     xmlns='http://www.w3.org/2000/svg'
-    className={className}
+    className={getIconClassName(className)}
   >
     <path
       fillRule='evenodd'

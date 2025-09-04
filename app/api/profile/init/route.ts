@@ -3,6 +3,63 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ACCENT_COLORS, getAccentColorValue } from "@/lib/accent-colors";
 import { InitProfile } from "@/schemas/profile";
 import { USERNAME } from "@/schemas/_shared";
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.SECRET_STRIPE_KEY!, {
+  apiVersion: '2025-08-27.basil',
+});
+
+// Function to sync premium status with Stripe
+async function syncPremiumStatus(userId: string) {
+  try {
+    // Search for Stripe customer by metadata
+    const customers = await stripe.customers.search({
+      query: `metadata['user_id']:'${userId}'`,
+      limit: 1
+    });
+
+    if (customers.data.length === 0) {
+      // No customer found, ensure is_premium is false
+      await supabaseAdmin
+        .schema('social_art')
+        .from('profiles')
+        .update({ is_premium: false })
+        .eq('user_id', userId);
+      return false;
+    }
+
+    const customer = customers.data[0];
+
+    // Get subscriptions
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: 'all',
+      limit: 10,
+    });
+
+    // Find active subscription
+    const activeSubscription = subscriptions.data.find(sub =>
+      sub.status === 'active' || sub.status === 'trialing'
+    );
+
+    const shouldBePremium = activeSubscription ?
+      (activeSubscription.status === 'active' || activeSubscription.status === 'trialing') :
+      false;
+
+    // Update profile
+    await supabaseAdmin
+      .schema('social_art')
+      .from('profiles')
+      .update({ is_premium: shouldBePremium })
+      .eq('user_id', userId);
+
+    return shouldBePremium;
+  } catch (error) {
+    console.error('Error syncing premium status:', error);
+    // On error, don't change the current status
+    return null;
+  }
+}
 
 async function findUniqueUsername(base: string) {
   const candidate = base;
@@ -79,6 +136,13 @@ export async function POST(req: NextRequest) {
             }
           }
         }
+
+        // Sync premium status with Stripe (this happens on every login)
+        const syncedPremiumStatus = await syncPremiumStatus(user_id);
+        if (syncedPremiumStatus !== null) {
+          updates.is_premium = syncedPremiumStatus;
+        }
+
         if (Object.keys(updates).length > 0) {
           const { error: upErr } = await supabaseAdmin
             .from("profiles")

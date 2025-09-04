@@ -1,5 +1,6 @@
 import type React from 'react'
 import type { IconProps } from '../../IconProps'
+import { getIconClassName } from '../../IconProps'
 
 export const OutlineTwitter: React.FC<IconProps> = ({ className, size = 24 }) => (
   // biome-ignore lint/a11y/noSvgWithoutTitle: <explanation>
@@ -9,7 +10,7 @@ export const OutlineTwitter: React.FC<IconProps> = ({ className, size = 24 }) =>
     viewBox='0 0 24 24'
     fill='none'
     xmlns='http://www.w3.org/2000/svg'
-    className={className}
+    className={getIconClassName(className)}
   >
     <path
       fillRule='evenodd'
@@ -28,7 +29,7 @@ export const SolidTwitter: React.FC<IconProps> = ({ className, size = 24 }) => (
     viewBox='0 0 24 24'
     fill='none'
     xmlns='http://www.w3.org/2000/svg'
-    className={className}
+    className={getIconClassName(className)}
   >
     <path
       fillRule='evenodd'
@@ -47,7 +48,7 @@ export const DuotoneTwitter: React.FC<IconProps> = ({ className, size = 24 }) =>
     viewBox='0 0 24 24'
     fill='none'
     xmlns='http://www.w3.org/2000/svg'
-    className={className}
+    className={getIconClassName(className)}
   >
     <path
       fillRule='evenodd'

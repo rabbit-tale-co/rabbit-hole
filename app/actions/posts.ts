@@ -1,7 +1,6 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getUserFromCookies } from "@/lib/auth";
 import { CreatePost, UpdatePost, PostIdUserId, CommentCreate, CommentDelete, FeedCursor } from "@/schemas/post";
 import { UUID } from "@/schemas/_shared";
 import { z } from "zod";
@@ -22,11 +21,11 @@ function encodeCursor(ts: string, id: string) {
 
 // Require logged-in and not-banned user. Optionally assert the userId matches the current user.
 async function requireActiveUser(expectedUserId?: string): Promise<{ error?: string; me?: { id: string } }> {
-  const me = await getUserFromCookies();
-  if (!me) return { error: "Unauthorized" };
+  const { data: auth } = await supabaseAdmin.auth.getUser();
+  if (!auth.user?.id) return { error: "Unauthorized" };
   // Note: bannedUntil check moved to admin functions in admin.ts
-  if (expectedUserId && me.id !== expectedUserId) return { error: "Forbidden" };
-  return { me: { id: me.id } };
+  if (expectedUserId && auth.user.id !== expectedUserId) return { error: "Forbidden" };
+  return { me: { id: auth.user.id } };
 }
 
 // --- create post (images must be already uploaded to Storage with those paths) ---

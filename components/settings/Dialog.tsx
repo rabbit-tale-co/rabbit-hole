@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 
 import {
   Breadcrumb,
@@ -28,11 +29,12 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 
-import { Profile, Privacy, Appearance, Notifications, Content } from "./index"
+import { Profile, Privacy, Appearance, Notifications, Content, Billing } from "./index"
 import { useAuth } from "@/providers/AuthProvider"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { OutlineBell, OutlineBrush, OutlineClose, OutlineImage, OutlineSettings, OutlineShield, OutlineUser } from "../icons/Icons"
+import { OutlineBell, OutlineBrush, OutlineClose, OutlineImage, OutlineReceipt, OutlineSettings, OutlineShield, OutlineUser, OutlineWarning } from "../icons/Icons"
+import { toast } from "sonner"
 
 // Unsaved changes provider API
 type SaveFn = (() => void | Promise<void>) | null;
@@ -51,7 +53,7 @@ export const useUnsavedChanges = () => {
   return ctx
 }
 
-type SettingsSection = "profile" | "privacy" | "appearance" | "notifications" | "content";
+type SettingsSection = "profile" | "privacy" | "appearance" | "notifications" | "content" | "billing";
 type NavItem = { name: string; icon: React.ElementType; id: SettingsSection };
 
 const data: { nav: NavItem[] } = {
@@ -61,6 +63,7 @@ const data: { nav: NavItem[] } = {
     { name: "Appearance", icon: OutlineBrush, id: "appearance" },
     { name: "Notifications", icon: OutlineBell, id: "notifications" },
     { name: "Content", icon: OutlineImage, id: "content" },
+    { name: "Billing & Subscription", icon: OutlineReceipt, id: "billing" },
   ],
 }
 
@@ -93,6 +96,8 @@ function SettingsContent({ activeSection, user }: SettingsContentProps) {
       return <Notifications />;
     case "content":
       return <Content />;
+    case "billing":
+      return <Billing />;
     default:
       return (
         <div className="flex items-center justify-center h-full">
@@ -117,10 +122,26 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
   const [internalOpen, setInternalOpen] = React.useState(false)
   const [activeSection, setActiveSection] = React.useState(initialSection)
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false)
+  const [showCancelDialog, setShowCancelDialog] = React.useState(false)
+  const [canceling, setCanceling] = React.useState(false)
+  const [cancelData, setCancelData] = React.useState<{ subscriptionId: string; userId: string } | null>(null)
   const { user: auth_user, profile } = useAuth()
 
   const open = controlledOpen ?? internalOpen
   const setOpen = onOpenChange ?? setInternalOpen
+
+  // Refs and helper for confirm dialog
+  const reopenAfterConfirmRef = React.useRef(false);
+
+  const closeConfirmAndMaybeReopen = React.useCallback(() => {
+    setShowCancelDialog(false);
+    setCancelData(null);
+    if (reopenAfterConfirmRef.current) {
+      reopenAfterConfirmRef.current = false;
+      // mały timeout, aby Radix zdjął atrybuty aria/inert
+      setTimeout(() => setOpen(true), 60);
+    }
+  }, [setOpen]);
 
   // Canonicalization and baseline tracking for unsaved changes
   const baselineKeyRef = React.useRef<string>("")
@@ -178,6 +199,20 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
     return () => window.removeEventListener('settings:requestClose', onRequestClose)
   }, [setOpen])
 
+  // Listen for cancel dialog request
+  React.useEffect(() => {
+    const onShowCancelDialog = (event: CustomEvent) => {
+      setCancelData(event.detail);
+      // wymuś zamknięcie settings (bez blokady unsaved)
+      reopenAfterConfirmRef.current = open; // zapamiętaj, czy mamy wrócić
+      setHasUnsavedChanges(false);
+      setOpen(false);
+      setShowCancelDialog(true);
+    };
+    window.addEventListener('settings:showCancelDialog', onShowCancelDialog as EventListener);
+    return () => window.removeEventListener('settings:showCancelDialog', onShowCancelDialog as EventListener);
+  }, [open, setOpen])
+
   // Handle save from toast
   const handleSaveFromToast = React.useCallback(async () => {
     if (activeSaveFunction) {
@@ -194,7 +229,7 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
   }, [activeSaveFunction])
 
   // Block navigation when there are unsaved changes
-  const handleSectionChange = (section: "profile" | "privacy" | "appearance" | "notifications" | "content") => {
+  const handleSectionChange = (section: "profile" | "privacy" | "appearance" | "notifications" | "content" | "billing") => {
     if (hasUnsavedChanges) {
       // Trigger shake effect on existing unsaved changes toast
       if (typeof window !== 'undefined' && (window as Window & { triggerToastShake?: () => void }).triggerToastShake) {
@@ -207,6 +242,10 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
 
   // Block dialog close when there are unsaved changes
   const handleDialogClose = (newOpen: boolean) => {
+    if (showCancelDialog) {                  // nie blokuj podczas confirm
+      setOpen(newOpen);
+      return;
+    }
     if (hasUnsavedChanges && !newOpen) {
       // Trigger shake effect on existing unsaved changes toast
       if (typeof window !== 'undefined' && (window as Window & { triggerToastShake?: () => void }).triggerToastShake) {
@@ -225,14 +264,51 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
 
   const singleSectionOnly = navItems.length === 1;
 
+  // Cancel subscription functionality
+  const cancelSubscription = React.useCallback(async () => {
+    if (!cancelData?.subscriptionId || !cancelData?.userId) {
+      toast.error('No subscription to cancel');
+      return;
+    }
+
+    console.log('Canceling subscription:', cancelData);
+    setCanceling(true);
+    try {
+      const res = await fetch('/api/stripe/cancel-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscriptionId: cancelData.subscriptionId,
+          userId: cancelData.userId
+        }),
+      });
+
+      console.log('Cancel subscription response status:', res.status);
+      const data = await res.json();
+      console.log('Cancel subscription response data:', data);
+
+      if (res.ok) {
+        toast.success('Subscription canceled successfully');
+      } else {
+        toast.error(data.error || 'Failed to cancel subscription');
+      }
+    } catch (e) {
+      console.error('Cancel subscription error:', e);
+      toast.error('Failed to cancel subscription');
+    } finally {
+      setCanceling(false);
+    }
+  }, [cancelData]);
+
   return (
     <>
-      <Dialog open={open} onOpenChange={handleDialogClose}>
+      <Dialog open={open && !showCancelDialog} onOpenChange={handleDialogClose}>
         <DialogContent
           className={cn("overflow-hidden rounded-2xl p-0 md:max-h-[600px] md:max-w-4xl", {
             "md:max-w-xl": singleSectionOnly,
           })}
           onPointerDownOutside={(e) => {
+            if (showCancelDialog) return;            // pozwól klikom przejść do confirm
             if (hasUnsavedChanges) {
               e.preventDefault()
               if (typeof window !== 'undefined' && (window as Window & { triggerToastShake?: () => void }).triggerToastShake) {
@@ -241,6 +317,7 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
             }
           }}
           onEscapeKeyDown={(e) => {
+            if (showCancelDialog) return;            // nie przechwytuj Esc
             if (hasUnsavedChanges) {
               e.preventDefault()
               if (typeof window !== 'undefined' && (window as Window & { triggerToastShake?: () => void }).triggerToastShake) {
@@ -328,7 +405,7 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
                     </DialogClose>
                   </div>
                 </header>
-                <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6 pt-4">
+                <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
                   <SettingsContent
                     activeSection={activeSection}
                     user={profile ? {
@@ -350,6 +427,61 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
           </UnsavedChangesContext.Provider>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Subscription Dialog - Teleported to root */}
+      {showCancelDialog && typeof window !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] grid place-items-center bg-black/50 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeConfirmAndMaybeReopen();
+          }}
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) e.preventDefault();
+          }}
+        >
+          <div
+            className="w-full max-w-md mx-4 rounded-xl border border-neutral-200 bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-3 border-b border-neutral-200 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-red-600 font-semibold">
+                <OutlineWarning className="h-5 w-5" />
+                Cancel Subscription
+              </div>
+              <button
+                onClick={closeConfirmAndMaybeReopen}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <OutlineClose className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to cancel your subscription? You&apos;ll lose access to premium features at the end of your current billing period.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={closeConfirmAndMaybeReopen} disabled={canceling} size="sm">
+                  Keep Subscription
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    await cancelSubscription();       // po sukcesie też zamknij i wznow
+                    // Trigger refresh of billing data
+                    window.dispatchEvent(new CustomEvent('billing:refresh'));
+                    closeConfirmAndMaybeReopen();
+                  }}
+                  disabled={canceling}
+                  size="sm"
+                >
+                  {canceling ? 'Canceling…' : 'Cancel Subscription'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   )
 }

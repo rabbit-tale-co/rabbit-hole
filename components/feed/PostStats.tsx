@@ -58,7 +58,7 @@ export function PostStats({ postId, className = "" }: PostStatsProps) {
               <span>{stats.views_total.toLocaleString()}</span>
             </div>
           </TooltipTrigger>
-          <TooltipContent side="top" align="center">
+          <TooltipContent side="bottom" align="center">
             Total views
           </TooltipContent>
         </Tooltip>
@@ -71,7 +71,7 @@ export function PostStats({ postId, className = "" }: PostStatsProps) {
               <span>{stats.unique_viewers.toLocaleString()}</span>
             </div>
           </TooltipTrigger>
-          <TooltipContent side="top" align="center">
+          <TooltipContent side="bottom" align="center">
             Unique viewers
           </TooltipContent>
         </Tooltip>

@@ -126,74 +126,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  useEffect(() => {
-    let alive = true;
-    let profileChannel: ReturnType<typeof supabase.channel> | null = null;
 
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!alive) return;
-      setSession(data.session ?? null);
-      setUser(data.session?.user ?? null);
-
-      // ...fetch profile...
-      if (data.session?.user?.id) {
-        // unikalna nazwa kanału
-        profileChannel = supabase
-          .channel(`profile-updates:${data.session.user.id}`)
-          .on(
-            "postgres_changes",
-            { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${data.session.user.id}` },
-            (payload) => { if (alive) setProfile(payload.new as ProfileRow); }
-          )
-          .subscribe();
-      } else {
-        setProfile(null);
-      }
-      if (alive) setLoading(false);
-
-      const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
-        if (!alive) return;
-        setSession(sess);
-        setUser(sess?.user ?? null);
-        // Defer async work to avoid deadlocks
-        setTimeout(() => {
-          if (!alive) return;
-          if (profileChannel) { try { profileChannel.unsubscribe(); } catch { } profileChannel = null; }
-
-          if (sess?.user?.id) {
-            fetch("/api/profile/init", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: sess.user.id }) }).catch(() => { });
-            (async () => {
-              try {
-                const { data: p } = await supabase.from("profiles").select("*").eq("user_id", sess.user.id).maybeSingle();
-                if (alive) setProfile((p as ProfileRow) ?? null);
-              } catch {
-                if (alive) setProfile(null);
-              }
-            })();
-
-            profileChannel = supabase
-              .channel(`profile-updates:${sess.user.id}`)
-              .on(
-                "postgres_changes",
-                { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${sess.user.id}` },
-                (payload) => { if (alive) setProfile(payload.new as ProfileRow); }
-              )
-              .subscribe();
-          } else {
-            setProfile(null);
-          }
-        }, 0);
-      });
-
-      // pewny cleanup
-      return () => {
-        alive = false;
-        try { sub.subscription.unsubscribe(); } catch { }
-        if (profileChannel) { try { profileChannel.unsubscribe(); } catch { } }
-      };
-    })();
-  }, []);
 
   const signUp: AuthCtx["signUp"] = async (params) => {
     const { email, password, ...meta } = params;

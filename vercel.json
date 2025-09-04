@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-premium-status",
+      "schedule": "0 */12 * * *"
+    }
+  ]
+}

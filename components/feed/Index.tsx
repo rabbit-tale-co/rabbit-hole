@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import Image from "next/image";
 import { buildPublicUrl } from "@/lib/publicUrl";
 import { useInfiniteFeed } from "@/hooks/useInfiniteFeed";
@@ -23,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useRouter } from "next/navigation";
 import { OutlineCalendar } from "../icons/Icons";
 import { useAuth } from "@/providers/AuthProvider";
+import { TypographyP } from "../ui/typography/p";
 
 // Local hover slideshow for multi-image posts
 function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; others: { src: string; alt?: string }[]; widthPx: number; alt?: string }) {
@@ -226,7 +228,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
           const height = Math.max(1, p.h * cell + (p.h - 1) * gap);
 
           return (
-            <article
+            <motion.article
               key={p.tile.id}
               data-post-id={p.tile.id}
               onClick={async () => {
@@ -235,6 +237,8 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
               }}
               className="group absolute bg-neutral-100 rounded-2xl overflow-hidden cursor-pointer"
               style={{ top, left, width, height, minWidth: 160, minHeight: 160 }}
+              initial="rest"
+              whileHover="hover"
             >
               {/* Track impressions for this post */}
               <PostImpressionTracker postId={p.tile.id} />
@@ -331,9 +335,56 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                       )}
                     </div>
                     {/* bottom gradient + actions row */}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
-                    <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3">
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
+                    <div className="absolute flex flex-col gap-2 inset-x-0 bottom-0 p-2 sm:p-3">
+                      {/* Post preview: bottom-anchored, max 3 lines */}
+                      {post?.text && (
+                        <motion.div
+                          className="w-full pointer-events-none transform-gpu [will-change:opacity,transform,filter] md:opacity-0 md:y-8"
+                          variants={{
+                            rest: {
+                              opacity: 0,
+                              y: 8,
+                              transition: {
+                                opacity: { duration: 0.15, ease: [0.16, 1, 0.3, 1], delay: 0.00 }, // leave: fade first
+                                y: { duration: 0.15, ease: [0.16, 1, 0.3, 1], delay: 0.00 },
+                              },
+                            },
+                            hover: {
+                              opacity: 1,
+                              y: 0,
+                              transition: {
+                                opacity: { duration: 0.15, ease: [0.16, 1, 0.3, 1], delay: 0.15 }, // enter: fade after blur
+                                y: { duration: 0.15, ease: [0.16, 1, 0.3, 1], delay: 0.15 },
+                              },
+                            },
+                          }}
+                        >
+                          {/* 3 lines * 1.25rem line-height = 3.75rem */}
+                          <div className="min-h-[3.75rem] flex flex-col justify-end">
+                            <motion.div
+                              className="[will-change:filter] md:blur-0"
+                              variants={{
+                                // enter: de-blur immediately
+                                hover: { filter: 'blur(0px)', transition: { duration: 0.15, ease: [0.16, 1, 0.3, 1], delay: 0.00 } },
+                                // leave: blur after the fade completes
+                                rest: { filter: 'blur(8px)', transition: { duration: 0.15, ease: [0.16, 1, 0.3, 1], delay: 0.15 } },
+                              }}
+                            >
+                              <TypographyP
+                                className="
+                                text-xs text-white leading-[1.25rem]
+                                line-clamp-3
+                                [display:-webkit-box] [-webkit-line-clamp:3] [-webkit-box-orient:vertical]
+                              "
+                              >
+                                {post.text}
+                              </TypographyP>
+                            </motion.div>
+                          </div>
+                        </motion.div>
+                      )}
                       <SocialActions
                         postId={p.tile.id}
                         likes={post?.like_count ?? 0}
@@ -354,13 +405,13 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                   </>
                 );
               })()}
-            </article>
+            </motion.article >
           );
         })}
-      </div>
+      </div >
 
       {/* sentinel for infinite scroll */}
-      <div ref={sentinelRef} className="h-12" />
+      < div ref={sentinelRef} className="h-12" />
 
       {/* lightweight status */}
       {error && <div className="py-6 text-center text-sm text-red-600">Error: {error}</div>}

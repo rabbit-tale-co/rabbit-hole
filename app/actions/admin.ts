@@ -1,18 +1,30 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getUserFromCookies, getUserFromToken } from "@/lib/auth";
+import { getUserFromToken } from "@/lib/auth";
 
 async function requireAdmin(token?: string) {
-  const me = token ? await getUserFromToken(token) : await getUserFromCookies();
-  if (!me) return { error: "Unauthorized" } as const;
+  let userId: string | null = null;
+
+  if (token) {
+    const me = await getUserFromToken(token);
+    if (!me) return { error: "Unauthorized" } as const;
+    userId = me.id;
+  } else {
+    const { data: auth } = await supabaseAdmin.auth.getUser();
+    if (!auth.user?.id) return { error: "Unauthorized" } as const;
+    userId = auth.user.id;
+  }
+
+  if (!userId) return { error: "Unauthorized" } as const;
+
   // Server-side check against social_art.profiles.is_admin
   try {
     const { data: prof, error } = await supabaseAdmin
       .schema('social_art')
       .from('profiles')
       .select('is_admin')
-      .eq('user_id', me.id)
+      .eq('user_id', userId)
       .maybeSingle();
     if (error) return { error: error.message } as const;
     const isAdmin = Boolean((prof as { is_admin?: boolean } | null)?.is_admin);
@@ -20,18 +32,18 @@ async function requireAdmin(token?: string) {
   } catch (e) {
     return { error: (e as Error).message } as const;
   }
-  return { me } as const;
+  return { me: { id: userId } } as const;
 }
 
 export async function isCurrentUserAdmin() {
-  const me = await getUserFromCookies();
-  if (!me) return { admin: false };
+  const { data: auth } = await supabaseAdmin.auth.getUser();
+  if (!auth.user?.id) return { admin: false };
   try {
     const { data: prof } = await supabaseAdmin
       .schema('social_art')
       .from('profiles')
       .select('is_admin')
-      .eq('user_id', me.id)
+      .eq('user_id', auth.user.id)
       .maybeSingle();
     const isAdmin = Boolean((prof as { is_admin?: boolean } | null)?.is_admin);
     return { admin: isAdmin };
