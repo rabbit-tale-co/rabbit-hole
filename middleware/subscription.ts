@@ -37,6 +37,17 @@ export async function checkSubscriptionStatus(userId: string) {
       return { isPremium: false, status: 'no_customer' };
     }
 
+    // Check for manual subscription (starts with 'manual_')
+    if (profile.stripe_customer_id.startsWith('manual_')) {
+      // For manual subscriptions, just return the is_premium status from the database
+      return {
+        isPremium: profile.is_premium,
+        status: profile.is_premium ? 'active' : 'inactive',
+        plan: 'manual',
+        subscriptionId: 'manual',
+      };
+    }
+
     // Check if we have recent subscription data (within last 5 minutes)
     const lastCheck = profile.updated_at;
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
