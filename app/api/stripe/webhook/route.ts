@@ -332,6 +332,13 @@ async function handlePaymentFailed(invoice: Record<string, unknown>) {
       return;
     }
 
+    // Skip manual subscriptions
+    const subId = (subscription as Record<string, unknown>).id;
+    if (subId && String(subId).startsWith('sub_manual_')) {
+      console.log('⏭️  Skipping manual subscription payment failure:', subId);
+      return;
+    }
+
     console.log(`✅ Payment failed for user ${userId}`);
 
     // Update status to indicate payment issue - just set is_premium to false for now
@@ -415,6 +422,12 @@ async function handleSubscriptionPaused(subscription: Record<string, unknown>) {
 
   if (!userId) {
     console.error('❌ Missing user_id in subscription metadata:', subscription.id);
+    return;
+  }
+
+  // Skip manual subscriptions
+  if (subscription.id && String(subscription.id).startsWith('sub_manual_')) {
+    console.log('⏭️  Skipping manual subscription pause:', subscription.id);
     return;
   }
 
