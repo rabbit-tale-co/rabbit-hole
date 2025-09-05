@@ -1,9 +1,9 @@
 export const SITE = 'RabbitHole';
-export const COMPANY = 'Rabbit Tale & Company. z o.o.';
-export const CONTACT_EMAIL = 'support@rabbit-hole.app';
-export const ADDRESS = 'Your Street 1, 00-000 City, Country';
-export const EFFECTIVE_PRIVACY = '2025-08-29';
-export const EFFECTIVE_TERMS = '2025-08-29';
+export const COMPANY = 'Rabbit Tale & Company. LLC.';
+export const CONTACT_EMAIL = 'kris@rabbittale.co';
+export const ADDRESS = 'We do not have company yet, so I will not dox myself putting there my adress';
+export const EFFECTIVE_PRIVACY = '2025-09-05';
+export const EFFECTIVE_TERMS = '2025-09-05';
 
 // ---------------------- Privacy ----------------------
 
