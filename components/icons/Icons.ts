@@ -17,6 +17,8 @@ export { OutlineVideo, SolidVideo, DuotoneVideo } from './assets/media/Video'
 export { OutlineLoading, SolidLoading, DuotoneLoading } from './assets/media/Loading'
 
 // Devices and Electronics
+export { OutlineTablet, SolidTablet, DuotoneTablet } from './assets/devices_and_electronics/Tablet'
+export { OutlineMobile02, SolidMobile02, DuotoneMobile02 } from './assets/devices_and_electronics/Mobile02'
 export { OutlineMonitor, SolidMonitor, DuotoneMonitor } from './assets/devices_and_electronics/Monitor'
 export { OutlineCloudUplaod, SolidCloudUplaod, DuotoneCloudUplaod } from './assets/devices_and_electronics/CloudUpload'
 export { OutlineHeadphones, SolidHeadphones, DuotoneHeadphones } from './assets/devices_and_electronics/Headphones'

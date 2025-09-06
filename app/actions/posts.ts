@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { CreatePost, UpdatePost, PostIdUserId, CommentCreate, CommentDelete, FeedCursor } from "@/schemas/post";
 import { UUID } from "@/schemas/_shared";
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 // using central schemas from '@/schemas/post'
 
 
@@ -21,8 +22,30 @@ function encodeCursor(ts: string, id: string) {
 
 // Require logged-in and not-banned user. Optionally assert the userId matches the current user.
 async function requireActiveUser(expectedUserId?: string): Promise<{ error?: string; me?: { id: string } }> {
+  // Try to get user from Supabase session first
   const { data: auth } = await supabaseAdmin.auth.getUser();
-  if (!auth.user?.id) return { error: "Unauthorized" };
+
+  if (!auth.user?.id) {
+    // If no session, try to get user from client-side context
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) return { error: "Unauthorized" };
+
+      // Log JWT usage for critical operations
+      console.log(`[JWT] User authenticated (client): ${user.id}${expectedUserId ? ` (expected: ${expectedUserId})` : ''}`);
+
+      if (expectedUserId && user.id !== expectedUserId) return { error: "Forbidden" };
+      return { me: { id: user.id } };
+    } catch (error) {
+      console.error('[JWT] Auth error:', error);
+      return { error: "Unauthorized" };
+    }
+  }
+
+  // Log JWT usage for critical operations
+  console.log(`[JWT] User authenticated (server): ${auth.user.id}${expectedUserId ? ` (expected: ${expectedUserId})` : ''}`);
+
   // Note: bannedUntil check moved to admin functions in admin.ts
   if (expectedUserId && auth.user.id !== expectedUserId) return { error: "Forbidden" };
   return { me: { id: auth.user.id } };
@@ -30,11 +53,21 @@ async function requireActiveUser(expectedUserId?: string): Promise<{ error?: str
 
 // --- create post (images must be already uploaded to Storage with those paths) ---
 export async function createPost(input: unknown) {
+  console.log(`[JWT] CreatePost function called with input:`, input);
+
   const parsed = CreatePost.safeParse(input);
-  if (!parsed.success) return { error: "Invalid payload" };
+  if (!parsed.success) {
+    console.log(`[JWT] CreatePost validation failed:`, parsed.error);
+    return { error: "Invalid payload" };
+  }
+
+  // Log JWT usage for post creation
+  console.log(`[JWT] Create post requested by user: ${parsed.data.author_id}`);
 
   {
+    console.log(`[JWT] Calling requireActiveUser for user: ${parsed.data.author_id}`);
     const auth = await requireActiveUser(parsed.data.author_id);
+    console.log(`[JWT] requireActiveUser result:`, auth);
     if (auth.error) return { error: auth.error };
   }
 
@@ -50,6 +83,11 @@ export async function createPost(input: unknown) {
     .single();
 
   if (error) return { error: error.message };
+
+  // Revalidate the feed pages to show the new post
+  revalidatePath('/');
+  revalidatePath(`/user/${parsed.data.author_id}`);
+
   return { post: data };
 }
 
@@ -57,6 +95,9 @@ export async function createPost(input: unknown) {
 export async function updatePost(input: unknown) {
   const parsed = UpdatePost.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  // Log JWT usage for post update
+  console.log(`[JWT] Update post requested: ${parsed.data.post_id} by user: ${parsed.data.author_id}`);
 
   {
     const auth = await requireActiveUser(parsed.data.author_id);
@@ -84,15 +125,22 @@ export async function updatePost(input: unknown) {
     .single();
 
   if (error) return { error: error.message };
+
+  // Revalidate the feed pages to show the new post
+  revalidatePath('/');
+  revalidatePath(`/user/${parsed.data.author_id}`);
+
   return { post: data };
 }
 
 // --- delete post (soft delete + return paths for caller to purge if needed) ---
 export async function deletePost(post_id: string, author_id: string) {
-  {
-    const auth = await requireActiveUser(author_id);
-    if (auth.error) return { error: auth.error };
-  }
+  // Log JWT usage for post deletion
+  console.log(`[JWT] Delete post requested: ${post_id} by user: ${author_id}`);
+  console.log(`[JWT] Delete post - author_id type: ${typeof author_id}, value: ${JSON.stringify(author_id)}`);
+
+  // Note: Authorization is already verified by the caller (API endpoint)
+  // We just need to verify that the user can delete this specific post
   const sb = supabaseAdmin;
   const { data: post, error: getErr } = await sb
     .from("posts")
@@ -100,7 +148,13 @@ export async function deletePost(post_id: string, author_id: string) {
     .eq("id", post_id)
     .single();
   if (getErr) return { error: getErr.message };
-  if (post.author_id !== author_id) return { error: "Forbidden" };
+
+  // Verify that the authenticated user is the author of the post
+  if (post.author_id !== author_id) {
+    console.log(`[JWT] Delete post - Forbidden: user ${author_id} cannot delete post by ${post.author_id}`);
+    return { error: "Forbidden" };
+  }
+
   if (post.is_deleted) return { ok: true, already: true, images: post.images ?? [] };
 
   const { error } = await sb
@@ -128,6 +182,10 @@ async function toggle(table: "likes" | "bookmarks" | "reposts", post_id: string,
 export async function setLike(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  // Log JWT usage for like operation
+  console.log(`[JWT] Like ${on ? 'added' : 'removed'} for post: ${parsed.data.post_id} by user: ${parsed.data.user_id}`);
+
   {
     const auth = await requireActiveUser(parsed.data.user_id);
     if (auth.error) return { error: auth.error };
@@ -137,6 +195,10 @@ export async function setLike(input: unknown, on: boolean) {
 export async function setBookmark(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  // Log JWT usage for bookmark operation
+  console.log(`[JWT] Bookmark ${on ? 'added' : 'removed'} for post: ${parsed.data.post_id} by user: ${parsed.data.user_id}`);
+
   {
     const auth = await requireActiveUser(parsed.data.user_id);
     if (auth.error) return { error: auth.error };
@@ -146,6 +208,10 @@ export async function setBookmark(input: unknown, on: boolean) {
 export async function setRepost(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  // Log JWT usage for repost operation
+  console.log(`[JWT] Repost ${on ? 'added' : 'removed'} for post: ${parsed.data.post_id} by user: ${parsed.data.user_id}`);
+
   {
     const auth = await requireActiveUser(parsed.data.user_id);
     if (auth.error) return { error: auth.error };
@@ -157,6 +223,10 @@ export async function setRepost(input: unknown, on: boolean) {
 export async function addComment(input: unknown) {
   const parsed = CommentCreate.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  // Log JWT usage for comment creation
+  console.log(`[JWT] Comment added to post: ${parsed.data.post_id} by user: ${parsed.data.author_id}`);
+
   {
     const auth = await requireActiveUser(parsed.data.author_id);
     if (auth.error) return { error: auth.error };
@@ -169,6 +239,10 @@ export async function addComment(input: unknown) {
 export async function removeComment(input: unknown) {
   const parsed = CommentDelete.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  // Log JWT usage for comment deletion
+  console.log(`[JWT] Comment removed: ${parsed.data.comment_id} by user: ${parsed.data.author_id}`);
+
   {
     const auth = await requireActiveUser(parsed.data.author_id);
     if (auth.error) return { error: auth.error };

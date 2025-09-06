@@ -31,6 +31,20 @@ export function useInfiniteFeed(
   const abortRef = useRef<AbortController | null>(null);
   const sameTokenHits = useRef(0);
 
+  // Listen for refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('Feed refresh event received');
+      setPages([]);
+      setCursor("");
+      setError(null);
+      hasAutoLoaded.current = false;
+    };
+
+    window.addEventListener('feed-refresh', handleRefresh);
+    return () => window.removeEventListener('feed-refresh', handleRefresh);
+  }, []);
+
   useEffect(() => {
     cursorRef.current = cursor;
   }, [cursor]);
@@ -44,7 +58,11 @@ export function useInfiniteFeed(
 
   const loadMore = useCallback(async () => {
     if (inFlight.current || globalInFlight || cursorRef.current === null || !mounted.current) {
-      console.log("useInfiniteFeed: loadMore skipped - inFlight:", inFlight.current, "globalInFlight:", globalInFlight, "cursor:", cursorRef.current, "mounted:", mounted.current);
+      return;
+    }
+
+    // Sprawdź czy komponent jest nadal zamontowany przed rozpoczęciem
+    if (!mounted.current) {
       return;
     }
 
@@ -52,7 +70,6 @@ export function useInfiniteFeed(
     globalInFlight = true;
     setLoading(true);
     setError(null);
-    console.log("useInfiniteFeed: Starting loadMore, setting loading=true");
 
     const currentCursor = cursorRef.current;
     const cursorParam = currentCursor === "" ? undefined : currentCursor;
@@ -63,7 +80,10 @@ export function useInfiniteFeed(
     if (opts?.authorId) qs.set("userId", opts.authorId);
     const url = `/api/posts${qs.toString() ? `?${qs.toString()}` : ""}`;
 
-    abortRef.current?.abort();
+    // Anuluj poprzednie żądanie tylko jeśli istnieje
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
     const ac = new AbortController();
     abortRef.current = ac;
 
@@ -77,7 +97,9 @@ export function useInfiniteFeed(
         signal: ac.signal,
       });
 
-      if (!mounted.current) return;
+      if (!mounted.current) {
+        return;
+      }
 
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));
@@ -89,28 +111,38 @@ export function useInfiniteFeed(
        const next = ("nextCursor" in res ? res.nextCursor : null) ?? null;
 
        if (next && next === currentCursor) {
-         sameTokenHits.current += 1;   // powtarza się token
+         sameTokenHits.current += 1;
        } else {
          sameTokenHits.current = 0;
        }
 
-       // – uznaj koniec TYLKO gdy backend jasno mówi null/undefined
-       //   ALBO dostaliśmy ten sam token np. 3 razy z rzędu
-       //   ALBO backend zwrócił mniej elementów niż pageSize (ostatnia strona)
        const itemsCount = res.items?.length ?? 0;
        const reachedEnd = next === null || sameTokenHits.current >= 3 || itemsCount < pageSize;
        const finalNext = reachedEnd ? null : next;
 
+       if (!mounted.current) {
+         return;
+       }
+
        setPages(prev => [...prev, { items: res.items ?? [], nextCursor: finalNext }]);
        setCursor(finalNext);
     } catch (e: unknown) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        return;
+      }
+
+      if (!mounted.current) {
+        return;
+      }
+
       if (e instanceof Error) {
         setError(e.message);
+      } else {
+        setError("Unknown error occurred");
       }
     } finally {
       if (mounted.current) {
         setLoading(false);
-        console.log("useInfiniteFeed: Finished loadMore, setting loading=false");
       }
       inFlight.current = false;
       globalInFlight = false;
@@ -119,15 +151,17 @@ export function useInfiniteFeed(
 
   const hasMore = cursor !== null;
 
-  // auto-load pierwszej strony przy montowaniu (gdy nie ma initial)
   useEffect(() => {
-    if (!hasAutoLoaded.current && cursor === "") {
+    if (!hasAutoLoaded.current && cursor === "" && mounted.current) {
       hasAutoLoaded.current = true;
-      void loadMore();
+      setTimeout(() => {
+        if (mounted.current) {
+          void loadMore();
+        }
+      }, 100);
     }
   }, [cursor, loadMore]); // Remove loadMore from dependencies
 
-  // reset przy zmianie filtra (np. authorId) lub pageSize
   useEffect(() => {
     setPages(initial ? [initial] : []);
     setCursor(initial ? initial.nextCursor ?? null : "");
@@ -144,12 +178,15 @@ export function useInfiniteFeed(
     };
   }, []);
 
-  // opcjonalnie: ręczne odświeżenie
   const refresh = useCallback(async () => {
+    if (!mounted.current) {
+      return;
+    }
+
     setPages([]);
     setCursor("");
     hasAutoLoaded.current = false;
-    sameTokenHits.current = 0; // reset licznika przy odświeżeniu
+    sameTokenHits.current = 0;
     await loadMore();
   }, [loadMore]);
 

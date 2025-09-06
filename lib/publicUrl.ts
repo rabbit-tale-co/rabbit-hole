@@ -13,6 +13,10 @@ export function buildPublicUrl(path: string): string {
       if (known.includes(hostLower) || looksLikeKey) {
         // rebase to S3 if configured
         key = u.pathname.replace(/^\/+/, "");
+        // Remove Supabase /storage/ prefix if present
+        if (key.startsWith('storage/')) {
+          key = key.replace(/^storage\//, '');
+        }
       } else {
         return path; // foreign absolute URL – use as-is
       }

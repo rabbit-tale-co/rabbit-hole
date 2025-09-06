@@ -23,6 +23,7 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@
 import { DeleteAccountDialog } from "./DeleteAccountDialog"
 import { supabase } from "@/lib/supabase"
 import { useProfileMedia } from "@/hooks/useProfileMedia"
+import { SessionManagement } from "./SessionManagement"
 
 // bio formatting not persisted yet
 
@@ -43,8 +44,9 @@ const profileSchema = z.object({
     .min(3, "Username must be at least 3 characters")
     .max(30, "Username must be less than 30 characters")
     .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
+  // BIO 100 -> 300 characters for premium
   bio: z.string()
-    .max(500, "Bio must be less than 500 characters")
+    .max(100, "Bio must be less than 100 characters")
     .optional(),
 })
 
@@ -106,7 +108,6 @@ export function Profile({ user }: ProfileProps) {
         username: validatedData.username.toLowerCase(),
         display_name: validatedData.displayName,
         bio: formData.bio || null,
-        // nie nadpisuj cover_url ani accent_color tutaj
       }
 
       // update email first if changed
@@ -149,7 +150,6 @@ export function Profile({ user }: ProfileProps) {
         window.dispatchEvent(new CustomEvent('profile:updated'))
         window.dispatchEvent(new CustomEvent('settings:requestClose'))
       } catch { }
-      // revalidatePath wykonujemy w server action; tutaj nie musimy odswiezac routera
 
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -166,8 +166,6 @@ export function Profile({ user }: ProfileProps) {
       console.error('Error updating profile:', error)
     }
   }, [formData, markAsSaved, user?.id, user?.email, checkForChanges])
-
-  // context already destructured above
 
   // Register save function with context so toast can call it
   React.useEffect(() => {
@@ -216,11 +214,27 @@ export function Profile({ user }: ProfileProps) {
     const url = URL.createObjectURL(file)
     await new Promise<void>((resolve) => {
       const im = new window.Image()
-      im.onload = () => { setGifNatDims({ w: im.naturalWidth || im.width, h: im.naturalHeight || im.height }); try { URL.revokeObjectURL(url) } catch { } resolve() }
+      im.onload = () => {
+        setGifNatDims({
+          w: im.naturalWidth || im.width,
+          h: im.naturalHeight || im.height
+        });
+        try {
+          URL.revokeObjectURL(url)
+        } catch { }
+
+        resolve()
+      }
       im.onerror = () => { try { URL.revokeObjectURL(url) } catch { } resolve() }
       im.src = url
     })
-    if (kind === "avatar") { setCropAvatarFile(file); setCropping("avatar-gif") } else { setCropCoverFile(file); setCropping("cover-gif") }
+    if (kind === "avatar") {
+      setCropAvatarFile(file);
+      setCropping("avatar-gif")
+    } else {
+      setCropCoverFile(file);
+      setCropping("cover-gif")
+    }
   }
 
   return (
@@ -694,6 +708,12 @@ export function Profile({ user }: ProfileProps) {
             </Button>
           </div>
         </div>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-6">
+        <SessionManagement />
       </div>
 
       <Separator />

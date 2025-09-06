@@ -10,6 +10,16 @@ export const supabaseAdmin = createClient(
   }
 );
 
+// Admin client for public schema (RPC functions for auth operations)
+export const supabaseAuthAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!, // service role
+  {
+    auth: { persistSession: false, autoRefreshToken: false },
+    db: { schema: 'public' },
+  }
+);
+
 // Admin client for stripe schema (Stripe tables)
 export const supabaseStripeAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

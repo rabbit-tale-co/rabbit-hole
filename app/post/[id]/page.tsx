@@ -9,6 +9,7 @@ import { buildPublicUrl } from "@/lib/publicUrl";
 import { PremiumBadge } from "@/components/user/PremiumBadge";
 import { useAuth } from "@/providers/AuthProvider";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import Center from "@/components/Center";
 import { toast } from "sonner";
@@ -79,7 +80,25 @@ export default function PostPage() {
     if (!post) return;
     try {
       setDeleting(true);
-      const r = await fetch(`/api/posts/${post.id}`, { method: "POST", body: JSON.stringify({ _action: "delete" }) });
+
+      // Get JWT token from Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      const r = await fetch(`/api/posts/${post.id}`, {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ _action: "delete" })
+      });
+
       if (!r.ok) throw new Error("delete_failed");
       toast.success("Post deleted");
       router.push("/");

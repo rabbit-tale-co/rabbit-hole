@@ -28,6 +28,7 @@ export function usePostComposer(authorId: string) {
   }, [authorId]);
 
   const create = useCallback(async (caption: string | undefined, files: FileLike[]) => {
+    console.log(`[CLIENT] Creating post for user: ${authorId}`);
     setBusy(true); setError(null);
     try {
       const postId = crypto.randomUUID();
@@ -35,7 +36,9 @@ export function usePostComposer(authorId: string) {
       for (const f of files) {
         metas.push(await uploadOne(postId, f));
       }
+      console.log(`[CLIENT] Calling createPost with data:`, { author_id: authorId, text: caption, images: metas });
       const res = await createPost({ author_id: authorId, text: caption, images: metas });
+      console.log(`[CLIENT] createPost result:`, res);
       if ("error" in res && res.error) throw new Error(res.error);
       return res.post;
     } catch (e: unknown) {

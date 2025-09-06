@@ -2,12 +2,60 @@
 
 import { toast } from "sonner";
 import { finalizeAvatar, finalizeCover, removeAvatar, removeCover } from "@/app/actions/storage";
-import { useMedia, type UploadResp } from "./useMedia";
+import { type UploadResp } from "./useMedia";
+import { supabase } from "@/lib/supabase";
 
 // Backend handles all conversions; no client-side type mapping needed
 
 export function useProfileMedia(userId?: string | null, onRefreshed?: () => Promise<void> | void) {
-  const { uploadProfileAvatar, uploadProfileCover } = useMedia();
+  // We don't need useMedia anymore since we're using local API endpoints
+
+  // Helper function to get JWT token
+  async function getAuthToken(): Promise<string | null> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      return session?.access_token || null;
+    } catch (error) {
+      console.error('Failed to get auth token:', error);
+      return null;
+    }
+  }
+
+  // Helper function to upload with JWT token
+  async function uploadWithAuth(
+    endpoint: string,
+    formData: FormData,
+    onProgress?: (pct: number) => void
+  ): Promise<UploadResp> {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", endpoint, true);
+      xhr.withCredentials = false;
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+      xhr.upload.onprogress = (evt) => {
+        if (!evt.lengthComputable) return;
+        const pct = Math.min(100, Math.round((evt.loaded / evt.total) * 100));
+        onProgress?.(pct);
+      };
+
+      xhr.responseType = "json";
+      xhr.onerror = () => reject(new Error("upload_error"));
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(xhr.response as UploadResp);
+        } else {
+          reject(new Error(`status_${xhr.status}`));
+        }
+      };
+      xhr.send(formData);
+    });
+  }
 
   async function uploadCoverViaPicker() {
     if (!userId) return;
@@ -17,15 +65,19 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      const isGif = (file.type || "").toLowerCase() === "image/gif" || (file.name || "").toLowerCase().endsWith(".gif");
+
+      const isGif = (file.type || "").toLowerCase() === "image/gif" ||
+      (file.name || "").toLowerCase().endsWith(".gif");
+
       if (isGif) {
         const fd = new FormData();
         fd.append("userId", userId);
         fd.append("file", file, file.name || "cover.gif");
         const toastId = toast.loading("Uploading cover… 0%");
         let json: UploadResp;
+
         try {
-          json = await uploadProfileCover(fd, (pct) => {
+          json = await uploadWithAuth('/api/profile/cover', fd, (pct) => {
             toast(`Uploading cover… ${pct}%`, { id: toastId });
           });
         } catch {
@@ -35,7 +87,9 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
         const fin = await finalizeCover(userId, json.url || json.path || "");
         if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
         await Promise.resolve(onRefreshed?.());
-        try { window.dispatchEvent(new CustomEvent("profile:updated")); } catch { }
+        try {
+          window.dispatchEvent(new CustomEvent("profile:updated"));
+        } catch { }
         toast.success("Cover updated", { id: toastId });
         return;
       }
@@ -45,7 +99,7 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
       const toastId = toast.loading("Uploading cover… 0%");
       let json: UploadResp;
       try {
-        json = await uploadProfileCover(fd, (pct) => {
+        json = await uploadWithAuth('/api/profile/cover', fd, (pct) => {
           toast(`Uploading cover… ${pct}%`, { id: toastId });
         });
       } catch {
@@ -77,7 +131,7 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
         const toastId = toast.loading("Uploading avatar… 0%");
         let json: UploadResp;
         try {
-          json = await uploadProfileAvatar(fd, (pct) => {
+          json = await uploadWithAuth('/api/profile/avatar', fd, (pct) => {
             toast(`Uploading avatar… ${pct}%`, { id: toastId });
           });
         } catch {
@@ -97,7 +151,7 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
       const toastId = toast.loading("Uploading avatar… 0%");
       let json: UploadResp;
       try {
-        json = await uploadProfileAvatar(fd, (pct) => {
+        json = await uploadWithAuth('/api/profile/avatar', fd, (pct) => {
           toast(`Uploading avatar… ${pct}%`, { id: toastId });
         });
       } catch {
@@ -124,7 +178,7 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
       const toastId = toast.loading("Uploading avatar… 0%");
       let json: UploadResp;
       try {
-        json = await uploadProfileAvatar(fd, (pct) => {
+        json = await uploadWithAuth('/api/profile/avatar', fd, (pct) => {
           toast(`Uploading avatar… ${pct}%`, { id: toastId });
         });
       } catch {
@@ -143,11 +197,11 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     fd.append("file", file, file.name || "avatar");
     const toastId = toast.loading("Uploading avatar… 0%");
     let json: UploadResp;
-    try {
-      json = await uploadProfileAvatar(fd, (pct) => {
-        toast(`Uploading avatar… ${pct}%`, { id: toastId });
-      });
-    } catch {
+        try {
+          json = await uploadWithAuth('/api/profile/avatar', fd, (pct: number) => {
+            toast(`Uploading avatar… ${pct}%`, { id: toastId });
+          });
+        } catch {
       toast.error("Upload failed", { id: toastId });
       return;
     }
@@ -170,11 +224,11 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     fd.append("file", file, file.name);
     const toastId = toast.loading("Uploading avatar… 0%");
     let json: UploadResp;
-    try {
-      json = await uploadProfileAvatar(fd, (pct) => {
-        toast(`Uploading avatar… ${pct}%`, { id: toastId });
-      });
-    } catch {
+        try {
+          json = await uploadWithAuth('/api/profile/avatar', fd, (pct: number) => {
+            toast(`Uploading avatar… ${pct}%`, { id: toastId });
+          });
+        } catch {
       toast.error("Upload failed", { id: toastId });
       return;
     }
@@ -195,7 +249,7 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
       const toastId = toast.loading("Uploading cover… 0%");
       let json: UploadResp;
       try {
-        json = await uploadProfileCover(fd, (pct) => {
+        json = await uploadWithAuth('/api/profile/cover', fd, (pct) => {
           toast(`Uploading cover… ${pct}%`, { id: toastId });
         });
       } catch {
@@ -214,11 +268,11 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     fd.append("file", file, file.name || "cover");
     const toastId = toast.loading("Uploading cover… 0%");
     let json: UploadResp;
-    try {
-      json = await uploadProfileCover(fd, (pct) => {
-        toast(`Uploading cover… ${pct}%`, { id: toastId });
-      });
-    } catch {
+        try {
+          json = await uploadWithAuth('/api/profile/cover', fd, (pct: number) => {
+            toast(`Uploading cover… ${pct}%`, { id: toastId });
+          });
+        } catch {
       toast.error("Upload failed", { id: toastId });
       return;
     }
@@ -239,11 +293,11 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     fd.append("file", file, file.name);
     const toastId = toast.loading("Uploading cover… 0%");
     let json: UploadResp;
-    try {
-      json = await uploadProfileCover(fd, (pct) => {
-        toast(`Uploading cover… ${pct}%`, { id: toastId });
-      });
-    } catch {
+        try {
+          json = await uploadWithAuth('/api/profile/cover', fd, (pct: number) => {
+            toast(`Uploading cover… ${pct}%`, { id: toastId });
+          });
+        } catch {
       toast.error("Upload failed", { id: toastId });
       return;
     }
@@ -287,11 +341,11 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     fd.append("crop_h", String(Math.max(1, Math.floor(crop.h))));
     const toastId = toast.loading("Uploading avatar… 0%");
     let json: UploadResp;
-    try {
-      json = await uploadProfileAvatar(fd, (pct) => {
-        toast(`Uploading avatar… ${pct}%`, { id: toastId });
-      });
-    } catch {
+        try {
+          json = await uploadWithAuth('/api/profile/avatar', fd, (pct: number) => {
+            toast(`Uploading avatar… ${pct}%`, { id: toastId });
+          });
+        } catch {
       toast.error("Upload failed", { id: toastId });
       return;
     }
@@ -313,11 +367,11 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     fd.append("crop_h", String(Math.max(1, Math.floor(crop.h))));
     const toastId = toast.loading("Uploading cover… 0%");
     let json: UploadResp;
-    try {
-      json = await uploadProfileCover(fd, (pct) => {
-        toast(`Uploading cover… ${pct}%`, { id: toastId });
-      });
-    } catch {
+        try {
+          json = await uploadWithAuth('/api/profile/cover', fd, (pct: number) => {
+            toast(`Uploading cover… ${pct}%`, { id: toastId });
+          });
+        } catch {
       toast.error("Upload failed", { id: toastId });
       return;
     }

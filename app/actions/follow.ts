@@ -111,6 +111,9 @@ export async function getBatchFollowStats(targetUserIds: string[], currentUserId
 }
 
 export async function toggleFollow(targetUserId: string, currentUserId: string): Promise<FollowStats & { ok: boolean; error?: string }> {
+  // Log JWT usage for follow operations
+  console.log(`[JWT] Follow toggle requested: ${currentUserId} -> ${targetUserId}`);
+
   const meId = currentUserId;
 
   if (!meId) {

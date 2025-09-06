@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { CreatePost } from "@/components/feed/upload/create-post"
 import { cn } from "@/lib/utils"
-// import type { Post } from "@/types/db"
+import { toast } from "sonner"
 
 
 type OptimisticPost = {
@@ -25,14 +25,16 @@ export default function PostButton({ className }: { className?: string }) {
   ) => {
     if (isError) {
       console.error('Failed to create post');
+      toast.error('Failed to create post');
       return;
     }
 
     if (realPost) {
       console.log('Post created successfully:', realPost);
+      toast.success('Post created successfully!');
       setOpen(false);
-      // Optionally refresh the page or update UI
-      window.location.reload();
+      // Trigger feed refresh event
+      window.dispatchEvent(new CustomEvent('feed-refresh'));
     }
   }
 

@@ -101,18 +101,18 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
 
   // map posts -> tiles (first image per post as cover)
   const tiles: Tile[] = useMemo(() => {
-    return items
-      .filter(p => p.images?.length > 0)
-      .map(p => {
-        const img = p.images[0];
-        const bucket = bucketFromWH(img.width, img.height);
-        return {
-          id: p.id,
-          w: bucket.w,
-          h: bucket.h,
-          cover: { path: img.path, width: img.width, height: img.height, alt: img.alt },
-        } satisfies Tile;
-      });
+    const postsWithImages = items.filter(p => p.images?.length > 0);
+
+    return postsWithImages.map(p => {
+      const img = p.images[0];
+      const bucket = bucketFromWH(img.width, img.height);
+      return {
+        id: p.id,
+        w: bucket.w,
+        h: bucket.h,
+        cover: { path: img.path, width: img.width, height: img.height, alt: img.alt },
+      } satisfies Tile;
+    });
   }, [items]);
 
   // quick lookup for overlays

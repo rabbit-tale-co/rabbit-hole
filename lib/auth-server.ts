@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from './supabase-admin';
+import { verifySupabaseJWT } from '@/lib/jwt-utils';
+
 
 /**
- * Get the current user's ID from the request
- * This function extracts the user ID from the Supabase session
+ * Safe getting user ID from request
+ * Checks JWT token and verifies it in the database
  */
 export async function getUserIdOrThrow(request: NextRequest): Promise<string> {
   try {
@@ -15,14 +17,28 @@ export async function getUserIdOrThrow(request: NextRequest): Promise<string> {
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-    // Verify the JWT token with Supabase
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-
-    if (error || !user) {
+    // 1. Verify JWT token using JWKS endpoint
+    const jwtResult = await verifySupabaseJWT(token);
+    if (!jwtResult) {
       throw new Error('Invalid or expired token');
     }
 
-    return user.id;
+    const userId = jwtResult.userId;
+
+    // 2. Check if token is assigned to user in the database
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .schema('social_art')
+      .from('profiles')
+      .select('user_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileError || !profile) {
+      console.error('User not found in database:', profileError);
+      throw new Error('User not found in database');
+    }
+
+    return userId;
   } catch (error) {
     console.error('Auth error:', error);
     throw new Error('Authentication required');
@@ -30,8 +46,8 @@ export async function getUserIdOrThrow(request: NextRequest): Promise<string> {
 }
 
 /**
- * Get user ID from request cookies (alternative method)
- * This can be used when the token is stored in cookies
+ * Safe getting user ID from cookies
+ * Checks JWT token from cookies and verifies it in the database
  */
 export async function getUserIdFromCookies(request: NextRequest): Promise<string> {
   try {
@@ -41,14 +57,28 @@ export async function getUserIdFromCookies(request: NextRequest): Promise<string
       throw new Error('No session found in cookies');
     }
 
-    // Verify the session with Supabase
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(sessionCookie);
-
-    if (error || !user) {
+    // 1. Verify JWT token using JWKS endpoint
+    const jwtResult = await verifySupabaseJWT(sessionCookie);
+    if (!jwtResult) {
       throw new Error('Invalid or expired session');
     }
 
-    return user.id;
+    const userId = jwtResult.userId;
+
+    // 2. Check if token is assigned to user in the database
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .schema('social_art')
+      .from('profiles')
+      .select('user_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileError || !profile) {
+      console.error('User not found in database:', profileError);
+      throw new Error('User not found in database');
+    }
+
+    return userId;
   } catch (error) {
     console.error('Cookie auth error:', error);
     throw new Error('Authentication required');

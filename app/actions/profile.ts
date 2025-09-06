@@ -9,6 +9,10 @@ import { getBatchFollowStats } from "./follow";
 export async function upsertProfile(input: unknown) {
   const parsed = UpsertProfile.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
+
+  // Log JWT usage for profile update
+  console.log(`[JWT] Profile update requested for user: ${parsed.data.user_id}`);
+
   // find old username to revalidate old path if it changes
   let oldUsername: string | null = null;
   {
@@ -53,6 +57,9 @@ export async function upsertProfile(input: unknown) {
 }
 
 export async function deleteAccount(userId: string) {
+  // Log JWT usage for account deletion
+  console.log(`[JWT] Account deletion requested for user: ${userId}`);
+
   const sb = supabaseAdmin;
   // delete reactions and comments first (cascades may help, but do it explicitly)
   // posts: delete by author, bookmarks/likes/reposts/comments tied to user will cascade via FKs

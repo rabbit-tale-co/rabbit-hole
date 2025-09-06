@@ -18,6 +18,9 @@ async function requireAdmin(token?: string) {
 
   if (!userId) return { error: "Unauthorized" } as const;
 
+  // Log JWT usage for admin operations
+  console.log(`[JWT] Admin operation requested by user: ${userId}`);
+
   // Server-side check against social_art.profiles.is_admin
   try {
     const { data: prof, error } = await supabaseAdmin

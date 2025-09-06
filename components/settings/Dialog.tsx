@@ -29,11 +29,11 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 
-import { Profile, Privacy, Appearance, Notifications, Content, Billing } from "./index"
+import { Profile, Privacy, Appearance, Notifications, Content, Billing, SessionManagement } from "./index"
 import { useAuth } from "@/providers/AuthProvider"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { OutlineBell, OutlineBrush, OutlineClose, OutlineImage, OutlineReceipt, OutlineSettings, OutlineShield, OutlineUser, OutlineWarning } from "../icons/Icons"
+import { OutlineBell, OutlineBrush, OutlineClose, OutlineImage, OutlineMonitor, OutlineReceipt, OutlineSettings, OutlineShield, OutlineUser, OutlineWarning } from "../icons/Icons"
 import { toast } from "sonner"
 
 // Unsaved changes provider API
@@ -53,7 +53,7 @@ export const useUnsavedChanges = () => {
   return ctx
 }
 
-type SettingsSection = "profile" | "privacy" | "appearance" | "notifications" | "content" | "billing";
+type SettingsSection = "profile" | "privacy" | "appearance" | "notifications" | "content" | "billing" | "session_management";
 type NavItem = { name: string; icon: React.ElementType; id: SettingsSection };
 
 const data: { nav: NavItem[] } = {
@@ -64,6 +64,7 @@ const data: { nav: NavItem[] } = {
     { name: "Notifications", icon: OutlineBell, id: "notifications" },
     { name: "Content", icon: OutlineImage, id: "content" },
     { name: "Billing & Subscription", icon: OutlineReceipt, id: "billing" },
+    { name: "Session Management", icon: OutlineMonitor, id: "session_management" },
   ],
 }
 
@@ -98,6 +99,8 @@ function SettingsContent({ activeSection, user }: SettingsContentProps) {
       return <Content />;
     case "billing":
       return <Billing />;
+    case "session_management":
+      return <SessionManagement />;
     default:
       return (
         <div className="flex items-center justify-center h-full">
@@ -229,7 +232,7 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
   }, [activeSaveFunction])
 
   // Block navigation when there are unsaved changes
-  const handleSectionChange = (section: "profile" | "privacy" | "appearance" | "notifications" | "content" | "billing") => {
+  const handleSectionChange = (section: "profile" | "privacy" | "appearance" | "notifications" | "content" | "billing" | "session_management") => {
     if (hasUnsavedChanges) {
       // Trigger shake effect on existing unsaved changes toast
       if (typeof window !== 'undefined' && (window as Window & { triggerToastShake?: () => void }).triggerToastShake) {

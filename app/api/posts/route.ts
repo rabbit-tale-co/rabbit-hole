@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
   const { cursor, limit } = parsed.data;
 
   const userIdParam = searchParams.get("userId");
+
   if (userIdParam) {
     const uid = z.uuid().safeParse(userIdParam);
     if (!uid.success) return Response.json({ error: "bad userId" }, { status: 400 });
@@ -129,6 +130,11 @@ export async function POST(req: NextRequest) {
 
   const { images, text } = parsed.data;
 
+  // Log JWT usage for post creation
+  console.log(`[JWT] Create post requested by user: ${user.id}`);
+  console.log(`[JWT] Post content: ${text ? `"${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"` : 'no text'}`);
+  console.log(`[JWT] Post images count: ${images?.length || 0}`);
+
   // Insert post
   const { data, error } = await supabaseAdmin
     .from("posts")
@@ -140,6 +146,12 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.log(`[JWT] Create post failed: ${error.message}`);
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  console.log(`[JWT] Post created successfully: ${data.id}`);
+
   return Response.json({ post: data }, { status: 201 });
 }

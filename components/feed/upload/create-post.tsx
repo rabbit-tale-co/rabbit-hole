@@ -457,6 +457,10 @@ export function CreateMediaPost({
     return metas;
   }, [uploadOne]);
 
+  // Create a stable reference to uploadAll to avoid infinite loops
+  const uploadAllRef = useRef(uploadAll);
+  uploadAllRef.current = uploadAll;
+
   // auto-upload newly added items in background and collect metas
   useEffect(() => {
     const idle = items.filter(i => i.status === 'idle');
@@ -466,7 +470,7 @@ export function CreateMediaPost({
     setUploading(true);
     (async () => {
       try {
-        const metas = await uploadAll(idle, ensurePost, patchItem);
+        const metas = await uploadAllRef.current(idle, ensurePost, patchItem);
         setUploadedMetas(prev => {
           const existing = new Set(prev.map(m => m.id));
           const added = metas.filter(m => !existing.has(m.id));
@@ -478,7 +482,7 @@ export function CreateMediaPost({
         setUploading(false);
       }
     })();
-  }, [items, postId, uploading, uploadAll]);
+  }, [items, postId, uploading]);
 
   const patchItem = (id: string, patch: Partial<Item>) => {
     setItems(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i));
@@ -510,13 +514,13 @@ export function CreateMediaPost({
       if (metas.length !== items.length) {
         const pending = items.filter(i => i.status !== 'done');
         if (pending.length) {
-          const extra = await uploadAll(pending, ensuredPostId, patchItem);
+          const extra = await uploadAllRef.current(pending, ensuredPostId, patchItem);
           metas = [...uploadedMetas, ...extra];
           setUploadedMetas(metas);
         }
       }
 
-      // create post (server API builds public URLs from storage paths)
+      // create post using API endpoint with JWT
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
@@ -537,10 +541,12 @@ export function CreateMediaPost({
           })),
         }),
       });
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to create post');
       }
+
       const realPost = await res.json();
       onPostCreated(optimistic, realPost);
 

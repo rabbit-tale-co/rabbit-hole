@@ -1,6 +1,7 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { buildPublicUrl } from "@/lib/publicUrl";
 import { randomUUID } from "crypto";
 
 const BUCKET = "social-art";
@@ -11,6 +12,10 @@ type PresignResp = { path: string; url: string; token: string; imageId: string }
 
 export async function presignPostImageUpload(postId: string, ext: "jpg" | "jpeg" | "png" | "webp", authorId: string): Promise<{ error?: string; data?: PresignResp }> {
   if (!postId || !authorId) return { error: "Missing ids" };
+
+  // Log JWT usage for post image upload
+  console.log(`[JWT] Post image upload presigned for user: ${authorId}, post: ${postId}`);
+
   const sb = supabaseAdmin;
   const imageId = randomUUID();
   const targetExt = ext; // keep original extension to avoid client-side conversion issues
@@ -23,6 +28,10 @@ export async function presignPostImageUpload(postId: string, ext: "jpg" | "jpeg"
 
 export async function presignAvatarUpload(userId: string, ext: "jpg"|"jpeg"|"png"|"webp"|"gif"): Promise<{ error?: string; data?: PresignResp }> {
   if (!userId) return { error: "Missing userId" };
+
+  // Log JWT usage for avatar upload
+  console.log(`[JWT] Avatar upload presigned for user: ${userId}`);
+
   const sb = supabaseAdmin;
   const targetExt = ext; // keep original extension (gif allowed)
   // Clean up any existing avatar files for this user to prevent clutter and conflicts
@@ -40,20 +49,21 @@ export async function presignAvatarUpload(userId: string, ext: "jpg"|"jpeg"|"png
 }
 
 export async function finalizeAvatar(userId: string, pathOrUrl: string) {
+  // Log JWT usage for avatar finalization
+  console.log(`[JWT] Avatar finalized for user: ${userId}`);
+
   const sb = supabaseAdmin;
-  const isFull = /^(https?:)?\/\//i.test(pathOrUrl);
-  const s3Endpoint = (process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.SOCIAL_S3_ENDPOINT || "").replace(/\/$/, "");
-  const s3Bucket = process.env.NEXT_PUBLIC_S3_BUCKET || process.env.SOCIAL_S3_BUCKET || "";
-  let publicUrl = isFull
-    ? pathOrUrl
-    : (s3Endpoint && s3Bucket)
-      ? `${s3Endpoint}/${s3Bucket}/${pathOrUrl}`
-      : pathOrUrl;
+
+  // Use buildPublicUrl to ensure consistent S3 URL generation
+  let publicUrl = buildPublicUrl(pathOrUrl);
+
+  // Add cache busting parameter
   try {
     const u = new URL(publicUrl.startsWith('http') ? publicUrl : `https://${publicUrl}`);
     u.searchParams.set('v', String(Date.now()));
     publicUrl = u.toString();
   } catch { }
+
   const { error } = await sb.from("profiles").update({ avatar_url: publicUrl }).eq("user_id", userId);
   if (error) return { error: error.message };
   return { ok: true, avatar_url: publicUrl };
@@ -76,20 +86,21 @@ export async function presignCoverUpload(userId: string, ext: "jpg"|"jpeg"|"png"
 }
 
 export async function finalizeCover(userId: string, pathOrUrl: string) {
+  // Log JWT usage for cover finalization
+  console.log(`[JWT] Cover finalized for user: ${userId}`);
+
   const sb = supabaseAdmin;
-  const isFull = /^(https?:)?\/\//i.test(pathOrUrl);
-  const s3Endpoint = (process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.SOCIAL_S3_ENDPOINT || "").replace(/\/$/, "");
-  const s3Bucket = process.env.NEXT_PUBLIC_S3_BUCKET || process.env.SOCIAL_S3_BUCKET || "";
-  let publicUrl = isFull
-    ? pathOrUrl
-    : (s3Endpoint && s3Bucket)
-      ? `${s3Endpoint}/${s3Bucket}/${pathOrUrl}`
-      : pathOrUrl;
+
+  // Use buildPublicUrl to ensure consistent S3 URL generation
+  let publicUrl = buildPublicUrl(pathOrUrl);
+
+  // Add cache busting parameter
   try {
     const u = new URL(publicUrl.startsWith('http') ? publicUrl : `https://${publicUrl}`);
     u.searchParams.set('v', String(Date.now()));
     publicUrl = u.toString();
   } catch { }
+
   const { error } = await sb.from("profiles").update({ cover_url: publicUrl }).eq("user_id", userId);
   if (error) return { error: error.message };
   return { ok: true, cover_url: publicUrl };

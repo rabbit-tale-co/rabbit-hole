@@ -64,3 +64,16 @@ export type AuditEventRow = {
   meta: Record<string, unknown>;
   created_at: ISODate;
 };
+
+export type UserSessionRow = {
+  id: UUID;
+  user_id: UUID;
+  session_token: string;
+  device_info: string;
+  ip_address: string;
+  user_agent: string;
+  created_at: ISODate;
+  last_activity: ISODate;
+  is_active: boolean;
+  expires_at: ISODate;
+};
