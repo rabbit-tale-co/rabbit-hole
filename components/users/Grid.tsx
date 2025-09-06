@@ -142,7 +142,15 @@ function UserCard({ user: u }: {
 
 export default function UsersGrid({ initialData }: { initialData?: { items: UserListItem[]; nextCursor: string | null } }) {
   const { items, loadMore, loading, error, hasMore } = useInfiniteUsers(initialData, 60);
-  const sentinelRef = useIntersection(() => { if (!loading && hasMore) loadMore(); }, "900px");
+  const sentinelRef = useIntersection(
+    () => { if (!loading && hasMore) loadMore(); },
+    {
+      rootMargin: "900px 0px 600px 0px",
+      threshold: 0,
+      disabled: loading || !hasMore,
+      debounceMs: 80,
+    }
+  );
 
   const isEmpty = !loading && items.length === 0;
 
