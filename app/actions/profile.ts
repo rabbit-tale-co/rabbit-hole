@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { UpsertProfile } from "@/schemas/profile";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getBatchFollowStats } from "./follow";
 
 export async function upsertProfile(input: unknown) {
   const parsed = UpsertProfile.safeParse(input);
@@ -132,6 +133,13 @@ export async function getUsersPage(input: unknown) {
     ? Buffer.from(`${data[data.length - 1].username}|${data[data.length - 1].user_id}`).toString("base64")
     : null;
 
-  const items = (data ?? []).map(r => ({ ...r, banned_until: suspMap.get(r.user_id) ?? null }));
+  // fetch follow stats for all users
+  const followStats = await getBatchFollowStats(ids, undefined);
+
+  const items = (data ?? []).map(r => ({
+    ...r,
+    banned_until: suspMap.get(r.user_id) ?? null,
+    followStats: followStats[r.user_id] || { isFollowing: false, followers: 0, following: 0 }
+  }));
   return { items, nextCursor };
 }

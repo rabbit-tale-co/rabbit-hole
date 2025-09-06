@@ -41,6 +41,75 @@ export async function getFollowStats(targetUserId: string, currentUserId?: strin
   return { isFollowing, followers: followers ?? 0, following: following ?? 0 };
 }
 
+export async function getBatchFollowStats(targetUserIds: string[], currentUserId?: string): Promise<Record<string, FollowStats>> {
+  const meId = currentUserId ?? null;
+  const result: Record<string, FollowStats> = {};
+
+  // Initialize all users with default stats
+  for (const userId of targetUserIds) {
+    result[userId] = { isFollowing: false, followers: 0, following: 0 };
+  }
+
+  if (targetUserIds.length === 0) return result;
+
+  // Batch fetch isFollowing relationships
+  if (meId) {
+    const { data: followingRelations } = await supabaseAdmin
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', meId)
+      .in('following_id', targetUserIds);
+
+    if (followingRelations) {
+      for (const rel of followingRelations) {
+        if (result[rel.following_id]) {
+          result[rel.following_id].isFollowing = true;
+        }
+      }
+    }
+  }
+
+  // Batch fetch followers count for all users
+  const { data: followersData } = await supabaseAdmin
+    .from('follows')
+    .select('following_id')
+    .in('following_id', targetUserIds);
+
+  if (followersData) {
+    const followersCount = new Map<string, number>();
+    for (const rel of followersData) {
+      followersCount.set(rel.following_id, (followersCount.get(rel.following_id) || 0) + 1);
+    }
+
+    for (const [userId, count] of followersCount) {
+      if (result[userId]) {
+        result[userId].followers = count;
+      }
+    }
+  }
+
+  // Batch fetch following count for all users
+  const { data: followingData } = await supabaseAdmin
+    .from('follows')
+    .select('follower_id')
+    .in('follower_id', targetUserIds);
+
+  if (followingData) {
+    const followingCount = new Map<string, number>();
+    for (const rel of followingData) {
+      followingCount.set(rel.follower_id, (followingCount.get(rel.follower_id) || 0) + 1);
+    }
+
+    for (const [userId, count] of followingCount) {
+      if (result[userId]) {
+        result[userId].following = count;
+      }
+    }
+  }
+
+  return result;
+}
+
 export async function toggleFollow(targetUserId: string, currentUserId: string): Promise<FollowStats & { ok: boolean; error?: string }> {
   const meId = currentUserId;
 

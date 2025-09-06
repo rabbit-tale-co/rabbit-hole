@@ -13,7 +13,7 @@ export function bucketFromWH(w: number, h: number): { w: 1|2; h: 1|2 } {
 
 export type PackStrategy = 'recency' | 'fit';
 
-export function packAppend(existing: PlacedTile[], incoming: Tile[], cols: number, strategy: PackStrategy = 'recency'): PlacedTile[] {
+export function packAppend(existing: PlacedTile[], incoming: Tile[], cols: number): PlacedTile[] {
   const grid: number[][] = [];
   const out = [...existing];
 
@@ -40,14 +40,110 @@ export function packAppend(existing: PlacedTile[], incoming: Tile[], cols: numbe
     }
   };
 
-  const tiles = strategy === 'fit' ? [...incoming].sort((a,b)=>(b.w*b.h)-(a.w*a.h)) : incoming;
-  for (const t of tiles) {
-    const placeW = Math.max(1, Math.min(t.w, cols));
-    const placeH = cols === 1 ? 1 : t.h; // keep feed compact on phones
-    const { x, y } = fitAt(placeW, placeH);
-    occupy(x, y, placeW, placeH);
-    out.push({ x, y, w: placeW, h: placeH, tile: t });
+  // Helper function to get size variants for gap filling
+  const getSizeVariants = (originalW: number, originalH: number): {w: number, h: number}[] => {
+    const variants = [];
+
+    // Original size
+    variants.push({ w: originalW, h: originalH });
+
+    // Try smaller sizes to fill gaps
+    if (originalW === 2 && originalH === 2) {
+      variants.push({ w: 2, h: 1 }, { w: 1, h: 2 }, { w: 1, h: 1 });
+    } else if (originalW === 2 && originalH === 1) {
+      variants.push({ w: 1, h: 1 });
+    } else if (originalW === 1 && originalH === 2) {
+      variants.push({ w: 1, h: 1 });
+    }
+
+    return variants;
+  };
+
+  // Helper function to find best fit with gap filling
+  const findBestFit = (tile: Tile, tileIndex: number) => {
+    const variants = getSizeVariants(tile.w, tile.h);
+    let bestFit = null;
+    let bestScore = Infinity; // lower is better (earlier row, then smaller x)
+
+    for (const variant of variants) {
+      const placeW = Math.max(1, Math.min(variant.w, cols));
+      const placeH = cols === 1 ? 1 : variant.h;
+
+      try {
+        const { x, y } = fitAt(placeW, placeH);
+        // Prioritize chronological order: earlier items should be placed first
+        // Use tileIndex to ensure chronological order is maintained
+        const score = (y * 1000 + x) + (tileIndex * 0.001); // tiny penalty for later items
+
+        if (score < bestScore) {
+          bestScore = score;
+          bestFit = { x, y, w: placeW, h: placeH };
+        }
+      } catch {
+        // If this variant doesn't fit, try the next one
+        continue;
+      }
+    }
+
+    return bestFit;
+  };
+
+  const tiles = [...incoming]; // Always preserve chronological order
+  for (let i = 0; i < tiles.length; i++) {
+    const t = tiles[i];
+    const bestFit = findBestFit(t, i);
+    if (bestFit) {
+      occupy(bestFit.x, bestFit.y, bestFit.w, bestFit.h);
+      out.push({ x: bestFit.x, y: bestFit.y, w: bestFit.w as 1|2, h: bestFit.h as 1|2, tile: { ...t, w: bestFit.w as 1|2, h: bestFit.h as 1|2 } });
+    } else {
+      // Fallback to original logic if no variant fits
+      const placeW = Math.max(1, Math.min(t.w, cols));
+      const placeH = cols === 1 ? 1 : t.h;
+      const { x, y } = fitAt(placeW, placeH);
+      occupy(x, y, placeW, placeH);
+      out.push({ x, y, w: placeW, h: placeH, tile: t });
+    }
   }
+
+  // Secondary compaction: try to move items left to fill gaps
+  const compactGrid = () => {
+    const movable = out.slice(existing.length).sort((a, b) => a.y - b.y || a.x - b.x);
+
+    for (const p of movable) {
+      // Clear current position
+      for (let dy = 0; dy < p.h; dy++) {
+        if (!grid[p.y + dy]) grid[p.y + dy] = Array(cols).fill(0);
+        for (let dx = 0; dx < p.w; dx++) grid[p.y + dy][p.x + dx] = 0;
+      }
+
+      // Try to move left
+      let targetX = p.x;
+      while (targetX > 0) {
+        let canMove = true;
+        for (let dy = 0; dy < p.h && canMove; dy++) {
+          if (!grid[p.y + dy]) grid[p.y + dy] = Array(cols).fill(0);
+          for (let dx = 0; dx < p.w; dx++) {
+            if (grid[p.y + dy][targetX - 1 + dx]) {
+              canMove = false;
+              break;
+            }
+          }
+        }
+        if (!canMove) break;
+        targetX--;
+      }
+
+      // Occupy new position
+      for (let dy = 0; dy < p.h; dy++) {
+        if (!grid[p.y + dy]) grid[p.y + dy] = Array(cols).fill(0);
+        for (let dx = 0; dx < p.w; dx++) grid[p.y + dy][targetX + dx] = 1;
+      }
+
+      p.x = targetX;
+    }
+  };
+
+  compactGrid();
   return out;
 }
 
@@ -59,8 +155,7 @@ export type PlacedGeneric<T extends { w: 1|2; h: 1|2 }> = {
 export function packAppendGeneric<T extends { w: 1|2; h: 1|2 }>(
   existing: PlacedGeneric<T>[],
   incoming: T[],
-  cols: number,
-  strategy: PackStrategy = 'recency'
+  cols: number
 ): PlacedGeneric<T>[] {
   const grid: number[][] = [];
   const out = [...existing];
@@ -88,7 +183,7 @@ export function packAppendGeneric<T extends { w: 1|2; h: 1|2 }>(
     }
   };
 
-  const tiles = strategy === 'fit' ? [...incoming].sort((a,b)=>(b.w*b.h)-(a.w*a.h)) : incoming;
+  const tiles = [...incoming]; // Always preserve chronological order
   for (const t of tiles) {
     const placeW = Math.max(1, Math.min(t.w, cols));
     const placeH = cols === 1 ? 1 : t.h;
@@ -120,8 +215,8 @@ export function useBento(tiles: Tile[]) {
 
   // compute placed purely with memo to avoid setState churn on rapid resizes
   const placed = useMemo<PlacedTile[]>(() => {
-    // Prefer tighter packing: prioritize big 2x2 first
-    return packAppend([], tiles, cols, 'recency');
+    // Use 'recency' strategy to preserve chronological order with gap filling
+    return packAppend([], tiles, cols);
   }, [tiles, cols]);
 
   return { cols, placed };

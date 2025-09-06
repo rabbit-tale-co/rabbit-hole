@@ -6,12 +6,12 @@ import { getFollowStats, toggleFollow } from '@/app/actions/follow';
 import { useAuth } from '@/providers/AuthProvider';
 import { toast } from 'sonner';
 
-export function useFollow(targetUserId?: string | null) {
+export function useFollow(targetUserId?: string | null, initialStats?: { isFollowing: boolean; followers: number; following: number }) {
   const { user } = useAuth(); // if your AuthProvider exposes `user` (or `profile.user_id`)
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followers, setFollowers] = useState(0);
-  const [following, setFollowing] = useState(0);
-  const [loading, setLoading] = useState(Boolean(targetUserId));
+  const [isFollowing, setIsFollowing] = useState(initialStats?.isFollowing ?? false);
+  const [followers, setFollowers] = useState(initialStats?.followers ?? 0);
+  const [following, setFollowing] = useState(initialStats?.following ?? 0);
+  const [loading, setLoading] = useState(Boolean(targetUserId && !initialStats));
   const [isPending, startTransition] = useTransition();
 
   // derive "canFollow"
@@ -24,7 +24,7 @@ export function useFollow(targetUserId?: string | null) {
 
   useEffect(() => {
     let cancelled = false;
-    if (!targetUserId) return;
+    if (!targetUserId || initialStats) return; // Skip if we have initial stats
 
     setLoading(true);
     getFollowStats(targetUserId, user?.id)
@@ -38,7 +38,7 @@ export function useFollow(targetUserId?: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [targetUserId, user?.id]);
+  }, [targetUserId, user?.id, initialStats]);
 
   const onToggle = useCallback(() => {
     if (!targetUserId) return;

@@ -172,10 +172,16 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, []);
 
-  // sentinel to fetch next page
-  const sentinelRef = useIntersection(() => {
-    if (!loading && hasMore) loadMore();
-  }, "1200px");
+  // sentinel to prefetch next page well before user reaches the end
+  const sentinelRef = useIntersection(
+    () => { if (!loading && hasMore) loadMore(); },
+    {
+      rootMargin: "1200px 0px 800px 0px", // prefetch ~1 ekran wcześniej
+      threshold: 0,
+      disabled: loading || !hasMore,
+      debounceMs: 80,
+    }
+  );
 
   // layout math
   const gap = 12;
@@ -400,19 +406,40 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                   </>
                 );
               })()}
-            </motion.article >
+            </motion.article>
           );
         })}
-      </div >
+      </div>
 
-      {/* sentinel for infinite scroll */}
-      < div ref={sentinelRef} className="h-12" />
+      <div ref={sentinelRef} style={{ height: 1, opacity: 0 }} />
+
+      {/* {loading && (
+        <div className="py-8 text-center">
+          <div className="inline-flex items-center gap-2 text-sm text-neutral-500">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-600"></div>
+            Loading more posts...
+          </div>
+        </div>
+      )} */}
+
+      {process.env.NODE_ENV === 'development' && (
+        <div className="py-2 text-center text-xs text-gray-400">
+          Debug: loading={loading.toString()}, hasMore={hasMore.toString()}, items={items.length}
+          <br />
+          <button
+            onClick={() => loadMore()}
+            className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+          >
+            Test Load More
+          </button>
+        </div>
+      )}
 
       {/* lightweight status */}
       {error && <div className="py-6 text-center text-sm text-red-600">Error: {error}</div>}
       {
         !hasMore && !loading && (
-          <div className="py-8 text-center text-sm text-neutral-400">You’re all caught up.</div>
+          <div className="py-8 text-center text-sm text-neutral-400">You&apos;re all caught up.</div>
         )
       }
     </div >

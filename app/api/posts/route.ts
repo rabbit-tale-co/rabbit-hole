@@ -4,6 +4,7 @@ import { CreatePost, Cursor } from "@/lib/validation";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getUser } from "@/lib/auth";
+import { PostRow } from "@/types";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -13,104 +14,96 @@ export async function GET(req: NextRequest) {
   });
   if (!parsed.success) return Response.json({ error: "bad cursor" }, { status: 400 });
 
-  // Get current user from request
   const user = await getUser(req);
-
   const { cursor, limit } = parsed.data;
-  const where: string[] = ["is_deleted = false"];
-  const params: string[] = [];
-  let idx = 1;
-
-  if (cursor) {
-    const [ts, id] = Buffer.from(cursor, "base64").toString("utf8").split("|");
-    where.push(`(created_at, id) < ($${idx}, $${idx + 1})`);
-    params.push(ts, id);
-    idx += 2;
-  }
 
   const userIdParam = searchParams.get("userId");
   if (userIdParam) {
     const uid = z.uuid().safeParse(userIdParam);
     if (!uid.success) return Response.json({ error: "bad userId" }, { status: 400 });
-    where.push(`author_id = $${idx}`);
-    params.push(uid.data);
-    idx += 1;
   }
 
-  // Fetch currently suspended users to exclude from feed
+  // suspended authors to exclude
   let suspendedIds: string[] = [];
   try {
     const nowIso = new Date().toISOString();
     const { data: susp } = await supabaseAdmin
-      .schema('social_art')
-      .from('suspended_users')
-      .select('user_id')
-      .gt('banned_until', nowIso);
+      .schema("social_art")
+      .from("suspended_users")
+      .select("user_id")
+      .gt("banned_until", nowIso);
     suspendedIds = (susp || []).map((r: { user_id: string }) => r.user_id).filter(Boolean);
-  } catch { /* ignore, treat as none suspended */ }
+  } catch {}
 
-  // Use query builder instead of RPC here to avoid dynamic SQL and param mismatch
-  let query = supabaseAdmin
-    .from("posts")
-    .select("*")
-    // include rows where is_deleted is null (legacy) OR false
-    .or("is_deleted.is.null,is_deleted.eq.false")
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(limit);
+  // helper to fetch one chunk using key-set cursor
+  const fetchChunk = async (
+    c: string | null | undefined,
+    chunk: number
+  ): Promise<{ rows: PostRow[]; next: string | null }> => {
+    let q = supabaseAdmin
+      .from("posts")
+      .select("*")
+      // include NULL (legacy) and false without using another OR:
+      .neq("is_deleted", true)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(chunk + 1);
 
-  // Exclude suspended authors
-  if (suspendedIds.length > 0) {
-    // PostgREST expects an "in" list like: (uuid1,uuid2) without quotes for UUIDs
-    const list = `(${suspendedIds.join(',')})`;
-    query = query.not('author_id', 'in', list);
-  }
-
-  if (userIdParam) {
-    query = query.eq("author_id", userIdParam);
-  }
-
-  if (cursor) {
-    const [ts, id] = Buffer.from(cursor, "base64").toString("utf8").split("|");
-    query = query.lt("created_at", ts).or(`and(created_at.eq.${ts},id.lt.${id})`);
-  }
-
-  const { data, error } = await query;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
-
-    // Get current user's like status for each post if authenticated
-  let postsWithLikes = data || [];
-
-  if (user && postsWithLikes.length > 0) {
-    try {
-      const postIds = postsWithLikes.map(p => p.id);
-
-      const { data: likes } = await supabaseAdmin
-        .from('likes')
-        .select('post_id')
-        .eq('user_id', user.id)
-        .in('post_id', postIds);
-
-      // console.log('🔍 API Debug - Likes found:', likes);
-
-      const likedPostIds = new Set((likes || []).map(l => l.post_id));
-      postsWithLikes = postsWithLikes.map(post => ({
-        ...post,
-        is_liked: likedPostIds.has(post.id)
-      }));
-
-      // console.log('🔍 API Debug - Posts with like status:', postsWithLikes.map(p => ({ id: p.id, is_liked: p.is_liked })));
-    } catch (error) {
-      // If we can't get likes, continue without them
-      console.warn('Failed to fetch likes:', error);
+    if (userIdParam) q = q.eq("author_id", userIdParam);
+    if (suspendedIds.length > 0) {
+      const list = `(${suspendedIds.join(",")})`;
+      q = q.not("author_id", "in", list);
     }
+
+    if (c) {
+      const [ts, id] = Buffer.from(c, "base64").toString("utf8").split("|");
+      // one OR for the key-set condition
+      q = q.or(`and(created_at.lt.${ts}),and(created_at.eq.${ts},id.lt.${id})`);
+    }
+
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const hasMore = (data?.length ?? 0) > chunk;
+    const rows = (data ?? []).slice(0, chunk);
+    let next: string | null = null;
+    if (hasMore && rows.length > 0) {
+      const last = rows[rows.length - 1];
+      next = Buffer.from(`${last.created_at}|${last.id}`).toString("base64");
+    }
+    return { rows, next };
+  };
+
+  // back-fill to gather up to `limit` visible posts
+  let acc: PostRow[] = [];
+  let nextCursor = cursor ?? null;
+  // safety guard to avoid pathological loops
+  for (let i = 0; acc.length < limit && i < 6; i++) {
+    const need = limit - acc.length;
+    const { rows, next } = await fetchChunk(nextCursor, need);
+    acc = acc.concat(rows);
+    nextCursor = next;
+    if (!nextCursor) break; // truly no more
   }
 
-  const nextCursor = postsWithLikes.length
-    ? Buffer.from(`${postsWithLikes[postsWithLikes.length - 1].created_at}|${postsWithLikes[postsWithLikes.length - 1].id}`).toString("base64")
-    : null;
+  // attach current-user like flags for returned page only
+  if (user && acc.length > 0) {
+    try {
+      const postIds = acc.map(p => p.id);
+      const { data: likes } = await supabaseAdmin
+        .from("likes")
+        .select("post_id")
+        .eq("user_id", user.id)
+        .in("post_id", postIds);
+      const liked = new Set((likes || []).map(l => l.post_id));
+      acc = acc.map(p => ({ ...p, is_liked: liked.has(p.id) }));
+    } catch {}
+  }
 
-  return Response.json({ items: postsWithLikes, nextCursor });
+  return Response.json({
+    items: acc,
+    nextCursor: nextCursor ?? null,
+  });
 }
 
 export async function POST(req: NextRequest) {

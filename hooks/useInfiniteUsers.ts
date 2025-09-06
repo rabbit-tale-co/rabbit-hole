@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getUsersPage } from "@/app/actions/profile";
 
 export type UserListItem = {
   user_id: string;
@@ -11,6 +10,11 @@ export type UserListItem = {
   avatar_url?: string | null;
   cover_url?: string | null;
   accent_color?: string | null;
+  followStats?: {
+    isFollowing: boolean;
+    followers: number;
+    following: number;
+  };
 };
 
 export function useInfiniteUsers(initial?: { items: UserListItem[]; nextCursor: string | null }, pageSize = 24) {
@@ -32,17 +36,29 @@ export function useInfiniteUsers(initial?: { items: UserListItem[]; nextCursor: 
 
   const loadMore = useCallback(async () => {
     if (inFlight.current || cursor === null) return;
+
     inFlight.current = true;
     setLoading(true);
     setError(null);
 
-    const cursorParam = cursor === "" ? undefined : cursor;
-    const res = await getUsersPage({ cursor: cursorParam, limit: pageSize });
-    if ("error" in res && res.error) {
-      setError(res.error);
-    } else {
-      setPages(prev => [...prev, { items: res.items ?? [], nextCursor: res.nextCursor ?? null }]);
-      setCursor(res.nextCursor ?? null);
+    try {
+      const cursorParam = cursor === "" ? undefined : cursor;
+      const response = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cursor: cursorParam, limit: pageSize }),
+      });
+
+      const res = await response.json();
+
+      if ("error" in res && res.error) {
+        setError(res.error);
+      } else {
+        setPages(prev => [...prev, { items: res.items ?? [], nextCursor: res.nextCursor ?? null }]);
+        setCursor(res.nextCursor ?? null);
+      }
+    } catch {
+      setError("Failed to load users");
     }
 
     setLoading(false);
@@ -52,8 +68,9 @@ export function useInfiniteUsers(initial?: { items: UserListItem[]; nextCursor: 
   const hasMore = cursor !== null;
 
   useEffect(() => {
-    if (cursor === "" && !inFlight.current) void loadMore();
-  }, [cursor, loadMore]);
+    // Only auto-load if we don't have initial data and cursor is empty
+    if (cursor === "" && !inFlight.current && !initial) void loadMore();
+  }, [cursor, loadMore, initial]);
 
   return { items, loadMore, loading, error, hasMore } as const;
 }

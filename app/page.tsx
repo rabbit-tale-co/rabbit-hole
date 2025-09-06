@@ -6,10 +6,11 @@ export const metadata: Metadata = {
   twitter: { title: "RabbitHole", images: [{ url: "/assets/og.webp" }] },
 };
 import Feed from "@/components/feed/Index";
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 export const revalidate = 300;
 
 export default async function HomePage() {
-  // Render statyczny; dane laduje klient przez /api/posts (CSR)
-  return <Feed />;
+  // For now, let the client handle the data fetching
+  // This prevents server-side fetch issues and ensures proper infinite scroll
+  return <Feed key="main-feed" />;
 }

@@ -1,23 +1,33 @@
 import { PlacedTile, Tile } from "@/types";
 
-export function bucketFromWH(w: number, h: number): {
-  w: 1 | 2;
-  h: 1 | 2
-} {
+export function bucketFromWH(w: number, h: number): { w: 1 | 2; h: 1 | 2 } {
   const a = w / h;
-  if (w >= 1200 && h >= 1200 && Math.abs(a - 1) < 0.15) return { w: 2, h: 2 }; // premium/rare
+  if (w >= 1200 && h >= 1200 && Math.abs(a - 1) < 0.15) return { w: 2, h: 2 };
   if (a >= 1.3) return { w: 2, h: 1 };
-  if (a <= 1/1.3) return { w: 1, h: 2 };
+  if (a <= 1 / 1.3) return { w: 1, h: 2 };
   return { w: 1, h: 1 };
 }
 
+type Size = { w: 1 | 2; h: 1 | 2 };
+const area = (s: Size) => s.w * s.h as 1 | 2 | 4;
+
+function variantsFor(w: 1 | 2, h: 1 | 2): Size[] {
+  if (w === 2 && h === 2) return [{ w: 2, h: 2 }, { w: 2, h: 1 }, { w: 1, h: 2 }, { w: 1, h: 1 }];
+  if (w === 2 && h === 1) return [{ w: 2, h: 1 }, { w: 1, h: 1 }];
+  if (w === 1 && h === 2) return [{ w: 1, h: 2 }, { w: 1, h: 1 }];
+  return [{ w: 1, h: 1 }];
+}
+
 export function packAppend(
-  existing: PlacedTile[],    // previously placed tiles
-  incoming: Tile[],      // new tiles to place
-  cols: number
+  existing: PlacedTile[],
+  incoming: Tile[],
+  cols: number,
+  options?: { shrinkToFill?: boolean }
 ): PlacedTile[] {
+  const shrinkToFill = options?.shrinkToFill ?? true;
+
+  // occupancy grid
   const grid: number[][] = [];
-  // materialize occupancy from existing
   for (const p of existing) {
     for (let yy = 0; yy < p.h; yy++) {
       if (!grid[p.y + yy]) grid[p.y + yy] = Array(cols).fill(0);
@@ -26,76 +36,99 @@ export function packAppend(
   }
   const out = [...existing];
 
-  // place bigger first to reduce fragmentation
-  const tiles = [...incoming].sort((a,b)=> (b.w*b.h)-(a.w*a.h));
-
-  const fitAt = (w:number,h:number) => {
-    let y=0;
+  // helper: find earliest spot for (w,h)
+  const fitAt = (w: 1 | 2, h: 1 | 2) => {
+    let y = 0;
+    // scan downward until a free rectangle appears
     while (true) {
-      for (let x=0; x<=cols-w; x++) {
+      for (let x = 0; x <= cols - w; x++) {
         let ok = true;
-        for (let dy=0; dy<h && ok; dy++) {
-          if (!grid[y+dy]) grid[y+dy] = Array(cols).fill(0);
-          for (let dx=0; dx<w; dx++) if (grid[y+dy][x+dx]) { ok=false; break; }
+        for (let dy = 0; dy < h && ok; dy++) {
+          if (!grid[y + dy]) grid[y + dy] = Array(cols).fill(0);
+          for (let dx = 0; dx < w; dx++) {
+            if (grid[y + dy][x + dx]) {
+              ok = false;
+              break;
+            }
+          }
         }
-        if (ok) return {x,y};
+        if (ok) return { x, y };
       }
       y++;
     }
   };
 
+  // place bigger first to reduce fragmentation
+  const tiles = [...incoming].sort((a, b) => (b.w * b.h) - (a.w * a.h));
+
   for (const t of tiles) {
-    const {x,y} = fitAt(t.w,t.h);
-    for (let dy=0; dy<t.h; dy++) {
-      if (!grid[y+dy]) grid[y+dy] = Array(cols).fill(0);
-      for (let dx=0; dx<t.w; dx++) grid[y+dy][x+dx] = 1;
+    let chosen: { x: number; y: number; w: 1 | 2; h: 1 | 2 };
+
+    if (shrinkToFill) {
+      // try all allowed size variants; pick one with the smallest y (earliest row)
+      // tie-break: prefer larger area, then smaller x.
+      let best: { x: number; y: number; w: 1 | 2; h: 1 | 2 } | null = null;
+      for (const s of variantsFor(t.w as 1 | 2, t.h as 1 | 2)) {
+        const { x, y } = fitAt(s.w, s.h);
+        if (
+          !best ||
+          y < best.y ||
+          (y === best.y && (area(s) > area(best) || (area(s) === area(best) && x < best.x)))
+        ) {
+          best = { x, y, ...s };
+        }
+      }
+      chosen = best!;
+    } else {
+      const { x, y } = fitAt(t.w as 1 | 2, t.h as 1 | 2);
+      chosen = { x, y, w: t.w as 1 | 2, h: t.h as 1 | 2 };
     }
-    out.push({ x, y, w: t.w, h: t.h, tile: t });
+
+    // occupy and push
+    for (let dy = 0; dy < chosen.h; dy++) {
+      if (!grid[chosen.y + dy]) grid[chosen.y + dy] = Array(cols).fill(0);
+      for (let dx = 0; dx < chosen.w; dx++) grid[chosen.y + dy][chosen.x + dx] = 1;
+    }
+    out.push({ x: chosen.x, y: chosen.y, w: chosen.w, h: chosen.h, tile: { ...t, w: chosen.w, h: chosen.h } });
   }
 
-  // secondary compaction: slide newly placed tiles left to remove horizontal gaps
+  // secondary compaction: slide newly placed tiles left
   const startIdx = existing.length;
-  const setOccupancy = (x:number,y:number,w:number,h:number,val:number) => {
-    for (let dy=0; dy<h; dy++) {
-      if (!grid[y+dy]) grid[y+dy] = Array(cols).fill(0);
-      for (let dx=0; dx<w; dx++) grid[y+dy][x+dx] = val;
+  const setOcc = (x: number, y: number, w: number, h: number, val: number) => {
+    for (let dy = 0; dy < h; dy++) {
+      if (!grid[y + dy]) grid[y + dy] = Array(cols).fill(0);
+      for (let dx = 0; dx < w; dx++) grid[y + dy][x + dx] = val;
     }
   };
 
-  const movable = out.slice(startIdx).sort((a,b)=> a.y - b.y || a.x - b.x);
+  const movable = out.slice(startIdx).sort((a, b) => a.y - b.y || a.x - b.x);
   for (const p of movable) {
-    // free current cells
-    setOccupancy(p.x, p.y, p.w, p.h, 0);
+    setOcc(p.x, p.y, p.w, p.h, 0);
     let targetX = p.x;
     while (targetX > 0) {
       let canSlide = true;
       for (let dy = 0; dy < p.h && canSlide; dy++) {
-        if (!grid[p.y+dy]) grid[p.y+dy] = Array(cols).fill(0);
+        if (!grid[p.y + dy]) grid[p.y + dy] = Array(cols).fill(0);
         for (let dx = 0; dx < p.w; dx++) {
-          if (grid[p.y+dy][(targetX - 1) + dx]) { canSlide = false; break; }
+          if (grid[p.y + dy][(targetX - 1) + dx]) { canSlide = false; break; }
         }
       }
       if (!canSlide) break;
       targetX--;
     }
-    // occupy final cells and update position
-    setOccupancy(targetX, p.y, p.w, p.h, 1);
+    setOcc(targetX, p.y, p.w, p.h, 1);
     p.x = targetX;
   }
+
   return out;
 }
 
 type PixelNode = {
   key: string;
   tile: Tile;
-  style: React.CSSProperties; // {position:'absolute', left, top, width, height}
+  style: React.CSSProperties;
 };
 
-/**
- * Zamień wynik packAppend na absolutnie pozycjonowane węzły z gapami.
- * cell = rozmiar „jednej kratki” w px (np. 240 lub 288)
- * gap  = odstęp między kaflami w px (np. 12)
- */
 export function toPixels(placed: PlacedTile[], cell: number, gap: number) {
   const leftPx   = (x: number) => x * cell + x * gap;
   const topPx    = (y: number) => y * cell + y * gap;

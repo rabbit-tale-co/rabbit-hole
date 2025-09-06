@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { buildPublicUrl } from "@/lib/publicUrl";
-import { useInfiniteUsers } from "@/hooks/useInfiniteUsers";
+import { useInfiniteUsers, UserListItem } from "@/hooks/useInfiniteUsers";
 import { useIntersection } from "@/hooks/useIntersection";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
@@ -22,20 +22,25 @@ function UserCard({ user: u }: {
   user: {
     user_id: string; username: string; display_name: string | null;
     avatar_url: string | null; cover_url: string | null; accent_color: string | null; bio?: string | null; is_premium: boolean; banned_until?: string | null;
+    followStats?: {
+      isFollowing: boolean;
+      followers: number;
+      following: number;
+    };
   }
 }) {
   const avatarAccentHex =
     u.accent_color || getAccentColorValue(generateAccentColor(u.username), 500);
   const isSuspended = Boolean(u.banned_until && Date.parse(u.banned_until) > Date.now());
 
-  // Use follow hook to get real follow data
-  const { loading: followLoading, isFollowing, followers, following, canFollow, toggleFollow } =
-    useFollow(u.user_id);
+  // Use follow stats from props instead of individual hook calls
+  const followStats = u.followStats || { isFollowing: false, followers: 0, following: 0 };
+  const { loading: followLoading, toggleFollow } = useFollow(u.user_id, followStats);
 
   return (
     <Link href={`/user/${u.username}`}>
       <article
-        className="group h-[300px] sm:h-[300px] lg:h-[300px] ring-1 ring-border flex flex-col rounded-2xl bg-white hover:bg-neutral-50 transition-colors duration-150"
+        className="group h-[280px] sm:h-[300px] lg:h-[320px] ring-1 ring-border flex flex-col rounded-2xl bg-white hover:bg-neutral-50 transition-colors duration-150"
       >
         {/* cover: fixed height */}
         <div className="relative h-24 sm:h-30 w-full overflow-hidden rounded-t-2xl">
@@ -86,9 +91,9 @@ function UserCard({ user: u }: {
               avatarUrl={!isSuspended && u.avatar_url ? buildPublicUrl(u.avatar_url) : undefined}
               accentHex={avatarAccentHex}
             />
-            {canFollow && !isSuspended && (
+            {followStats && !isSuspended && (
               <Button
-                variant={isFollowing ? "secondary" : "default"}
+                variant={followStats.isFollowing ? "secondary" : "default"}
                 size="sm"
                 onClick={(e) => {
                   e.preventDefault();
@@ -98,7 +103,7 @@ function UserCard({ user: u }: {
                 disabled={followLoading}
                 className="absolute right-2 top-2"
               >
-                {isFollowing ? "Following" : "Follow"}
+                {followStats.isFollowing ? "Following" : "Follow"}
               </Button>
             )}
           </div>
@@ -126,7 +131,7 @@ function UserCard({ user: u }: {
           {/* footer pinned to bottom */}
           <div className="mt-auto pt-3 flex items-center justify-between">
             <span className="text-[11px] text-muted-foreground">
-              {followers} Followers • {following} Following
+              {followStats.followers} Followers • {followStats.following} Following
             </span>
           </div>
         </div>
@@ -135,8 +140,8 @@ function UserCard({ user: u }: {
   );
 }
 
-export default function UsersGrid() {
-  const { items, loadMore, loading, error, hasMore } = useInfiniteUsers(undefined, 36);
+export default function UsersGrid({ initialData }: { initialData?: { items: UserListItem[]; nextCursor: string | null } }) {
+  const { items, loadMore, loading, error, hasMore } = useInfiniteUsers(initialData, 60);
   const sentinelRef = useIntersection(() => { if (!loading && hasMore) loadMore(); }, "900px");
 
   const isEmpty = !loading && items.length === 0;
@@ -154,7 +159,7 @@ export default function UsersGrid() {
           <p className="mt-1 text-xs text-muted-foreground">When new artists join, they’ll show up here.</p>
         </div>
       ) : (
-        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {items.map((u) => (
             <UserCard key={u.user_id} user={{
               user_id: u.user_id,
@@ -166,6 +171,7 @@ export default function UsersGrid() {
               bio: (u as { bio?: string | null }).bio ?? null,
               is_premium: (u as { is_premium?: boolean }).is_premium ?? false,
               banned_until: (u as { banned_until?: string | null }).banned_until ?? null,
+              followStats: u.followStats,
             }} />
           ))}
         </div>
