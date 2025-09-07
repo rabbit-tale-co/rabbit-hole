@@ -4,8 +4,6 @@ import { ACCENT_COLORS, getAccentColorValue } from "@/lib/accent-colors";
 import { InitProfile } from "@/schemas/profile";
 import { USERNAME } from "@/schemas/_shared";
 import Stripe from 'stripe';
-import { withAuth } from "@/middleware/auth";
-import { logSecureError } from "@/lib/secure-db";
 
 const stripe = new Stripe(process.env.SECRET_STRIPE_KEY!, {
   apiVersion: '2025-08-27.basil',

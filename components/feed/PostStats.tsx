@@ -1,6 +1,5 @@
 "use client";
 
-import { usePostStats } from "@/hooks/usePostStats";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { OutlineEye, OutlineUser } from "../icons/Icons";
 import { useEffect, useState, useRef } from "react";

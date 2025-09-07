@@ -4,7 +4,7 @@ import { verifySupabaseJWT } from "@/lib/jwt-utils";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { username: string } }
+  { params }: { params: Promise<{ username: string }> }
 ) {
   try {
     // Get JWT token from Authorization header
@@ -21,7 +21,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { username } = params;
+    const { username } = await params;
 
     // Get follow stats for the specific user
     const followStats = await getFollowStats(username, jwtResult.userId);

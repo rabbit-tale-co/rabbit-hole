@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/middleware/auth";
 import { logSecureError } from "@/lib/secure-db";
-import { buildPublicUrl } from "@/lib/publicUrl";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
