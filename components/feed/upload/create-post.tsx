@@ -49,7 +49,7 @@ type Item = {
   width?: number;
   height?: number;
   size_bytes?: number;
-  mime?: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' | 'video/webm';
+  mime?: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' | 'video/webm' | 'video/mp4';
   // post meta
   isCover?: boolean;
   // server results
@@ -189,6 +189,22 @@ export function CreateMediaPost({
         const file = f.file as File;
         const isVideo = file.type?.startsWith('video/');
         const isGif = file.type === 'image/gif';
+
+        // Validate MIME type matches file extension to prevent manipulation
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        const expectedVideoExts = ['mp4', 'webm', 'mov', 'avi'];
+        const expectedImageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+        if (isVideo && fileExt && !expectedVideoExts.includes(fileExt)) {
+          console.warn('Video file with invalid extension rejected:', file.name, 'MIME:', file.type);
+          continue;
+        }
+
+        if (!isVideo && fileExt && !expectedImageExts.includes(fileExt)) {
+          console.warn('Image file with invalid extension rejected:', file.name, 'MIME:', file.type);
+          continue;
+        }
+
         const kind: Kind = isVideo ? 'video' : (isGif ? 'gif' : 'image');
 
         // enforce counts
@@ -328,7 +344,7 @@ export function CreateMediaPost({
 
     const MEDIA_API = process.env.NEXT_PUBLIC_BACKEND || process.env.NEXT_PUBLIC_MEDIA_API_URL || 'https://api.rabbittale.co';
 
-    // Direct upload for videos or payloads that may exceed serverless limits
+    // Direct upload for videos or large payloads that may exceed serverless limits
     if (it.kind === 'video' || blob.size > 4 * 1024 * 1024) {
       let serverMeta: Meta | null = null;
       await new Promise<void>(async (resolve, reject) => {

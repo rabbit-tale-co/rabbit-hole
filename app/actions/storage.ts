@@ -10,7 +10,7 @@ const FOLDER_POSTS = "posts";   // posts/<postUUID>/<imageUUID>.ext
 
 type PresignResp = { path: string; url: string; token: string; imageId: string };
 
-export async function presignPostImageUpload(postId: string, ext: "jpg" | "jpeg" | "png" | "webp", authorId: string): Promise<{ error?: string; data?: PresignResp }> {
+export async function presignPostImageUpload(postId: string, ext: "jpg" | "jpeg" | "png" | "webp" | "gif" | "mp4" | "webm", authorId: string): Promise<{ error?: string; data?: PresignResp }> {
   if (!postId || !authorId) return { error: "Missing ids" };
 
   // Log JWT usage for post image upload
