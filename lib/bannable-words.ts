@@ -1,11 +1,20 @@
-// Open source bannable words system
-// Uses community-maintained lists from GitHub
+// Enhanced bannable words system
+// Combines open source lists with Obscenity library for advanced detection
+
+import {
+  containsObscenity,
+  censorObscenity,
+  getObscenityConfigFromEnv,
+  type ObscenityConfig
+} from './obscenity-wrapper';
 
 export interface BannableWordsConfig {
   enabled: boolean;
   strictMode: boolean; // if true, blocks even partial matches
   customWords: string[];
   whitelist: string[]; // words that should never be blocked
+  useObscenity: boolean; // if true, uses Obscenity for enhanced detection
+  obscenityConfig?: ObscenityConfig; // Obscenity-specific configuration
 }
 
 // Default configuration
@@ -13,7 +22,9 @@ export const DEFAULT_CONFIG: BannableWordsConfig = {
   enabled: true,
   strictMode: false,
   customWords: [],
-  whitelist: []
+  whitelist: [],
+  useObscenity: true, // Enable Obscenity by default
+  obscenityConfig: getObscenityConfigFromEnv()
 };
 
 // Cache for bannable words lists
@@ -59,7 +70,12 @@ async function fetchBannableWords(): Promise<Set<string>> {
     // Fallback to local hardcoded list if fetch fails
     const fallbackWords = [
       'spam', 'scam', 'fake', 'hack', 'phish', 'malware', 'virus',
-      'bot', 'automated', 'script', 'exploit', 'breach', 'leak'
+      'bot', 'automated', 'script', 'exploit', 'breach', 'leak',
+      // Additional NSFW words for 16+ filtering
+      'adult film', 'adult films', 'fetish', 'fetishes', 'stripper', 'strippers',
+      'brothel', 'brothels', 'naked', 'nudity', 'nudist', 'nudism',
+      'pornstar', 'pornstars', 'escort', 'escorts', 'hooker', 'hookers',
+      'whore', 'whores', 'slut', 'sluts', 'slutty'
     ];
 
     fallbackWords.forEach(word => words.add(word));
@@ -76,24 +92,108 @@ async function fetchBannableWords(): Promise<Set<string>> {
 }
 
 /**
- * Checks if text contains bannable words
+ * Checks if text contains bannable words using both traditional and Obscenity detection
  */
 export async function containsBannableWords(
   text: string,
   config: BannableWordsConfig = DEFAULT_CONFIG
-): Promise<{ hasBannableWords: boolean; foundWords: string[] }> {
+): Promise<{ hasBannableWords: boolean; foundWords: string[]; detectionMethod?: string }> {
   if (!config.enabled || !text) {
     return { hasBannableWords: false, foundWords: [] };
   }
 
-  const bannableWords = await fetchBannableWords();
   const foundWords: string[] = [];
+  const detectionMethod = 'traditional';
+
+  // First, try Obscenity detection if enabled
+  if (config.useObscenity && config.obscenityConfig) {
+    try {
+      const obscenityResult = containsObscenity(text, config.obscenityConfig);
+      if (obscenityResult.hasObscenity) {
+        return {
+          hasBannableWords: true,
+          foundWords: obscenityResult.foundWords,
+          detectionMethod: 'obscenity'
+        };
+      }
+    } catch (error) {
+      console.warn('Obscenity detection failed, falling back to traditional method:', error);
+    }
+  }
+
+  // Fallback to traditional method
+  const bannableWords = await fetchBannableWords();
   const normalizedText = text.toLowerCase();
+
+  // Get age-appropriate words to allow
+  const ageAppropriateWords = (config.obscenityConfig?.ageRating === 'mature' || config.obscenityConfig?.ageRating === 'adult') ? [
+    'fuck', 'fucking', 'fucked', 'fucks',
+    'shit', 'shitting', 'shitted', 'shits', 'bullshit',
+    'damn', 'damned', 'damning',
+    'hell', 'hells',
+    'ass', 'asses', 'asshole', 'assholes',
+    'bitch', 'bitches', 'bitching',
+    'crap', 'craps', 'crappy',
+    'piss', 'pissing', 'pissed', 'pisses',
+    'dick', 'dicks', 'dickhead', 'dickheads',
+    'bastard', 'bastards',
+    'bloody', 'bloody hell',
+    // Add common variants
+    'f@ck', 'f@c', 'f0ck', 'f0c', 'fucc', 'fuc',
+    'sh1t', 'sh1', 'sh!t', 'sh!', 'shiit', 'shii',
+    'd@mn', 'd@m', 'd0mn', 'd0m',
+    'h3ll', 'h3l', 'he11', 'he1',
+    'a55', 'a5s', 'a$$', 'a$s',
+    'b1tch', 'b1t', 'b!tch', 'b!t',
+    'd1ck', 'd1c', 'd!ck', 'd!c',
+    // Add mature content for adult rating
+    ...(config.obscenityConfig?.ageRating === 'adult' ? [
+      'porn', 'pornography', 'xxx', 'sex', 'sexual',
+      'pussy', 'pussies', 'cock', 'cocks', 'penis', 'penises',
+      'vagina', 'vaginas', 'boob', 'boobs', 'breast', 'breasts', 'tits', 'titties',
+      'masturbation', 'orgasm', 'orgasms', 'cum', 'cums', 'cumming',
+      'erotic', 'erotica', 'fetish', 'fetishes', 'kinky', 'kink',
+      'bdsm', 'bondage', 'prostitution', 'escort', 'escorts', 'hooker', 'hookers',
+      'stripper', 'strippers', 'brothel', 'brothels', 'whore', 'whores', 'slut', 'sluts',
+      'nude', 'nudes', 'naked', 'nudity', 'nudist', 'nudism',
+      'pornstar', 'pornstars', 'adult film', 'adult films'
+    ] : [])
+  ] : [];
+
+  // Add false positive whitelist
+  const falsePositiveWhitelist = [
+    'arsenic', 'arsenical', 'arsenate', 'arsenite',
+    'class', 'classic', 'classical', 'classify', 'classification',
+    'glass', 'glasses', 'glassy',
+    'mass', 'massive', 'massacre', 'massage',
+    'pass', 'passage', 'passenger', 'passport',
+    'grass', 'grassy',
+    'brass', 'brassy',
+    'assassin', 'assassinate', 'assassination',
+    'assemble', 'assembly', 'assemblage',
+    'assess', 'assessment', 'assessor',
+    'assert', 'assertion', 'assertive',
+    'assign', 'assignment', 'assigned',
+    'assist', 'assistance', 'assistant',
+    'associate', 'association', 'associated',
+    'assume', 'assumption', 'assuming',
+    'assure', 'assurance', 'assured',
+    'assort', 'assorted', 'assortment',
+    'assume', 'assumption', 'assuming',
+    'assume', 'assumption', 'assuming'
+  ];
+
+  // Combine whitelist with age-appropriate words and false positive whitelist
+  const allowedWords = new Set([
+    ...config.whitelist,
+    ...ageAppropriateWords,
+    ...falsePositiveWhitelist
+  ]);
 
   // Check each bannable word
   for (const word of bannableWords) {
-    // Skip if word is in whitelist
-    if (config.whitelist.includes(word)) {
+    // Skip if word is in whitelist or age-appropriate
+    if (allowedWords.has(word)) {
       continue;
     }
 
@@ -116,7 +216,7 @@ export async function containsBannableWords(
   // Check custom words
   for (const word of config.customWords) {
     const normalizedWord = word.toLowerCase();
-    if (config.whitelist.includes(normalizedWord)) {
+    if (allowedWords.has(normalizedWord)) {
       continue;
     }
 
@@ -135,7 +235,8 @@ export async function containsBannableWords(
 
   return {
     hasBannableWords: foundWords.length > 0,
-    foundWords
+    foundWords,
+    detectionMethod
   };
 }
 
@@ -161,6 +262,7 @@ export async function validateText(
 
 /**
  * Sanitizes text by replacing bannable words with asterisks
+ * Uses Obscenity's advanced censoring if enabled
  */
 export async function sanitizeText(
   text: string,
@@ -170,6 +272,17 @@ export async function sanitizeText(
     return text;
   }
 
+  // Use Obscenity censoring if enabled
+  if (config.useObscenity && config.obscenityConfig) {
+    try {
+      const censoredText = censorObscenity(text, config.obscenityConfig);
+      return censoredText;
+    } catch (error) {
+      console.warn('Obscenity censoring failed, falling back to traditional method:', error);
+    }
+  }
+
+  // Fallback to traditional method
   const bannableWords = await fetchBannableWords();
   let sanitizedText = text;
 
@@ -204,6 +317,8 @@ export function getConfigFromEnv(): BannableWordsConfig {
     enabled: process.env.BANNABLE_WORDS_ENABLED !== 'false',
     strictMode: process.env.BANNABLE_WORDS_STRICT === 'true',
     customWords: process.env.BANNABLE_WORDS_CUSTOM?.split(',').map(w => w.trim()) || [],
-    whitelist: process.env.BANNABLE_WORDS_WHITELIST?.split(',').map(w => w.trim()) || []
+    whitelist: process.env.BANNABLE_WORDS_WHITELIST?.split(',').map(w => w.trim()) || [],
+    useObscenity: process.env.BANNABLE_WORDS_USE_OBSCENITY !== 'false', // Default to true
+    obscenityConfig: getObscenityConfigFromEnv()
   };
 }
