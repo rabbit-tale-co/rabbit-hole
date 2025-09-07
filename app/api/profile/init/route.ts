@@ -4,6 +4,7 @@ import { ACCENT_COLORS, getAccentColorValue } from "@/lib/accent-colors";
 import { InitProfile } from "@/schemas/profile";
 import { USERNAME } from "@/schemas/_shared";
 import { verifySupabaseJWT } from "@/lib/jwt-utils";
+import { checkBannableWordsInRequest } from "@/middleware/bannable-words";
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.SECRET_STRIPE_KEY!, {
@@ -132,6 +133,15 @@ export async function POST(req: NextRequest) {
     const json = await req.json().catch(() => ({}));
     const parsed = InitProfile.safeParse(json);
     if (!parsed.success) return Response.json({ error: "invalid payload" }, { status: 400 });
+
+    // 3. Check for bannable words
+    const bannableWordsCheck = await checkBannableWordsInRequest(req, ['username']);
+    if (!bannableWordsCheck.isValid) {
+      return Response.json({
+        error: bannableWordsCheck.error,
+        foundWords: bannableWordsCheck.foundWords
+      }, { status: 400 });
+    }
 
     const { username: desiredUsername } = parsed.data;
 
