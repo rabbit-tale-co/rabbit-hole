@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   });
   if (!parsed.success) return Response.json({ error: "bad cursor" }, { status: 400 });
 
-  const user = await getUser(req);
+  const user = await getUser();
   const { cursor, limit } = parsed.data;
 
   const userIdParam = searchParams.get("userId");
@@ -51,20 +51,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // verify Supabase session JWT from Authorization/Cookie
-  const auth = req.headers.get("authorization") || req.headers.get("Authorization");
-  const cookie = req.headers.get("cookie") || req.headers.get("Cookie");
-  let accessToken: string | null = null;
-  if (auth && auth.startsWith("Bearer ")) accessToken = auth.slice(7);
-  if (!accessToken && cookie) {
-    const match = /(?:^|; )sb-access-token=([^;]+)/.exec(cookie);
-    if (match) accessToken = decodeURIComponent(match[1]);
-  }
-  let user: { id: string } | null = null;
-  if (accessToken) {
-    const { data } = await supabaseAdmin.auth.getUser(accessToken);
-    if (data?.user) user = { id: data.user.id };
-  }
+  // verify Supabase session JWT from cookies
+  const user = await getUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
   const body = await req.json();

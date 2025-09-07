@@ -1,46 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { verifySupabaseJWT } from '@/lib/jwt-utils';
+import { createClient } from '@/lib/supabase-cookies';
 
 
 /**
  * Middleware to secure API endpoints
  * Checks JWT token and verifies it in the database
  */
-export async function validateAuthToken(request: NextRequest): Promise<{ userId: string; token: string } | null> {
+export async function validateAuthToken(): Promise<{ userId: string } | null> {
   try {
-    // Get token from Authorization header or cookies
-    const authHeader = request.headers.get('authorization');
-    let token: string | null = null;
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    } else {
-      const sessionCookie = await supabaseAdmin.auth.getSession().then(({ data }) =>
-        data.session?.access_token);
-      if (sessionCookie) {
-        token = sessionCookie;
-      }
-    }
-
-    if (!token) {
+    if (error || !user) {
       return null;
     }
-
-    // 1. Verify JWT token using JWKS endpoint
-    const jwtResult = await verifySupabaseJWT(token);
-    if (!jwtResult) {
-      return null;
-    }
-
-    const userId = jwtResult.userId;
 
     // 2. Check if token is assigned to user in the database
     const { data: profile, error: profileError } = await supabaseAdmin
       .schema('social_art')
       .from('profiles')
       .select('user_id')
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .single();
 
     if (profileError || !profile) {
@@ -51,7 +32,7 @@ export async function validateAuthToken(request: NextRequest): Promise<{ userId:
     // 3. Supabase Auth handles session management automatically
     // No need to manually create or update sessions
 
-    return { userId, token };
+    return { userId: user.id };
   } catch (error) {
     console.error('Auth validation error:', error);
     return null;
@@ -62,9 +43,9 @@ export async function validateAuthToken(request: NextRequest): Promise<{ userId:
  * Middleware wrapper for API routes
  * Automatically checks authentication and adds userId to request
  */
-export function withAuth(handler: (request: NextRequest, context: { userId: string; token: string }) => Promise<NextResponse>) {
+export function withAuth(handler: (request: NextRequest, context: { userId: string }) => Promise<NextResponse>) {
   return async (request: NextRequest): Promise<NextResponse> => {
-    const authResult = await validateAuthToken(request);
+    const authResult = await validateAuthToken();
 
     if (!authResult) {
       return NextResponse.json(
@@ -74,7 +55,7 @@ export function withAuth(handler: (request: NextRequest, context: { userId: stri
     }
 
     try {
-      return await handler(request, { userId: authResult.userId, token: authResult.token });
+      return await handler(request, { userId: authResult.userId });
     } catch (error) {
       console.error('API handler error:', error);
       return NextResponse.json(
@@ -88,8 +69,8 @@ export function withAuth(handler: (request: NextRequest, context: { userId: stri
 /**
  * Middleware to check admin privileges
  */
-export async function validateAdminAuth(request: NextRequest): Promise<{ userId: string } | null> {
-  const authResult = await validateAuthToken(request);
+export async function validateAdminAuth(): Promise<{ userId: string } | null> {
+  const authResult = await validateAuthToken();
   if (!authResult) return null;
 
   try {
@@ -118,7 +99,7 @@ export async function validateAdminAuth(request: NextRequest): Promise<{ userId:
  */
 export function withAdminAuth(handler: (request: NextRequest, context: { userId: string }) => Promise<NextResponse>) {
   return async (request: NextRequest): Promise<NextResponse> => {
-    const authResult = await validateAdminAuth(request);
+    const authResult = await validateAdminAuth();
 
     if (!authResult) {
       return NextResponse.json(

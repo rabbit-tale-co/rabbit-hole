@@ -129,18 +129,13 @@ export function Profile({ user }: ProfileProps) {
 
       console.log('About to call upsertProfile with payload:', payload);
 
-      // Get JWT token
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      console.log('JWT token obtained:', token ? 'YES' : 'NO');
-
       // Show loading toast
       toast.loading('Updating profile...', { id: 'profile-update' });
 
       try {
         console.log('Calling upsertProfile...');
 
-        const result = await upsertProfile(payload, token);
+        const result = await upsertProfile(payload);
 
         console.log('upsertProfile completed, result:', result);
         console.log('Result type:', typeof result);

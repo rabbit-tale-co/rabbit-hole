@@ -1,36 +1,26 @@
-import { NextRequest } from 'next/server';
 import { supabaseAdmin } from './supabase-admin';
-import { verifySupabaseJWT } from '@/lib/jwt-utils';
+import { createClient } from './supabase-cookies';
 
 
 /**
  * Safe getting user ID from request
- * Checks JWT token and verifies it in the database
+ * Checks JWT token from cookies and verifies it in the database
  */
-export async function getUserIdOrThrow(request: NextRequest): Promise<string> {
+export async function getUserIdOrThrow(): Promise<string> {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new Error('Missing or invalid authorization header');
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) {
+      throw new Error('Authentication required');
     }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    // 1. Verify JWT token using JWKS endpoint
-    const jwtResult = await verifySupabaseJWT(token);
-    if (!jwtResult) {
-      throw new Error('Invalid or expired token');
-    }
-
-    const userId = jwtResult.userId;
 
     // 2. Check if token is assigned to user in the database
     const { data: profile, error: profileError } = await supabaseAdmin
       .schema('social_art')
       .from('profiles')
       .select('user_id')
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .single();
 
     if (profileError || !profile) {
@@ -38,7 +28,7 @@ export async function getUserIdOrThrow(request: NextRequest): Promise<string> {
       throw new Error('User not found in database');
     }
 
-    return userId;
+    return user.id;
   } catch (error) {
     console.error('Auth error:', error);
     throw new Error('Authentication required');
@@ -49,28 +39,21 @@ export async function getUserIdOrThrow(request: NextRequest): Promise<string> {
  * Safe getting user ID from cookies
  * Checks JWT token from cookies and verifies it in the database
  */
-export async function getUserIdFromCookies(request: NextRequest): Promise<string> {
+export async function getUserIdFromCookies(): Promise<string> {
   try {
-    // Get the session from cookies
-    const sessionCookie = request.cookies.get('sb-access-token')?.value;
-    if (!sessionCookie) {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) {
       throw new Error('No session found in cookies');
     }
-
-    // 1. Verify JWT token using JWKS endpoint
-    const jwtResult = await verifySupabaseJWT(sessionCookie);
-    if (!jwtResult) {
-      throw new Error('Invalid or expired session');
-    }
-
-    const userId = jwtResult.userId;
 
     // 2. Check if token is assigned to user in the database
     const { data: profile, error: profileError } = await supabaseAdmin
       .schema('social_art')
       .from('profiles')
       .select('user_id')
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .single();
 
     if (profileError || !profile) {
@@ -78,7 +61,7 @@ export async function getUserIdFromCookies(request: NextRequest): Promise<string
       throw new Error('User not found in database');
     }
 
-    return userId;
+    return user.id;
   } catch (error) {
     console.error('Cookie auth error:', error);
     throw new Error('Authentication required');

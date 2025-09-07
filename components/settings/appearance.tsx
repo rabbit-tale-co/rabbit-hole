@@ -47,7 +47,6 @@ export function Appearance() {
       if (!profile) throw new Error('No profile loaded')
       const hex = getAccentColorValue(colorToUse, 500)
       const res = await upsertProfile({
-        user_id: (profile.user_id as unknown) as import("@/types/db").UUID,
         username: profile.username,
         display_name: profile.display_name,
         accent_color: hex,

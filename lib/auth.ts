@@ -1,41 +1,21 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { verifySupabaseJWT } from "@/lib/jwt-utils";
+import { createClient } from "@/lib/supabase-cookies";
 
-function parseCookie(header: string | null, name: string): string | null {
-  if (!header) return null;
-  const parts = header.split(/;\s*/);
-  for (const part of parts) {
-    const [k, v] = part.split("=");
-    if (decodeURIComponent(k) === name) return decodeURIComponent(v ?? "");
-  }
-  return null;
-}
-
-function getBearer(req: Request): string | null {
-  const auth = req.headers.get("authorization") || req.headers.get("Authorization");
-  if (auth && auth.startsWith("Bearer ")) return auth.slice(7);
-  const cookieHeader = req.headers.get("cookie") || req.headers.get("Cookie");
-  // common supabase helpers cookie name
-  const token = parseCookie(cookieHeader, "sb-access-token");
-  return token || null;
-}
-
-export async function getUser(req: Request): Promise<{ id: string } | null> {
-  const token = getBearer(req);
-  // console.log(`[AUTH] Token found: ${token ? 'YES' : 'NO'}`);
-  if (!token) return null;
-
+export async function getUser(): Promise<{ id: string } | null> {
   try {
-    const jwtResult = await verifySupabaseJWT(token);
-    if (!jwtResult) return null;
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-    const userId = jwtResult.userId;
+    if (error || !user) {
+      console.log(`[AUTH] Authentication failed:`, error?.message || 'No user');
+      return null;
+    }
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .schema('social_art')
       .from('profiles')
       .select('user_id')
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .single();
 
     if (profileError || !profile) {
@@ -43,7 +23,7 @@ export async function getUser(req: Request): Promise<{ id: string } | null> {
       return null;
     }
 
-    return { id: userId };
+    return { id: user.id };
   } catch (error) {
     console.error('Auth error:', error);
     return null;
@@ -54,6 +34,8 @@ export async function getUserFromToken(token: string | null | undefined): Promis
   if (!token) return null;
 
   try {
+    // For backward compatibility, we'll use the old JWT verification
+    const { verifySupabaseJWT } = await import("@/lib/jwt-utils");
     const jwtResult = await verifySupabaseJWT(token);
     if (!jwtResult) return null;
 

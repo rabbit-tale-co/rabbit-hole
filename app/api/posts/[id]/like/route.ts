@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-// no direct helpers used here, manual token read
+import { getUser } from "@/lib/auth";
 
 const Id = z.uuid();
 
@@ -22,19 +22,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   const parsed = Id.safeParse(id);
   if (!parsed.success) return Response.json({ error: "bad id" }, { status: 400 });
 
-  const auth = req.headers.get("authorization") || req.headers.get("Authorization");
-  const cookie = req.headers.get("cookie") || req.headers.get("Cookie");
-  let accessToken: string | null = null;
-  if (auth && auth.startsWith("Bearer ")) accessToken = auth.slice(7);
-  if (!accessToken && cookie) {
-    const match = /(?:^|; )sb-access-token=([^;]+)/.exec(cookie);
-    if (match) accessToken = decodeURIComponent(match[1]);
-  }
-  let user: { id: string } | null = null;
-  if (accessToken) {
-    const { data } = await supabaseAdmin.auth.getUser(accessToken);
-    if (data?.user) user = { id: data.user.id };
-  }
+  const user = await getUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
   // toggle like
@@ -49,4 +37,3 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     return Response.json({ liked: true });
   }
 }
-// removed placeholder handlers

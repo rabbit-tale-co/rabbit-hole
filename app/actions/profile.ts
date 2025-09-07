@@ -1,12 +1,13 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { createClient } from "@/lib/supabase-cookies";
 import { UpsertProfileClient } from "@/schemas/profile";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 // import { getBatchFollowStats } from "./follow"; // No longer needed - follow stats loaded on hover
 
-export async function upsertProfile(input: unknown, token?: string) {
+export async function upsertProfile(input: unknown) {
   const callId = Math.random().toString(36).substring(7);
   console.log(`[${callId}] upsertProfile called at ${new Date().toISOString()}`);
 
@@ -14,55 +15,24 @@ export async function upsertProfile(input: unknown, token?: string) {
   const parsed = UpsertProfileClient.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
 
-  // Verify user authentication and get user_id from JWT
-  console.log(`[${callId}] Starting JWT verification...`);
+  // Verify user authentication using Supabase SSR client with cookies
+  console.log(`[${callId}] Starting authentication verification...`);
   let userId: string;
 
-  if (token) {
-    // Use JWT token for verification
     try {
-      const { verifySupabaseJWT } = await import("@/lib/jwt-utils");
-      const jwtResult = await verifySupabaseJWT(token);
-      console.log(`[${callId}] JWT verification result:`, jwtResult);
+      const supabase = await createClient();
+      const { data: { user }, error } = await supabase.auth.getUser();
 
-      if (!jwtResult) {
-        console.log(`[${callId}] JWT verification failed`);
-        return { error: "Unauthorized" };
-      }
-
-      userId = jwtResult.userId;
-
-      // Log JWT usage for profile update
-      console.log(`[${callId}] [JWT] Profile update (token auth): ${userId}`);
-    } catch (error) {
-      console.error(`[${callId}] [JWT] Token verification error:`, error);
+    if (error || !user) {
+      console.log(`[${callId}] Authentication failed:`, error?.message || 'No user');
       return { error: "Unauthorized" };
     }
-  } else {
-    // Fallback to server/client auth
-    console.log(`[${callId}] No token provided, trying server auth...`);
-    const { data: auth } = await supabaseAdmin.auth.getUser();
-    if (!auth.user?.id) {
-      // Fallback to client-side authentication
-      try {
-        const { supabase } = await import("@/lib/supabase");
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user?.id) return { error: "Unauthorized" };
 
-        userId = user.id;
-
-        // Log JWT usage for profile update
-        console.log(`[${callId}] [JWT] Profile update (client auth): ${userId}`);
-      } catch (error) {
-        console.error(`[${callId}] [JWT] Profile update auth error:`, error);
-        return { error: "Unauthorized" };
-      }
-    } else {
-      userId = auth.user.id;
-
-      // Log JWT usage for profile update
-      console.log(`[${callId}] [JWT] Profile update (server auth): ${userId}`);
-    }
+    userId = user.id;
+    console.log(`[${callId}] [AUTH] Profile update (cookie auth): ${userId}`);
+  } catch (error) {
+    console.error(`[${callId}] [AUTH] Authentication error:`, error);
+    return { error: "Unauthorized" };
   }
 
   // find old username to revalidate old path if it changes
@@ -98,11 +68,10 @@ export async function upsertProfile(input: unknown, token?: string) {
     if (oldUsername && oldUsername !== data?.username) {
       revalidatePath(`/user/${oldUsername}`);
     }
-    // Don't revalidate main page to avoid infinite loops
-    // revalidatePath("/");
-    // revalidate api endpoint used by client hooks
-    // if (data?.username) revalidatePath(`/api/users/${data.username}`);
-    // if (oldUsername && oldUsername !== data?.username) revalidatePath(`/api/users/${oldUsername}`);
+    // Revalidate main page to show updated profile data
+    revalidatePath("/");
+    // Revalidate explore page
+    revalidatePath("/explore");
   } catch {}
   return { profile: data };
 }

@@ -1,30 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { trackPostView } from "@/app/actions/posts";
-import { verifySupabaseJWT } from "@/lib/jwt-utils";
+import { getUser } from "@/lib/auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Get JWT token from Authorization header
-    const authHeader = request.headers.get("authorization");
-    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify JWT token
-    const jwtResult = await verifySupabaseJWT(token);
-    if (!jwtResult) {
+    const user = await getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: postId } = await params;
 
     // Track the post view
-    const result = await trackPostView(postId, jwtResult.userId);
+    const result = await trackPostView(postId, user.id);
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: 500 });

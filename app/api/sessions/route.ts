@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/middleware/auth";
 import { getUserSessions, revokeUserSession, revokeAllOtherSessions, updateSessionActivity } from "@/lib/session-management";
 import { logSecureError } from "@/lib/secure-db";
+import { createClient } from "@/lib/supabase-cookies";
 
 /**
  * GET /api/sessions - Get all active user sessions
  */
-export const GET = withAuth(async (request: NextRequest, { userId, token }) => {
+export const GET = withAuth(async (request: NextRequest, { userId }) => {
   try {
     // Update current session activity
     await updateSessionActivity();
@@ -15,7 +16,7 @@ export const GET = withAuth(async (request: NextRequest, { userId, token }) => {
     const sessions = await getUserSessions(userId);
 
     // Get current session ID from JWT token
-    const currentSessionId = getCurrentSessionIdFromToken(token);
+    const currentSessionId = await getCurrentSessionIdFromToken();
 
     // Mark current session
     const sessionsWithCurrent = sessions.map(session => ({
@@ -36,14 +37,14 @@ export const GET = withAuth(async (request: NextRequest, { userId, token }) => {
 /**
  * DELETE /api/sessions - Revoke user session
  */
-export const DELETE = withAuth(async (request: NextRequest, { userId, token }) => {
+export const DELETE = withAuth(async (request: NextRequest, { userId }) => {
   try {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');
     const revokeAll = searchParams.get('revokeAll') === 'true';
 
     // Get current session ID from JWT token
-    const currentSessionId = getCurrentSessionIdFromToken(token);
+    const currentSessionId = await getCurrentSessionIdFromToken();
 
     if (revokeAll) {
       // Revoke all sessions except the current one
@@ -90,10 +91,18 @@ export const DELETE = withAuth(async (request: NextRequest, { userId, token }) =
 /**
  * Get current session ID from JWT token
  */
-function getCurrentSessionIdFromToken(token: string): string {
+async function getCurrentSessionIdFromToken(): Promise<string> {
   try {
+    const supabase = await createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      console.log('No access token found in session');
+      return '';
+    }
+
     // Decode JWT token to get session_id claim
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+    const payload = JSON.parse(Buffer.from(session.access_token.split('.')[1], 'base64').toString());
     console.log('JWT payload:', payload);
     return payload.session_id || payload.jti || '';
   } catch (error) {
