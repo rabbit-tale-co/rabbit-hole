@@ -7,7 +7,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user
-    const userId = await getUserIdOrThrow(request);
+    const userId = await getUserIdOrThrow();
 
     // Parse request body
     const body = await request.json();

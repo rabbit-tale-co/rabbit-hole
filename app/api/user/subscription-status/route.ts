@@ -190,10 +190,10 @@ export async function GET(request: NextRequest) {
 }
 
 // POST endpoint to force refresh subscription status
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // Get current user from session
-    const user = await getUser(request);
+    const user = await getUser();
     if (!user) {
       return NextResponse.json(
         { error: 'Authentication required' },

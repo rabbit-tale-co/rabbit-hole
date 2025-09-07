@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 export async function GET(request: NextRequest) {
   try {
     // Get authenticated user
-    const userId = await getUserIdOrThrow(request);
+    const userId = await getUserIdOrThrow();
 
     // Get user's premium status
     const { data: profile, error: profileError } = await supabaseAdmin
