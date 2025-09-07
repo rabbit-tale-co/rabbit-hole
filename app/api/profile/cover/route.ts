@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/middleware/auth";
 import { logSecureError } from "@/lib/secure-db";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,29 @@ export const POST = withAuth(async (req: NextRequest, { userId: authenticatedUse
 
     console.log("[cover] request: userId=%s name=%s type=%s size=%d crop=%d,%d %dx%d", authenticatedUserId, (file as File).name, (file as File).type, (file as File).size, cropX, cropY, cropW, cropH);
     if (!(file instanceof File)) return NextResponse.json({ error: "No file" }, { status: 400 });
+
+    // Check if file is GIF and validate premium status
+    const isGif = (file.type || "").toLowerCase() === "image/gif" ||
+                  (file.name || "").toLowerCase().endsWith(".gif");
+
+    if (isGif) {
+      // Check if user has premium status
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .select("is_premium")
+        .eq("user_id", authenticatedUserId)
+        .single();
+
+      if (profileError) {
+        logSecureError('cover_premium_check_error', profileError, authenticatedUserId);
+        return NextResponse.json({ error: "Failed to verify premium status" }, { status: 500 });
+      }
+
+      if (!profile?.is_premium) {
+        logSecureError('cover_gif_unauthorized', new Error('Non-premium user tried to upload GIF cover'), authenticatedUserId);
+        return NextResponse.json({ error: "GIF covers are available only for Golden Carrot subscribers" }, { status: 403 });
+      }
+    }
 
     // Forward request to external API for processing
     const externalFormData = new FormData();
