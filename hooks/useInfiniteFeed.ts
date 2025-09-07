@@ -178,7 +178,7 @@ export function useInfiniteFeed(
         }
       }, 100);
     }
-  }, [cursor, loadMore]); // Remove loadMore from dependencies
+  }, [cursor, loadMore]);
 
   useEffect(() => {
     setPages(initial ? [initial] : []);

@@ -1,41 +1,68 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { UpsertProfile } from "@/schemas/profile";
+import { UpsertProfileClient } from "@/schemas/profile";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getBatchFollowStats } from "./follow";
 
-export async function upsertProfile(input: unknown) {
+export async function upsertProfile(input: unknown, token?: string) {
   const callId = Math.random().toString(36).substring(7);
   console.log(`[${callId}] upsertProfile called at ${new Date().toISOString()}`);
-  const parsed = UpsertProfile.safeParse(input);
+
+  // Parse client input (without user_id)
+  const parsed = UpsertProfileClient.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
 
-  // Verify user authentication
-  const { data: auth } = await supabaseAdmin.auth.getUser();
-  if (!auth.user?.id) {
-    // Fallback to client-side authentication
-    try {
-      const { supabase } = await import("@/lib/supabase");
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) return { error: "Unauthorized" };
+  // Verify user authentication and get user_id from JWT
+  console.log(`[${callId}] Starting JWT verification...`);
+  let userId: string;
 
-      // Verify user can only update their own profile
-      if (user.id !== parsed.data.user_id) return { error: "Forbidden" };
+  if (token) {
+    // Use JWT token for verification
+    try {
+      const { verifySupabaseJWT } = await import("@/lib/jwt-utils");
+      const jwtResult = await verifySupabaseJWT(token);
+      console.log(`[${callId}] JWT verification result:`, jwtResult);
+
+      if (!jwtResult) {
+        console.log(`[${callId}] JWT verification failed`);
+        return { error: "Unauthorized" };
+      }
+
+      userId = jwtResult.userId;
 
       // Log JWT usage for profile update
-      console.log(`[JWT] Profile update (client auth): ${user.id}`);
+      console.log(`[${callId}] [JWT] Profile update (token auth): ${userId}`);
     } catch (error) {
-      console.error('[JWT] Profile update auth error:', error);
+      console.error(`[${callId}] [JWT] Token verification error:`, error);
       return { error: "Unauthorized" };
     }
   } else {
-    // Verify user can only update their own profile
-    if (auth.user.id !== parsed.data.user_id) return { error: "Forbidden" };
+    // Fallback to server/client auth
+    console.log(`[${callId}] No token provided, trying server auth...`);
+    const { data: auth } = await supabaseAdmin.auth.getUser();
+    if (!auth.user?.id) {
+      // Fallback to client-side authentication
+      try {
+        const { supabase } = await import("@/lib/supabase");
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) return { error: "Unauthorized" };
 
-    // Log JWT usage for profile update
-    console.log(`[JWT] Profile update (server auth): ${auth.user.id}`);
+        userId = user.id;
+
+        // Log JWT usage for profile update
+        console.log(`[${callId}] [JWT] Profile update (client auth): ${userId}`);
+      } catch (error) {
+        console.error(`[${callId}] [JWT] Profile update auth error:`, error);
+        return { error: "Unauthorized" };
+      }
+    } else {
+      userId = auth.user.id;
+
+      // Log JWT usage for profile update
+      console.log(`[${callId}] [JWT] Profile update (server auth): ${userId}`);
+    }
   }
 
   // find old username to revalidate old path if it changes
@@ -44,7 +71,7 @@ export async function upsertProfile(input: unknown) {
     const { data: existing } = await supabaseAdmin
       .from("profiles")
       .select("username")
-      .eq("user_id", parsed.data.user_id)
+      .eq("user_id", userId)
       .maybeSingle();
     oldUsername = (existing?.username as string | undefined) ?? null;
   }
@@ -52,7 +79,7 @@ export async function upsertProfile(input: unknown) {
     .from("profiles")
     .upsert(
       {
-        user_id: parsed.data.user_id,
+        user_id: userId,
         username: parsed.data.username,
         display_name: parsed.data.display_name,
         bio: parsed.data.bio ?? null,
@@ -71,10 +98,11 @@ export async function upsertProfile(input: unknown) {
     if (oldUsername && oldUsername !== data?.username) {
       revalidatePath(`/user/${oldUsername}`);
     }
-    revalidatePath("/");
+    // Don't revalidate main page to avoid infinite loops
+    // revalidatePath("/");
     // revalidate api endpoint used by client hooks
-    if (data?.username) revalidatePath(`/api/users/${data.username}`);
-    if (oldUsername && oldUsername !== data?.username) revalidatePath(`/api/users/${oldUsername}`);
+    // if (data?.username) revalidatePath(`/api/users/${data.username}`);
+    // if (oldUsername && oldUsername !== data?.username) revalidatePath(`/api/users/${oldUsername}`);
   } catch {}
   return { profile: data };
 }

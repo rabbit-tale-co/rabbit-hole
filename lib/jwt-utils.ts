@@ -42,8 +42,14 @@ export async function verifySupabaseJWT(token: string): Promise<{ userId: string
 
     console.log('JWT Algorithm:', header.alg);
 
+    // Use 'sub' from JWT payload as userId (more secure)
+    // 'sub' is the subject identifier in JWT standard
+    const userId = payload.sub || user.id;
+
+    console.log('JWT verification - user.id:', user.id, 'payload.sub:', payload.sub, 'using userId:', userId);
+
     return {
-      userId: user.id,
+      userId: userId,
       claims: payload as SupabaseJWTPayload
     };
   } catch (error) {

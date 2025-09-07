@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator"
 
 import { useAuth } from "@/providers/AuthProvider"
 import { upsertProfile, deleteAccount } from "@/app/actions/profile"
-import type { UpsertProfileDTO } from "@/types/profile"
+// import type { UpsertProfileDTO } from "@/types/profile" // No longer needed
 import { z } from "zod"
 import { toast } from "sonner"
 import Image from "next/image"
@@ -108,8 +108,7 @@ export function Profile({ user }: ProfileProps) {
       console.log('Validation successful:', validatedData);
 
       // Create a promise for the profile update via server action
-      const payload: UpsertProfileDTO = {
-        user_id: user?.id as unknown as import("@/types/db").UUID,
+      const payload = {
         username: validatedData.username.toLowerCase(),
         display_name: validatedData.displayName,
         bio: formData.bio || null,
@@ -203,7 +202,7 @@ export function Profile({ user }: ProfileProps) {
       }
       console.error('Error updating profile:', error)
     }
-  }, [formData, markAsSaved, user?.id, user?.email, checkForChanges])
+  }, [formData, markAsSaved, user?.email, checkForChanges])
 
   // Register save function with context so toast can call it
   React.useEffect(() => {

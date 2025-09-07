@@ -23,6 +23,15 @@ export const UpsertProfile = z.object({
   accent_color: HEX6.nullable().optional(),
 });
 
+// Client-side schema without user_id (more secure)
+export const UpsertProfileClient = z.object({
+  username: USERNAME,
+  display_name: z.string().min(1).max(50),
+  bio: z.string().max(500).nullable().optional(),
+  cover_url: z.url().nullable().optional(),
+  accent_color: HEX6.nullable().optional(),
+});
+
 export const InitProfile = z.object({
   user_id: UUID,
   username: USERNAME.optional(),
