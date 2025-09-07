@@ -9,7 +9,7 @@ import { logSecureError } from "@/lib/secure-db";
 export const GET = withAuth(async (request: NextRequest, { userId, token }) => {
   try {
     // Update current session activity
-    await updateSessionActivity(userId, token);
+    await updateSessionActivity();
 
     // Get all user sessions
     const sessions = await getUserSessions(userId);

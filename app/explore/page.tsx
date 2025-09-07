@@ -12,8 +12,8 @@ import UsersGrid from "@/components/users/Grid";
 import { getUsersPage } from "@/app/actions/profile";
 
 export default async function ExplorePage() {
-  // Fetch initial data server-side with a larger batch
-  const initialData = await getUsersPage({ limit: 60 });
+  // Fetch initial data server-side
+  const initialData = await getUsersPage({ limit: 20 });
 
   if ("error" in initialData) {
     return (

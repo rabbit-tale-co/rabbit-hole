@@ -82,3 +82,12 @@ export type UserSessionRow = {
   is_active: boolean;
   expires_at: ISODate;
 };
+
+export type PostsStatsRow = {
+  post_id: UUID;
+  views_total: number;
+  unique_viewers: number;
+  last_view_at: ISODate | null;
+  created_at: ISODate;
+  updated_at: ISODate;
+};

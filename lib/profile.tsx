@@ -45,7 +45,7 @@ export const renderBioContent = (bio: string): React.ReactNode[] => {
     const chunkPieces = part.split(URL_RX);
     for (const piece of chunkPieces) {
       if (!piece) continue;
-      if (URL_RX.test(piece)) {
+      if (/(https?:\/\/[^\s<]+|www\.[^\s<]+)/.test(piece)) {
         const url = piece.startsWith("http") ? piece : `https://${piece}`;
         out.push(
           <React.Fragment key={k++}>

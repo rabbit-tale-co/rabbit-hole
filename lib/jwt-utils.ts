@@ -37,10 +37,10 @@ export async function verifySupabaseJWT(token: string): Promise<{ userId: string
       return null;
     }
 
-    const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
+    // const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
     const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
 
-    console.log('JWT Algorithm:', header.alg);
+    // console.log('JWT Algorithm:', header.alg);
 
     // Use 'sub' from JWT payload as userId (more secure)
     // 'sub' is the subject identifier in JWT standard

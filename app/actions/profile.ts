@@ -167,7 +167,7 @@ export async function deleteAccount(userId: string) {
 }
 
 export async function getUsersPage(input: unknown) {
-  const parsed = z.object({ cursor: z.string().optional(), limit: z.number().int().min(1).max(60).default(24) }).safeParse(input);
+  const parsed = z.object({ cursor: z.string().optional(), limit: z.number().int().min(1).max(24).default(24) }).safeParse(input);
   if (!parsed.success) return { error: "Invalid cursor" };
 
   const sb = supabaseAdmin;
@@ -210,13 +210,60 @@ export async function getUsersPage(input: unknown) {
     }
   }
 
+  // Fetch follow stats for all users (counts only, no current user follow status)
+  const followStatsMap = new Map<string, { isFollowing: boolean; followers: number; following: number }>();
+  if (ids.length > 0) {
+    try {
+      // Get follower counts for all users
+      const { data: followerCounts } = await sb
+        .schema('social_art')
+        .from('follows')
+        .select('following_id, follower_id')
+        .in('following_id', ids);
+
+      // Get following counts for all users
+      const { data: followingCounts } = await sb
+        .schema('social_art')
+        .from('follows')
+        .select('follower_id, following_id')
+        .in('follower_id', ids);
+
+      // Count followers and following for each user
+      const followerCount = new Map<string, number>();
+      const followingCount = new Map<string, number>();
+
+      (followerCounts || []).forEach(follow => {
+        const count = followerCount.get(follow.following_id) || 0;
+        followerCount.set(follow.following_id, count + 1);
+      });
+
+      (followingCounts || []).forEach(follow => {
+        const count = followingCount.get(follow.follower_id) || 0;
+        followingCount.set(follow.follower_id, count + 1);
+      });
+
+      // Build follow stats map (isFollowing will be set to false, will be updated client-side)
+      ids.forEach(userId => {
+        followStatsMap.set(userId, {
+          isFollowing: false, // Will be updated client-side
+          followers: followerCount.get(userId) || 0,
+          following: followingCount.get(userId) || 0
+        });
+      });
+    } catch (error) {
+      console.error('Error fetching follow stats:', error);
+      // If follow stats fail, continue without them
+    }
+  }
+
   const nextCursor = data && data.length
     ? Buffer.from(`${data[data.length - 1].username}|${data[data.length - 1].user_id}`).toString("base64")
     : null;
 
   const items = (data ?? []).map(r => ({
     ...r,
-    banned_until: suspMap.get(r.user_id) ?? null
+    banned_until: suspMap.get(r.user_id) ?? null,
+    followStats: followStatsMap.get(r.user_id) || { isFollowing: false, followers: 0, following: 0 }
   }));
   return { items, nextCursor };
 }

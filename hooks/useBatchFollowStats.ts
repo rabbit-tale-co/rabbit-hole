@@ -23,7 +23,14 @@ export function useBatchFollowStats(userId: string) {
   const requestTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchStats = useCallback(async () => {
-    if (!user || followStats || loading || pendingRequests.has(userId)) return;
+    if (followStats || loading || pendingRequests.has(userId)) return;
+
+    // If no user is logged in, set default stats and return
+    if (!user) {
+      const defaultStats: FollowStats = { isFollowing: false, followers: 0, following: 0 };
+      setFollowStats(defaultStats);
+      return;
+    }
 
     // Add to pending requests
     pendingRequests.add(userId);
@@ -104,6 +111,11 @@ export function useBatchFollowStats(userId: string) {
     }, 100);
 
   }, [userId, user, followStats, loading]);
+
+  // Auto-fetch stats when component mounts
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

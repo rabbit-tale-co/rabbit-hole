@@ -51,11 +51,11 @@ export function useFollowLazy(targetUserId?: string | null, enabled = false) {
   }, [targetUserId, user?.id, enabled, loaded]);
 
   const handleToggleFollow = useCallback(() => {
-    if (!targetUserId || !canFollow || isPending) return;
+    if (!targetUserId || !canFollow || isPending || !user?.id) return;
 
     startTransition(async () => {
       try {
-        const result = await toggleFollow(targetUserId, user?.id);
+        const result = await toggleFollow(targetUserId, user.id);
         if (result.ok) {
           setIsFollowing(result.isFollowing);
           setFollowers(result.followers);

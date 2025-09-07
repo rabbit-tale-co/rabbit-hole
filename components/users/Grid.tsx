@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
 import { buildPublicUrl } from "@/lib/publicUrl";
 import { useInfiniteUsers, UserListItem } from "@/hooks/useInfiniteUsers";
@@ -15,8 +14,10 @@ import {
 import { renderBioContent } from "@/lib/profile";
 import { SolidCarrot } from "../icons/Icons";
 import { useFollow } from "@/hooks/useFollow";
-import { useBatchFollowStats } from "@/hooks/useBatchFollowStats";
+import { useGlobalFollowStats } from "@/hooks/useGlobalFollowStats";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/providers/AuthProvider";
 
 /** Minimal card with bg-white, ring-1, rounded, no shadows. */
 function UserCard({ user: u }: {
@@ -33,124 +34,138 @@ function UserCard({ user: u }: {
   const avatarAccentHex =
     u.accent_color || getAccentColorValue(generateAccentColor(u.username), 500);
   const isSuspended = Boolean(u.banned_until && Date.parse(u.banned_until) > Date.now());
+  const { user } = useAuth();
+  const isOwnProfile = user?.id === u.user_id;
 
-  // Use batch loading for follow stats
-  const { followStats, loading: followStatsLoading, fetchStats } = useBatchFollowStats(u.user_id);
+  // Use follow stats from the user data (counts) and update follow status client-side
+  const { followStats: clientFollowStats, loading: followStatsLoading } = useGlobalFollowStats(u.user_id);
+  const serverFollowStats = u.followStats;
+
+  // Merge server stats (counts) with client stats (follow status)
+  const followStats = serverFollowStats ? {
+    ...serverFollowStats,
+    isFollowing: clientFollowStats?.isFollowing ?? serverFollowStats.isFollowing
+  } : clientFollowStats;
+
   const { loading: followLoading, toggleFollow } = useFollow(u.user_id, followStats || { isFollowing: false, followers: 0, following: 0 });
 
+  const router = useRouter();
+
+  const handleCardClick = () => {
+    router.push(`/user/${u.username}`);
+  };
+
   return (
-    <Link href={`/user/${u.username}`}>
-      <article
-        className="group h-[280px] sm:h-[300px] lg:h-[320px] ring-1 ring-border flex flex-col rounded-2xl bg-white hover:bg-neutral-50 transition-colors duration-150"
-        data-user-id={u.user_id}
-        onMouseEnter={fetchStats}
-      >
-        {/* cover: fixed height */}
-        <div className="relative h-24 sm:h-30 w-full overflow-hidden rounded-t-2xl">
-          {u.banned_until && Date.parse(u.banned_until) > Date.now() && (
-            <div className="absolute inset-0 z-10 flex items-start justify-end p-2">
-              <span className="rounded-full bg-red-600/90 text-white text-[10px] px-2 py-1">Suspended</span>
-            </div>
-          )}
-          {!isSuspended && u.cover_url ? (
-            /\.webm(\?|#|$)/i.test(u.cover_url) ? (
-              <video
-                key={u.cover_url}
-                src={buildPublicUrl(u.cover_url)}
-                className="absolute inset-0 size-full object-cover"
-                muted
-                playsInline
-                autoPlay
-                loop
-              />
-            ) : (
-              <Image
-                src={buildPublicUrl(u.cover_url)}
-                alt={`${u.username} cover`}
-                fill
-                className="object-cover"
-                sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-              />
-            )
-          ) : (
-            <div
-              className="absolute inset-0"
-              style={
-                u.accent_color
-                  ? getStyleFromHexShade(u.accent_color, "100", "backgroundColor")
-                  : getAccentColorStyle(generateAccentColor(u.username), 100, "backgroundColor")
-              }
-              aria-hidden
+    <article
+      className="group h-[280px] sm:h-[300px] lg:h-[320px] ring-1 ring-border flex flex-col rounded-2xl bg-white hover:bg-neutral-50 transition-colors duration-150 cursor-pointer"
+      data-user-id={u.user_id}
+      onClick={handleCardClick}
+    >
+      {/* cover: fixed height */}
+      <div className="relative h-24 sm:h-30 w-full overflow-hidden rounded-t-2xl">
+        {u.banned_until && Date.parse(u.banned_until) > Date.now() && (
+          <div className="absolute inset-0 z-10 flex items-start justify-end p-2">
+            <span className="rounded-full bg-red-600/90 text-white text-[10px] px-2 py-1">Suspended</span>
+          </div>
+        )}
+        {!isSuspended && u.cover_url ? (
+          /\.webm(\?|#|$)/i.test(u.cover_url) ? (
+            <video
+              key={u.cover_url}
+              src={buildPublicUrl(u.cover_url)}
+              className="absolute inset-0 size-full object-cover"
+              muted
+              playsInline
+              autoPlay
+              loop
             />
+          ) : (
+            <Image
+              src={buildPublicUrl(u.cover_url)}
+              alt={`${u.username} cover`}
+              fill
+              className="object-cover"
+              sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            />
+          )
+        ) : (
+          <div
+            className="absolute inset-0"
+            style={
+              u.accent_color
+                ? getStyleFromHexShade(u.accent_color, "100", "backgroundColor")
+                : getAccentColorStyle(generateAccentColor(u.username), 100, "backgroundColor")
+            }
+            aria-hidden
+          />
+        )}
+      </div>
+
+      {/* content area grows */}
+      <div className="p-4 flex-1 flex flex-col relative">
+        <div className="-mt-11">
+          <UserAvatar
+            className="ring-2 ring-white size-14"
+            username={u.username}
+            avatarUrl={!isSuspended && u.avatar_url ? buildPublicUrl(u.avatar_url) : undefined}
+            accentHex={avatarAccentHex}
+          />
+          {followStats && !isSuspended && !isOwnProfile && (
+            <Button
+              variant={followStats.isFollowing ? "secondary" : "default"}
+              size="sm"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleFollow();
+              }}
+              disabled={followLoading}
+              className="absolute right-2 top-2"
+            >
+              {followStats.isFollowing ? "Following" : "Follow"}
+            </Button>
           )}
         </div>
 
-        {/* content area grows */}
-        <div className="p-4 flex-1 flex flex-col relative">
-          <div className="-mt-11">
-            <UserAvatar
-              className="ring-2 ring-white size-14"
-              username={u.username}
-              avatarUrl={!isSuspended && u.avatar_url ? buildPublicUrl(u.avatar_url) : undefined}
-              accentHex={avatarAccentHex}
-            />
-            {followStats && !isSuspended && (
-              <Button
-                variant={followStats.isFollowing ? "secondary" : "default"}
-                size="sm"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  toggleFollow();
-                }}
-                disabled={followLoading}
-                className="absolute right-2 top-2"
-              >
-                {followStats.isFollowing ? "Following" : "Follow"}
-              </Button>
-            )}
-          </div>
-
-          <div className="mt-2 min-w-0">
-            <h3 className="text-sm font-semibold">
-              <span className="flex items-center gap-1 min-w-0">
-                <span className="truncate">{u.display_name?.trim() || u.username}</span>
-                {u.is_premium && <SolidCarrot className="size-4 shrink-0" />}
-              </span>
-            </h3>
-            <p className="mt-0.5 text-xs text-muted-foreground truncate">@{u.username}</p>
-          </div>
-
-          {/* bio block keeps consistent vertical space */}
-          {u.bio && u.bio.trim() ? (
-            <div className="mt-2 text-xs text-muted-foreground line-clamp-2">
-              {renderBioContent(u.bio)}
-            </div>
-          ) : (
-            // reserve roughly the space of 2 lines to keep cards equal visually
-            <div className="mt-2 h-[1.75rem]" aria-hidden />
-          )}
-
-          {/* footer pinned to bottom */}
-          <div className="mt-auto pt-3 flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">
-              {followStatsLoading ? (
-                "Loading..."
-              ) : followStats ? (
-                `${followStats.followers} Followers • ${followStats.following} Following`
-              ) : (
-                "Hover to load stats"
-              )}
+        <div className="mt-2 min-w-0">
+          <h3 className="text-sm font-semibold">
+            <span className="flex items-center gap-1 min-w-0">
+              <span className="truncate">{u.display_name?.trim() || u.username}</span>
+              {u.is_premium && <SolidCarrot className="size-4 shrink-0" />}
             </span>
-          </div>
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground truncate">@{u.username}</p>
         </div>
-      </article>
-    </Link>
+
+        {/* bio block keeps consistent vertical space */}
+        {u.bio && u.bio.trim() ? (
+          <div className="mt-2 text-xs text-muted-foreground line-clamp-2">
+            {renderBioContent(u.bio)}
+          </div>
+        ) : (
+          // reserve roughly the space of 2 lines to keep cards equal visually
+          <div className="mt-2 h-[1.75rem]" aria-hidden />
+        )}
+
+        {/* footer pinned to bottom */}
+        <div className="mt-auto pt-3 flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">
+            {followStatsLoading ? (
+              "Loading..."
+            ) : followStats ? (
+              `${followStats.followers} Followers • ${followStats.following} Following`
+            ) : (
+              "0 Followers • 0 Following"
+            )}
+          </span>
+        </div>
+      </div>
+    </article>
   );
 }
 
 export default function UsersGrid({ initialData }: { initialData?: { items: UserListItem[]; nextCursor: string | null } }) {
-  const { items, loadMore, loading, error, hasMore } = useInfiniteUsers(initialData, 60);
+  const { items, loadMore, loading, error, hasMore } = useInfiniteUsers(initialData, 20);
   const sentinelRef = useIntersection(
     () => { if (!loading && hasMore) loadMore(); },
     {
@@ -176,7 +191,7 @@ export default function UsersGrid({ initialData }: { initialData?: { items: User
           <p className="mt-1 text-xs text-muted-foreground">When new artists join, they’ll show up here.</p>
         </div>
       ) : (
-        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((u) => (
             <UserCard key={u.user_id} user={{
               user_id: u.user_id,

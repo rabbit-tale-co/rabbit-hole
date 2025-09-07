@@ -118,11 +118,7 @@ export async function revokeAllOtherSessions(
  * This function is kept for compatibility but doesn't need to do anything
  */
 export async function updateSessionActivity(
-  _userId: string,
-  _sessionToken: string
 ): Promise<boolean> {
-  // Supabase Auth automatically updates session activity
-  // No need to manually update anything
   return true;
 }
 

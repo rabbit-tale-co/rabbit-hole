@@ -282,27 +282,76 @@ export async function getFeedPage(input: unknown) {
   const { data, error } = await query;
   if (error) return { error: error.message };
 
-  // Add mock stats to each post (temporarily for testing)
-  console.log('Adding mock stats to posts, count:', data?.length || 0);
-  const itemsWithStats = (data ?? []).map(post => {
-    const stats = {
-      views_total: Math.floor(Math.random() * 1000) + 100, // Mock data for testing
-      unique_viewers: Math.floor(Math.random() * 200) + 50,
-      last_view_at: new Date().toISOString()
-    };
-    console.log(`Post ${post.id} stats:`, stats);
-    return {
-      ...post,
-      stats
-    };
-  });
+  // Fetch real post stats for all posts in batch
+  let itemsWithStats = data ?? [];
+
+  if (data && data.length > 0) {
+    try {
+      const postIds = data.map(post => post.id);
+      // console.log('Fetching real stats for posts:', postIds.length);
+
+      const { data: statsData, error: statsError } = await sb
+        .from('posts_stats')
+        .select('post_id, views_total, unique_viewers, last_view_at')
+        .in('post_id', postIds);
+
+      if (statsError) {
+        console.error('Failed to fetch post stats:', statsError);
+        // If stats table doesn't exist, return posts without stats
+        console.log('Stats table not available, returning posts without stats');
+        itemsWithStats = data.map(post => ({
+          ...post,
+          stats: {
+            views_total: 0,
+            unique_viewers: 0,
+            last_view_at: null
+          }
+        }));
+      } else {
+        // Create a map of post_id to stats for efficient lookup
+        const statsMap = new Map();
+        (statsData ?? []).forEach(stat => {
+          statsMap.set(stat.post_id, {
+            views_total: stat.views_total || 0,
+            unique_viewers: stat.unique_viewers || 0,
+            last_view_at: stat.last_view_at
+          });
+        });
+
+        // Attach stats to each post
+        itemsWithStats = data.map(post => {
+          const stats = statsMap.get(post.id) || {
+            views_total: 0,
+            unique_viewers: 0,
+            last_view_at: null
+          };
+          // console.log(`Post ${post.id} real stats:`, stats);
+          return {
+            ...post,
+            stats
+          };
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching post stats:', err);
+      // Return posts without stats if there's an error
+      itemsWithStats = data.map(post => ({
+        ...post,
+        stats: {
+          views_total: 0,
+          unique_viewers: 0,
+          last_view_at: null
+        }
+      }));
+    }
+  }
 
   const nextCursor =
     data && data.length
       ? encodeCursor(data[data.length - 1].created_at as string, data[data.length - 1].id as string)
       : null;
 
-  console.log('Returning items with stats, first item stats:', itemsWithStats[0]?.stats);
+  // console.log('Returning items with real stats, first item stats:', itemsWithStats[0]?.stats);
   return { items: itemsWithStats, nextCursor };
 }
 
@@ -369,5 +418,56 @@ export async function getPostStats(postId: string) {
   } catch (err) {
     console.error('Failed to fetch post stats:', err);
     return { error: 'Failed to fetch stats' };
+  }
+}
+
+// --- track post view ---
+export async function trackPostView(postId: string, userId?: string) {
+  const sb = supabaseAdmin;
+
+  try {
+    // First, try to get existing stats
+    const { data: existingStats } = await sb
+      .from('posts_stats')
+      .select('views_total, unique_viewers')
+      .eq('post_id', postId)
+      .single();
+
+    if (existingStats) {
+      // Update existing stats
+      const { error } = await sb
+        .from('posts_stats')
+        .update({
+          views_total: existingStats.views_total + 1,
+          unique_viewers: userId ? existingStats.unique_viewers + 1 : existingStats.unique_viewers,
+          last_view_at: new Date().toISOString()
+        })
+        .eq('post_id', postId);
+
+      if (error) {
+        console.error('Failed to update post stats:', error);
+        return { error: error.message };
+      }
+    } else {
+      // Create new stats record
+      const { error } = await sb
+        .from('posts_stats')
+        .insert({
+          post_id: postId,
+          views_total: 1,
+          unique_viewers: userId ? 1 : 0,
+          last_view_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Failed to create post stats:', error);
+        return { error: error.message };
+      }
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to track post view:', err);
+    return { error: 'Failed to track view' };
   }
 }
