@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getUser } from '@/lib/auth';
+import { verifySupabaseJWT } from '@/lib/jwt-utils';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.SECRET_STRIPE_KEY!, {
@@ -9,15 +10,40 @@ const stripe = new Stripe(process.env.SECRET_STRIPE_KEY!, {
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
+    // 1. Verify authentication first
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
+        { error: 'Missing or invalid authorization header' },
+        { status: 401 }
       );
     }
+
+    const token = authHeader.substring(7);
+    const authResult = await verifySupabaseJWT(token);
+    if (!authResult) {
+      return NextResponse.json(
+        { error: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    const authenticatedUserId = authResult.userId;
+
+    // 2. Get userId from query params (for backward compatibility)
+    const { searchParams } = new URL(request.url);
+    const requestedUserId = searchParams.get('userId');
+
+    // 3. Security check: ensure user can only access their own subscription status
+    if (requestedUserId && requestedUserId !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: 'Unauthorized: You can only access your own subscription status' },
+        { status: 403 }
+      );
+    }
+
+    // Use authenticated user ID
+    const userId = requestedUserId || authenticatedUserId;
 
     // Get user profile from social_art schema
     const { data: profile, error: profileError } = await supabaseAdmin

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { verifySupabaseJWT } from '@/lib/jwt-utils';
 import Stripe from 'stripe';
 
 interface BillingHistoryItem {
@@ -22,17 +23,43 @@ const stripe = new Stripe(process.env.SECRET_STRIPE_KEY!, {
 });
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get('userId');
+  let userId: string | null = null;
 
   try {
-
-    if (!userId) {
+    // 1. Verify authentication first
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
+        { error: 'Missing or invalid authorization header' },
+        { status: 401 }
       );
     }
+
+    const token = authHeader.substring(7);
+    const authResult = await verifySupabaseJWT(token);
+    if (!authResult) {
+      return NextResponse.json(
+        { error: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    const authenticatedUserId = authResult.userId;
+
+    // 2. Get userId from query params (for backward compatibility)
+    const { searchParams } = new URL(request.url);
+    const requestedUserId = searchParams.get('userId');
+
+    // 3. Security check: ensure user can only access their own billing data
+    if (requestedUserId && requestedUserId !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: 'Unauthorized: You can only access your own billing data' },
+        { status: 403 }
+      );
+    }
+
+    // Use authenticated user ID
+    userId = requestedUserId || authenticatedUserId;
 
     // Get user profile
     const { data: profile, error: profileError } = await supabaseAdmin
@@ -139,7 +166,7 @@ export async function GET(request: NextRequest) {
     console.error('Error details:', {
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      userId
+      userId: userId || 'unknown'
     });
     return NextResponse.json(
       {
