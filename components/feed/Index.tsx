@@ -288,6 +288,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                 const post = idToPost.get(p.tile.id);
                 const profile = post ? authorProfiles.get(post.author_id) : undefined;
                 const dateLabel = post?.created_at ? new Date(post.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+
                 return (
                   <>
 
@@ -331,7 +332,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                       {/* Post Stats - Only show for admin and premium users */}
                       {(currentUserProfile?.is_admin || currentUserProfile?.is_premium) && (
                         <Badge className="bg-black/50">
-                          <PostStats postId={p.tile.id} />
+                          <PostStats stats={post?.stats} />
                         </Badge>
                       )}
                     </div>

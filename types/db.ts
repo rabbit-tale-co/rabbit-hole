@@ -40,6 +40,11 @@ export type PostRow = {
   comment_count: number;
   bookmark_count: number;
   is_liked?: boolean;  // Added by API when fetching posts
+  stats?: {            // Added by getFeedPage when fetching posts
+    views_total: number;
+    unique_viewers: number;
+    last_view_at: string | null;
+  };
 };
 
 export type CommentRow = {

@@ -4,13 +4,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { buildPublicUrl } from "@/lib/publicUrl";
 import * as React from "react";
+import { useState } from "react";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { generateAccentColor, getAccentColorStyle, getStyleFromHexShade, getAccentColorValue } from "@/lib/accent-colors";
 import { cn } from "@/lib/utils";
 import { PremiumBadge } from "./PremiumBadge";
-import { useFollow } from "@/hooks/useFollow";
+import { useFollowLazy } from "@/hooks/useFollowLazy";
 
 // FIXME: posts have different numbers for same user
 
@@ -42,9 +43,11 @@ export function UserChipHoverCard({
   const accent500 =
     accentColor || getAccentColorValue(generateAccentColor(username), 500);
 
-  // Use the same follow hook as Profile component
-  const { loading: followLoading, isFollowing, followers, following, canFollow, toggleFollow } =
-    useFollow(user_id);
+  const [isHoverOpen, setIsHoverOpen] = useState(false);
+
+  // Use lazy loading for follow stats - only load when hover card is open
+  const { loading: followLoading, isFollowing, followers, following, canFollow, toggleFollow, loaded } =
+    useFollowLazy(user_id, isHoverOpen);
 
   const handleFollow = async (e: React.MouseEvent) => {
     e.preventDefault(); // prevent link navigation on button click
@@ -53,7 +56,10 @@ export function UserChipHoverCard({
   };
 
   return (
-    <HoverCard openDelay={120}>
+    <HoverCard
+      openDelay={120}
+      onOpenChange={setIsHoverOpen}
+    >
       <HoverCardTrigger asChild>
         <Link
           href={`/user/${username}`}
@@ -173,14 +179,22 @@ export function UserChipHoverCard({
 
           {/* stats */}
           <div className="mt-3 flex items-center gap-1 text-[11px] text-muted-foreground">
-            <span><strong className="text-foreground">{followers}</strong> Followers</span>
-            <span>•</span>
-            <span><strong className="text-foreground">{following}</strong> Following</span>
-            {typeof stats?.posts === "number" && (
+            {followLoading ? (
+              <span>Loading stats...</span>
+            ) : loaded ? (
               <>
+                <span><strong className="text-foreground">{followers}</strong> Followers</span>
                 <span>•</span>
-                <span><strong className="text-foreground">{stats.posts}</strong> Posts</span>
+                <span><strong className="text-foreground">{following}</strong> Following</span>
+                {typeof stats?.posts === "number" && (
+                  <>
+                    <span>•</span>
+                    <span><strong className="text-foreground">{stats.posts}</strong> Posts</span>
+                  </>
+                )}
               </>
+            ) : (
+              <span>Hover to load stats</span>
             )}
           </div>
         </div>

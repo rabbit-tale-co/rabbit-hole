@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { UpsertProfileClient } from "@/schemas/profile";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getBatchFollowStats } from "./follow";
+// import { getBatchFollowStats } from "./follow"; // No longer needed - follow stats loaded on hover
 
 export async function upsertProfile(input: unknown, token?: string) {
   const callId = Math.random().toString(36).substring(7);
@@ -214,13 +214,9 @@ export async function getUsersPage(input: unknown) {
     ? Buffer.from(`${data[data.length - 1].username}|${data[data.length - 1].user_id}`).toString("base64")
     : null;
 
-  // fetch follow stats for all users
-  const followStats = await getBatchFollowStats(ids, undefined);
-
   const items = (data ?? []).map(r => ({
     ...r,
-    banned_until: suspMap.get(r.user_id) ?? null,
-    followStats: followStats[r.user_id] || { isFollowing: false, followers: 0, following: 0 }
+    banned_until: suspMap.get(r.user_id) ?? null
   }));
   return { items, nextCursor };
 }

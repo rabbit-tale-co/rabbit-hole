@@ -4,7 +4,7 @@ import { CreatePost, Cursor } from "@/lib/validation";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getUser } from "@/lib/auth";
-import { PostRow } from "@/types";
+import { getFeedPage, getUserFeedPage } from "@/app/actions/posts";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -22,89 +22,32 @@ export async function GET(req: NextRequest) {
   if (userIdParam) {
     const uid = z.uuid().safeParse(userIdParam);
     if (!uid.success) return Response.json({ error: "bad userId" }, { status: 400 });
+
+    // Use getUserFeedPage for user-specific feeds
+    const result = await getUserFeedPage({ cursor, limit, author_id: userIdParam });
+    if (result.error) return Response.json({ error: result.error }, { status: 400 });
+    return Response.json(result);
   }
 
-  // suspended authors to exclude
-  let suspendedIds: string[] = [];
-  try {
-    const nowIso = new Date().toISOString();
-    const { data: susp } = await supabaseAdmin
-      .schema("social_art")
-      .from("suspended_users")
-      .select("user_id")
-      .gt("banned_until", nowIso);
-    suspendedIds = (susp || []).map((r: { user_id: string }) => r.user_id).filter(Boolean);
-  } catch {}
+  // Use getFeedPage for main feed (includes stats)
+  const result = await getFeedPage({ cursor, limit });
+  if (result.error) return Response.json({ error: result.error }, { status: 400 });
 
-  // helper to fetch one chunk using key-set cursor
-  const fetchChunk = async (
-    c: string | null | undefined,
-    chunk: number
-  ): Promise<{ rows: PostRow[]; next: string | null }> => {
-    let q = supabaseAdmin
-      .from("posts")
-      .select("*")
-      // include NULL (legacy) and false without using another OR:
-      .neq("is_deleted", true)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(chunk + 1);
-
-    if (userIdParam) q = q.eq("author_id", userIdParam);
-    if (suspendedIds.length > 0) {
-      const list = `(${suspendedIds.join(",")})`;
-      q = q.not("author_id", "in", list);
-    }
-
-    if (c) {
-      const [ts, id] = Buffer.from(c, "base64").toString("utf8").split("|");
-      // one OR for the key-set condition
-      q = q.or(`and(created_at.lt.${ts}),and(created_at.eq.${ts},id.lt.${id})`);
-    }
-
-    const { data, error } = await q;
-    if (error) throw new Error(error.message);
-
-    const hasMore = (data?.length ?? 0) > chunk;
-    const rows = (data ?? []).slice(0, chunk);
-    let next: string | null = null;
-    if (hasMore && rows.length > 0) {
-      const last = rows[rows.length - 1];
-      next = Buffer.from(`${last.created_at}|${last.id}`).toString("base64");
-    }
-    return { rows, next };
-  };
-
-  // back-fill to gather up to `limit` visible posts
-  let acc: PostRow[] = [];
-  let nextCursor = cursor ?? null;
-  // safety guard to avoid pathological loops
-  for (let i = 0; acc.length < limit && i < 6; i++) {
-    const need = limit - acc.length;
-    const { rows, next } = await fetchChunk(nextCursor, need);
-    acc = acc.concat(rows);
-    nextCursor = next;
-    if (!nextCursor) break; // truly no more
-  }
-
-  // attach current-user like flags for returned page only
-  if (user && acc.length > 0) {
+  // Attach current-user like flags for returned page only
+  if (user && result.items && result.items.length > 0) {
     try {
-      const postIds = acc.map(p => p.id);
+      const postIds = result.items.map(p => p.id);
       const { data: likes } = await supabaseAdmin
         .from("likes")
         .select("post_id")
         .eq("user_id", user.id)
         .in("post_id", postIds);
       const liked = new Set((likes || []).map(l => l.post_id));
-      acc = acc.map(p => ({ ...p, is_liked: liked.has(p.id) }));
+      result.items = result.items.map(p => ({ ...p, is_liked: liked.has(p.id) }));
     } catch {}
   }
 
-  return Response.json({
-    items: acc,
-    nextCursor: nextCursor ?? null,
-  });
+  return Response.json(result);
 }
 
 export async function POST(req: NextRequest) {

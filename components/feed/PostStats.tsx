@@ -3,44 +3,50 @@
 import { usePostStats } from "@/hooks/usePostStats";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { OutlineEye, OutlineUser } from "../icons/Icons";
+import { useEffect, useState, useRef } from "react";
+import NumberFlow from "@number-flow/react";
+import { cn } from "@/lib/utils";
 
 interface PostStatsProps {
-  postId: string;
+  stats?: {
+    views_total: number;
+    unique_viewers: number;
+    last_view_at: string | null;
+  };
   className?: string;
 }
 
-export function PostStats({ postId, className = "" }: PostStatsProps) {
-  const { stats, loading, error } = usePostStats({ postId });
+export function PostStats({ stats, className = "" }: PostStatsProps) {
 
-  if (loading) {
-    return (
-      <div className={`flex items-center gap-2 text-xs text-white/90 ${className}`}>
-        <div className="flex items-center gap-1">
-          <OutlineEye className="size-3" />
-          <span>...</span>
-        </div>
-      </div>
-    );
-  }
+  // Animation state
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+  const [animateViews, setAnimateViews] = useState(0);
+  const [animateViewers, setAnimateViewers] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasAnimatedRef = useRef(false);
 
-  // If there's an error (like table doesn't exist), show 0 stats instead of hiding
-  if (error || !stats) {
+  // Start animation when stats are available
+  useEffect(() => {
+    if (!stats || hasAnimatedRef.current) return;
+
+    hasAnimatedRef.current = true;
+    setShouldAnimate(true);
+    setTimeout(() => {
+      setAnimateViews(stats.views_total || 0);
+      setAnimateViewers(stats.unique_viewers || 0);
+    }, 100);
+  }, [stats]);
+
+  // If no stats provided, show 0 values
+  if (!stats) {
     return (
-      <div className={`flex items-center gap-2 text-xs text-white/90 ${className}`}>
+      <div className={`flex items-center gap-3 text-xs text-white/90 ${className}`}>
         <div className="flex items-center gap-1">
-          <OutlineEye className="size-3" />
+          <OutlineEye size={16} />
           <span>0</span>
         </div>
-      </div>
-    );
-  }
-
-  // Only show stats if we have actual data
-  if (stats.views_total === 0 && stats.unique_viewers === 0) {
-    return (
-      <div className={`flex items-center gap-2 text-xs text-white/90 ${className}`}>
         <div className="flex items-center gap-1">
-          <OutlineEye className="size-3" />
+          <OutlineUser size={16} />
           <span>0</span>
         </div>
       </div>
@@ -49,13 +55,25 @@ export function PostStats({ postId, className = "" }: PostStatsProps) {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className={`flex items-center gap-2 text-xs text-white/90 ${className}`}>
+      <div ref={containerRef} className={`flex items-center gap-3 text-xs text-white/90 ${className}`}>
         {/* Total Views */}
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex items-center gap-1">
-              <OutlineEye className="size-3" />
-              <span>{stats.views_total.toLocaleString()}</span>
+              <OutlineEye className="size-4" />
+              <span className={cn(
+                "transition-opacity",
+                shouldAnimate ? "opacity-100" : "opacity-0"
+              )}>
+                <NumberFlow
+                  value={shouldAnimate ? animateViews : 0}
+                  className="inline-block"
+                  transformTiming={{ duration: 400, easing: 'ease-out' }}
+                  spinTiming={{ duration: 300, easing: 'ease-out' }}
+                  opacityTiming={{ duration: 200, easing: 'ease-out' }}
+                  animated={shouldAnimate}
+                />
+              </span>
             </div>
           </TooltipTrigger>
           <TooltipContent side="bottom" align="center">
@@ -67,8 +85,20 @@ export function PostStats({ postId, className = "" }: PostStatsProps) {
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex items-center gap-1">
-              <OutlineUser className="size-3" />
-              <span>{stats.unique_viewers.toLocaleString()}</span>
+              <OutlineUser className="size-4" />
+              <span className={cn(
+                "transition-opacity",
+                shouldAnimate ? "opacity-100" : "opacity-0"
+              )}>
+                <NumberFlow
+                  value={shouldAnimate ? animateViewers : 0}
+                  className="inline-block"
+                  transformTiming={{ duration: 400, easing: 'ease-out' }}
+                  spinTiming={{ duration: 300, easing: 'ease-out' }}
+                  opacityTiming={{ duration: 200, easing: 'ease-out' }}
+                  animated={shouldAnimate}
+                />
+              </span>
             </div>
           </TooltipTrigger>
           <TooltipContent side="bottom" align="center">

@@ -282,12 +282,28 @@ export async function getFeedPage(input: unknown) {
   const { data, error } = await query;
   if (error) return { error: error.message };
 
+  // Add mock stats to each post (temporarily for testing)
+  console.log('Adding mock stats to posts, count:', data?.length || 0);
+  const itemsWithStats = (data ?? []).map(post => {
+    const stats = {
+      views_total: Math.floor(Math.random() * 1000) + 100, // Mock data for testing
+      unique_viewers: Math.floor(Math.random() * 200) + 50,
+      last_view_at: new Date().toISOString()
+    };
+    console.log(`Post ${post.id} stats:`, stats);
+    return {
+      ...post,
+      stats
+    };
+  });
+
   const nextCursor =
     data && data.length
       ? encodeCursor(data[data.length - 1].created_at as string, data[data.length - 1].id as string)
       : null;
 
-  return { items: data ?? [], nextCursor };
+  console.log('Returning items with stats, first item stats:', itemsWithStats[0]?.stats);
+  return { items: itemsWithStats, nextCursor };
 }
 
 // --- feed page filtered by author ---
