@@ -19,4 +19,5 @@ export type AuthCtx = {
     accent_color?: string;
   }) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
+  getToken: () => Promise<string | null>;
 };

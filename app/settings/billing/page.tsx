@@ -19,14 +19,24 @@ interface BillingInfo {
 }
 
 export default function BillingPage() {
-  const { user } = useAuth();
+  const { user, getToken } = useAuth();
   const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPortalLoading, setIsPortalLoading] = useState(false);
 
   const fetchBillingInfo = useCallback(async () => {
     try {
-      const response = await fetch(`/api/user/subscription-status?userId=${user?.id}`);
+      const token = await getToken();
+      if (!token) {
+        console.error('No authentication token available');
+        return;
+      }
+
+      const response = await fetch(`/api/user/subscription-status?userId=${user?.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         // Map the API response to the expected format
@@ -43,7 +53,7 @@ export default function BillingPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, getToken]);
 
   useEffect(() => {
     if (user?.id) {

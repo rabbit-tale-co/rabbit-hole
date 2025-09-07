@@ -107,7 +107,7 @@ const subscriptionStatusChip = (status: string, isCanceling: boolean) => {
 //   );
 
 export default function BillingSettings() {
-  const { user } = useAuth();
+  const { user, getToken } = useAuth();
   const {
     isPremium,
     subscriptionStatus,
@@ -126,8 +126,18 @@ export default function BillingSettings() {
   const fetchBillingData = useCallback(async () => {
     if (!user?.id) return;
     try {
+      const token = await getToken();
+      if (!token) {
+        console.error('No authentication token available');
+        return;
+      }
+
       console.log('Fetching billing data for user:', user.id);
-      const res = await fetch(`/api/user/billing?userId=${user.id}`);
+      const res = await fetch(`/api/user/billing?userId=${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       console.log('Billing API response status:', res.status);
 
       const data = await res.json();
@@ -147,7 +157,7 @@ export default function BillingSettings() {
       console.error('Billing fetch error:', e);
       toast.error('Failed to fetch billing data');
     }
-  }, [user?.id]);
+  }, [user?.id, getToken]);
 
 
 

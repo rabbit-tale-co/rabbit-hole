@@ -14,7 +14,7 @@ interface SubscriptionStatus {
 }
 
 export function useSubscriptionStatus() {
-  const { user } = useAuth();
+  const { user, getToken } = useAuth();
   const [status, setStatus] = useState<SubscriptionStatus>({
     isPremium: false,
     subscriptionStatus: 'none',
@@ -36,10 +36,18 @@ export function useSubscriptionStatus() {
     setStatus(prev => ({ ...prev, loading: true, error: null }));
 
     try {
+      const token = await getToken();
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
       const method = forceRefresh ? 'POST' : 'GET';
       const response = await fetch(`/api/user/subscription-status?userId=${user.id}`, {
         method,
-        headers: forceRefresh ? { 'Content-Type': 'application/json' } : {},
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...(forceRefresh ? { 'Content-Type': 'application/json' } : {}),
+        },
         body: forceRefresh ? JSON.stringify({ userId: user.id }) : undefined,
       });
 
@@ -68,7 +76,7 @@ export function useSubscriptionStatus() {
         error: error instanceof Error ? error.message : 'Unknown error',
       }));
     }
-  }, [user?.id]);
+  }, [user?.id, getToken]);
 
   const refreshSubscriptionStatus = useCallback(() => {
     checkSubscriptionStatus(true);

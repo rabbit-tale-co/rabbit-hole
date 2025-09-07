@@ -62,8 +62,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             // ensure profile row exists then fetch it
             fetch("/api/profile/init", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ user_id: sess.user.id }),
+              headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${sess.access_token}`,
+              },
+              body: JSON.stringify({}),
             }).catch(() => { });
 
             (async () => {
@@ -140,9 +143,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     try {
       const res = await fetch("/api/profile/init", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${data.session?.access_token}`,
+        },
         body: JSON.stringify({
-          user_id: data.user?.id,
           username: meta.username,
         }),
       });
@@ -181,11 +186,17 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     } catch { }
   };
 
+  // Get JWT token for API calls
+  const getToken = useCallback(async () => {
+    if (!session?.access_token) return null;
+    return session.access_token;
+  }, [session?.access_token]);
+
   const value = useMemo<AuthCtx>(() => ({
     user, session, loading, profile,
     refreshProfile, signIn, signUp, signOut,
-    resetPassword
-  }), [user, session, loading, profile, refreshProfile]);
+    resetPassword, getToken
+  }), [user, session, loading, profile, refreshProfile, getToken]);
 
   // Dev logs for debugging auth state
   // useEffect(() => {
