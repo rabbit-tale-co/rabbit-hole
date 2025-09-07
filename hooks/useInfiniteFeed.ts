@@ -34,11 +34,12 @@ export function useInfiniteFeed(
   // Listen for refresh events
   useEffect(() => {
     const handleRefresh = () => {
-      console.log('Feed refresh event received');
+      console.log('Feed refresh event received - resetting feed');
       setPages([]);
       setCursor("");
       setError(null);
       hasAutoLoaded.current = false;
+      console.log('Feed reset complete');
     };
 
     window.addEventListener('feed-refresh', handleRefresh);
@@ -57,7 +58,16 @@ export function useInfiniteFeed(
   }, [pages]);
 
   const loadMore = useCallback(async () => {
+    const loadId = Math.random().toString(36).substring(7);
+    console.log(`[${loadId}] loadMore called:`, {
+      inFlight: inFlight.current,
+      globalInFlight,
+      cursor: cursorRef.current,
+      mounted: mounted.current
+    });
+
     if (inFlight.current || globalInFlight || cursorRef.current === null || !mounted.current) {
+      console.log(`[${loadId}] loadMore early return`);
       return;
     }
 
@@ -141,6 +151,7 @@ export function useInfiniteFeed(
         setError("Unknown error occurred");
       }
     } finally {
+      console.log(`[${loadId}] loadMore completed`);
       if (mounted.current) {
         setLoading(false);
       }
@@ -152,10 +163,17 @@ export function useInfiniteFeed(
   const hasMore = cursor !== null;
 
   useEffect(() => {
+    console.log('Auto-load useEffect triggered:', {
+      hasAutoLoaded: hasAutoLoaded.current,
+      cursor,
+      mounted: mounted.current
+    });
     if (!hasAutoLoaded.current && cursor === "" && mounted.current) {
+      console.log('Auto-loading feed...');
       hasAutoLoaded.current = true;
       setTimeout(() => {
         if (mounted.current) {
+          console.log('Calling loadMore from auto-load useEffect');
           void loadMore();
         }
       }, 100);

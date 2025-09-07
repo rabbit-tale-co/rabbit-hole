@@ -85,7 +85,8 @@ export async function createPost(input: unknown) {
   if (error) return { error: error.message };
 
   // Revalidate the feed pages to show the new post
-  revalidatePath('/');
+  // Don't revalidate main page to avoid infinite loops
+  // revalidatePath('/');
   revalidatePath(`/user/${parsed.data.author_id}`);
 
   return { post: data };
@@ -127,7 +128,8 @@ export async function updatePost(input: unknown) {
   if (error) return { error: error.message };
 
   // Revalidate the feed pages to show the new post
-  revalidatePath('/');
+  // Don't revalidate main page to avoid infinite loops
+  // revalidatePath('/');
   revalidatePath(`/user/${parsed.data.author_id}`);
 
   return { post: data };

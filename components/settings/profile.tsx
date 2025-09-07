@@ -95,12 +95,17 @@ export function Profile({ user }: ProfileProps) {
 
   // Add handleSave function back as a regular function
   const handleSave = React.useCallback(async () => {
+    console.log('handleSave called');
     // Clear previous validation errors
     setValidationErrors({})
 
     try {
+      // Debug: log form data before validation
+      console.log('Form data before validation:', formData);
+
       // Validate form data with Zod
       const validatedData = profileSchema.parse(formData)
+      console.log('Validation successful:', validatedData);
 
       // Create a promise for the profile update via server action
       const payload: UpsertProfileDTO = {
@@ -110,6 +115,12 @@ export function Profile({ user }: ProfileProps) {
         bio: formData.bio || null,
       }
 
+      // Debug: log payload before sending
+      console.log('Payload being sent to server:', payload);
+      console.log('Bio value:', formData.bio);
+      console.log('Bio type:', typeof formData.bio);
+      console.log('Bio length:', formData.bio?.length);
+
       // update email first if changed
       if (formData.email && user?.email && formData.email.trim() !== user.email) {
         const { error: emailErr } = await supabase.auth.updateUser({ email: formData.email.trim() })
@@ -117,23 +128,49 @@ export function Profile({ user }: ProfileProps) {
         try { await supabase.auth.refreshSession() } catch { }
       }
 
-      const updatePromise = upsertProfile(payload)
+      console.log('About to call upsertProfile with payload:', payload);
 
-      // Show toast with promise
-      toast.promise(updatePromise, {
-        loading: 'Updating profile...',
-        success: () => 'Profile updated successfully!',
-        error: (error) => {
-          console.error('Failed to update profile:', error)
-          return error instanceof Error ? error.message : 'Failed to update profile'
-        },
-      })
+      // Get JWT token
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      console.log('JWT token obtained:', token ? 'YES' : 'NO');
 
-      // Wait for the promise to resolve
-      await updatePromise
+      // Show loading toast
+      toast.loading('Updating profile...', { id: 'profile-update' });
 
-      // Success - toast is already shown
-      console.log('Profile updated successfully')
+      try {
+        console.log('Calling upsertProfile...');
+
+        const result = await upsertProfile(payload, token);
+
+        console.log('upsertProfile completed, result:', result);
+        console.log('Result type:', typeof result);
+        console.log('Result has error property:', result && typeof result === 'object' && 'error' in result);
+
+        if (result && typeof result === 'object' && 'error' in result && result.error) {
+          // Handle specific error types
+          if (result.error === 'Unauthorized') {
+            toast.error('You are not authorized to update this profile. Please log in again.', { id: 'profile-update' });
+          } else if (result.error === 'Forbidden') {
+            toast.error('You can only update your own profile.', { id: 'profile-update' });
+          } else if (result.error === 'Invalid payload') {
+            toast.error('Invalid profile data. Please check your input.', { id: 'profile-update' });
+          } else {
+            toast.error(`Failed to update profile: ${result.error}`, { id: 'profile-update' });
+          }
+          return;
+        }
+
+        // Success
+        console.log('No error, showing success toast');
+        toast.success('Profile updated successfully!', { id: 'profile-update' });
+        console.log('Profile updated successfully');
+
+      } catch (error) {
+        console.error('Unexpected error updating profile:', error);
+        toast.error('An unexpected error occurred. Please try again.', { id: 'profile-update' });
+        return;
+      }
 
       // After save, set current canonical values as new baseline
       const canonNow = toCanonSnapshot({
@@ -154,6 +191,7 @@ export function Profile({ user }: ProfileProps) {
     } catch (error) {
       if (error instanceof z.ZodError) {
         // Handle validation errors
+        console.error('Validation error:', error.issues);
         const errors: Record<string, string> = {}
         error.issues.forEach((err: z.ZodIssue) => {
           if (err.path[0]) {
@@ -744,11 +782,23 @@ export function Profile({ user }: ProfileProps) {
             await supabase.auth.signOut();
             // 2) delete account on server
             const res = await deleteAccount(user.id);
+
             if ((res as { error?: string }).error) {
-              toast.error(String((res as { error?: string }).error));
+              const error = (res as { error?: string }).error;
+              // Handle specific error types
+              if (error === 'Unauthorized') {
+                toast.error('You are not authorized to delete this account. Please log in again.');
+              } else if (error === 'Forbidden') {
+                toast.error('You can only delete your own account.');
+              } else {
+                toast.error(`Failed to delete account: ${error}`);
+              }
             } else {
-              toast.success("Account deleted");
+              toast.success("Account deleted successfully");
             }
+          } catch (error) {
+            console.error('Unexpected error deleting account:', error);
+            toast.error('An unexpected error occurred while deleting account.');
           } finally {
             setDeleting(false);
           }

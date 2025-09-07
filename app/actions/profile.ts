@@ -7,6 +7,8 @@ import { z } from "zod";
 import { getBatchFollowStats } from "./follow";
 
 export async function upsertProfile(input: unknown) {
+  const callId = Math.random().toString(36).substring(7);
+  console.log(`[${callId}] upsertProfile called at ${new Date().toISOString()}`);
   const parsed = UpsertProfile.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
 
