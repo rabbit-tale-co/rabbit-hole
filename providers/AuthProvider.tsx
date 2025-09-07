@@ -62,7 +62,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             // ensure profile row exists then fetch it
             fetch("/api/profile/init", {
               method: "POST",
-              headers: { 
+              headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${sess.access_token}`,
               },
@@ -143,7 +143,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     try {
       const res = await fetch("/api/profile/init", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${data.session?.access_token}`,
         },
