@@ -33,6 +33,5 @@ export const UpsertProfileClient = z.object({
 });
 
 export const InitProfile = z.object({
-  user_id: UUID,
   username: USERNAME.optional(),
 });

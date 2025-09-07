@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ACCENT_COLORS, getAccentColorValue } from "@/lib/accent-colors";
 import { InitProfile } from "@/schemas/profile";
 import { USERNAME } from "@/schemas/_shared";
+import { verifySupabaseJWT } from "@/lib/jwt-utils";
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.SECRET_STRIPE_KEY!, {
@@ -113,11 +114,29 @@ async function isUsernameAvailable(candidate: string, excludeUserId?: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Verify authentication first
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return Response.json({ error: "Missing or invalid authorization header" }, { status: 401 });
+    }
+
+    const token = authHeader.substring(7);
+    const authResult = await verifySupabaseJWT(token);
+    if (!authResult) {
+      return Response.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
+    const authenticatedUserId = authResult.userId;
+
+    // 2. Parse and validate request
     const json = await req.json().catch(() => ({}));
     const parsed = InitProfile.safeParse(json);
     if (!parsed.success) return Response.json({ error: "invalid payload" }, { status: 400 });
 
-    const { user_id, username: desiredUsername } = parsed.data;
+    const { username: desiredUsername } = parsed.data;
+
+    // 3. Use authenticated user_id from JWT token
+    const user_id = authenticatedUserId;
 
     // helper to pick random accent hex
     const pickRandomAccentHex = () => {
