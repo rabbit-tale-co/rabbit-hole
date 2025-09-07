@@ -10,8 +10,31 @@ export async function upsertProfile(input: unknown) {
   const parsed = UpsertProfile.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
 
-  // Log JWT usage for profile update
-  console.log(`[JWT] Profile update requested for user: ${parsed.data.user_id}`);
+  // Verify user authentication
+  const { data: auth } = await supabaseAdmin.auth.getUser();
+  if (!auth.user?.id) {
+    // Fallback to client-side authentication
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) return { error: "Unauthorized" };
+
+      // Verify user can only update their own profile
+      if (user.id !== parsed.data.user_id) return { error: "Forbidden" };
+
+      // Log JWT usage for profile update
+      console.log(`[JWT] Profile update (client auth): ${user.id}`);
+    } catch (error) {
+      console.error('[JWT] Profile update auth error:', error);
+      return { error: "Unauthorized" };
+    }
+  } else {
+    // Verify user can only update their own profile
+    if (auth.user.id !== parsed.data.user_id) return { error: "Forbidden" };
+
+    // Log JWT usage for profile update
+    console.log(`[JWT] Profile update (server auth): ${auth.user.id}`);
+  }
 
   // find old username to revalidate old path if it changes
   let oldUsername: string | null = null;
@@ -31,7 +54,6 @@ export async function upsertProfile(input: unknown) {
         username: parsed.data.username,
         display_name: parsed.data.display_name,
         bio: parsed.data.bio ?? null,
-        // nie dotykaj cover_url/accent_color jesli nie przyszly w danych
         ...(parsed.data.cover_url !== undefined ? { cover_url: parsed.data.cover_url } : {}),
         ...(parsed.data.accent_color !== undefined ? { accent_color: parsed.data.accent_color } : {}),
       },
@@ -40,7 +62,6 @@ export async function upsertProfile(input: unknown) {
     .select()
     .single();
   if (error) return { error: error.message };
-  // Revalidate key sciezki, aby UI otrzymal swieze dane (profil i strona uzytkownika)
   try {
     if (data?.username) {
       revalidatePath(`/user/${data.username}`);
@@ -57,8 +78,31 @@ export async function upsertProfile(input: unknown) {
 }
 
 export async function deleteAccount(userId: string) {
-  // Log JWT usage for account deletion
-  console.log(`[JWT] Account deletion requested for user: ${userId}`);
+  // Verify user authentication
+  const { data: auth } = await supabaseAdmin.auth.getUser();
+  if (!auth.user?.id) {
+    // Fallback to client-side authentication
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) return { error: "Unauthorized" };
+
+      // Verify user can only delete their own account
+      if (user.id !== userId) return { error: "Forbidden" };
+
+      // Log JWT usage for account deletion
+      console.log(`[JWT] Account deletion (client auth): ${user.id}`);
+    } catch (error) {
+      console.error('[JWT] Account deletion auth error:', error);
+      return { error: "Unauthorized" };
+    }
+  } else {
+    // Verify user can only delete their own account
+    if (auth.user.id !== userId) return { error: "Forbidden" };
+
+    // Log JWT usage for account deletion
+    console.log(`[JWT] Account deletion (server auth): ${auth.user.id}`);
+  }
 
   const sb = supabaseAdmin;
   // delete reactions and comments first (cascades may help, but do it explicitly)

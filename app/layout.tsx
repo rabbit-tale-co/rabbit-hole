@@ -61,7 +61,11 @@ export const viewport: Viewport = {
 // TODO: add to cropping function presets (full square), rectangle, 16:9, 4:3, 3:4, 9:16, 1:1
 // TODO: svg in button mt-.5? to center vertically?
 
-//TODO: replace all <video> with media-player component
+// TODO: replace all <video> with media-player component
+// FIXME: make text container in post event-none, because slider on hover do not works than
+// TODO: add link formatting to posts and bio
+// TODO: add links section for profile page
+// TODO: add badges section for profile page
 
 export default function RootLayout({
   children,
