@@ -56,8 +56,8 @@ export async function POST(req: NextRequest) {
   if (!user) return new Response("Unauthorized", { status: 401 });
 
   const body = await req.json();
-  const parsed = CreatePost.safeParse(body);
-  if (!parsed.success) return Response.json({ error: parsed.error.flatten() }, { status: 400 });
+  const parsed = await CreatePost.safeParseAsync(body);
+  if (!parsed.success) return Response.json({ error: parsed.error.issues }, { status: 400 });
 
   const { images, text } = parsed.data;
 

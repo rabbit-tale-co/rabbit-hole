@@ -5,31 +5,61 @@ import { createClient } from "@/lib/supabase-cookies";
 import { UpsertProfileClient } from "@/schemas/profile";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { verifySupabaseJWT } from "@/lib/jwt-utils";
 // import { getBatchFollowStats } from "./follow"; // No longer needed - follow stats loaded on hover
 
-export async function upsertProfile(input: unknown) {
+export async function upsertProfile(input: unknown, token?: string) {
   const callId = Math.random().toString(36).substring(7);
   console.log(`[${callId}] upsertProfile called at ${new Date().toISOString()}`);
 
   // Parse client input (without user_id)
-  const parsed = UpsertProfileClient.safeParse(input);
-  if (!parsed.success) return { error: "Invalid payload" };
+  const parsed = await UpsertProfileClient.safeParseAsync(input);
+  if (!parsed.success) {
+    console.log(`[${callId}] Validation failed:`, parsed.error.issues);
+    // Extract bannable words errors specifically
+    const bannableWordsErrors = parsed.error.issues
+      .filter(issue => issue.code === "custom" && issue.message?.includes("inappropriate content"))
+      .map(issue => issue.message);
 
-  // Verify user authentication using Supabase SSR client with cookies
+    if (bannableWordsErrors.length > 0) {
+      return { error: bannableWordsErrors[0] };
+    }
+
+    // For other validation errors, return the first error message
+    const firstError = parsed.error.issues[0];
+    return { error: firstError.message || "Invalid input data" };
+  }
+
+  // Verify user authentication - try JWT token first, then cookies
   console.log(`[${callId}] Starting authentication verification...`);
   let userId: string;
 
-    try {
+  try {
+    // Try JWT token first if provided
+    if (token) {
+      console.log(`[${callId}] [AUTH] Attempting JWT authentication with token:`, token.substring(0, 20) + '...');
+      const authResult = await verifySupabaseJWT(token);
+      if (authResult) {
+        userId = authResult.userId;
+        console.log(`[${callId}] [AUTH] Profile update (JWT auth): ${userId}`);
+      } else {
+        console.log(`[${callId}] [AUTH] JWT token verification failed`);
+        throw new Error('Invalid JWT token');
+      }
+    } else {
+      console.log(`[${callId}] [AUTH] No JWT token provided, trying cookies...`);
+      // Fallback to cookies
       const supabase = await createClient();
       const { data: { user }, error } = await supabase.auth.getUser();
 
-    if (error || !user) {
-      console.log(`[${callId}] Authentication failed:`, error?.message || 'No user');
-      return { error: "Unauthorized" };
-    }
+      if (error || !user) {
+        console.log(`[${callId}] Authentication failed:`, error?.message || 'No user');
+        return { error: "Unauthorized" };
+      }
 
-    userId = user.id;
-    console.log(`[${callId}] [AUTH] Profile update (cookie auth): ${userId}`);
+      userId = user.id;
+      console.log(`[${callId}] [AUTH] Profile update (cookie auth): ${userId}`);
+    }
   } catch (error) {
     console.error(`[${callId}] [AUTH] Authentication error:`, error);
     return { error: "Unauthorized" };

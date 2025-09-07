@@ -27,18 +27,19 @@ export const USERNAME_WITH_BANNABLE_CHECK = z
   .min(3)
   .max(20)
   .regex(/^[a-z0-9_]+$/)
-  .refine(
-    async (username) => {
-      if (!username) return true;
+  .superRefine(async (username, ctx) => {
+    if (!username) return;
 
-      const config = getConfigFromEnv();
-      const result = await validateText(username, 'username', config);
-      return result.isValid;
-    },
-    {
-      message: "Username contains inappropriate content"
+    const config = getConfigFromEnv();
+    const result = await validateText(username, 'username', config);
+
+    if (!result.isValid) {
+      ctx.addIssue({
+        code: "custom",
+        message: result.error || "Username contains inappropriate content"
+      });
     }
-  );
+  });
 
 /**
  * Enhanced bio validation with bannable words check
@@ -48,18 +49,19 @@ export const BIO_WITH_BANNABLE_CHECK = z
   .max(500)
   .nullable()
   .optional()
-  .refine(
-    async (bio) => {
-      if (!bio) return true;
+  .superRefine(async (bio, ctx) => {
+    if (!bio) return;
 
-      const config = getConfigFromEnv();
-      const result = await validateText(bio, 'bio', config);
-      return result.isValid;
-    },
-    {
-      message: "Bio contains inappropriate content"
+    const config = getConfigFromEnv();
+    const result = await validateText(bio, 'bio', config);
+
+    if (!result.isValid) {
+      ctx.addIssue({
+        code: "custom",
+        message: result.error || "Bio contains inappropriate content"
+      });
     }
-  );
+  });
 
 /**
  * Enhanced display name validation with bannable words check
@@ -68,18 +70,19 @@ export const DISPLAY_NAME_WITH_BANNABLE_CHECK = z
   .string()
   .min(1)
   .max(50)
-  .refine(
-    async (displayName) => {
-      if (!displayName) return true;
+  .superRefine(async (displayName, ctx) => {
+    if (!displayName) return;
 
-      const config = getConfigFromEnv();
-      const result = await validateText(displayName, 'display name', config);
-      return result.isValid;
-    },
-    {
-      message: "Display name contains inappropriate content"
+    const config = getConfigFromEnv();
+    const result = await validateText(displayName, 'display name', config);
+
+    if (!result.isValid) {
+      ctx.addIssue({
+        code: "custom",
+        message: result.error || "Display name contains inappropriate content"
+      });
     }
-  );
+  });
 
 /**
  * Enhanced post content validation with bannable words check
@@ -88,18 +91,19 @@ export const POST_CONTENT_WITH_BANNABLE_CHECK = z
   .string()
   .min(1)
   .max(2000)
-  .refine(
-    async (content) => {
-      if (!content) return true;
+  .superRefine(async (content, ctx) => {
+    if (!content) return;
 
-      const config = getConfigFromEnv();
-      const result = await validateText(content, 'post content', config);
-      return result.isValid;
-    },
-    {
-      message: "Post content contains inappropriate content"
+    const config = getConfigFromEnv();
+    const result = await validateText(content, 'post content', config);
+
+    if (!result.isValid) {
+      ctx.addIssue({
+        code: "custom",
+        message: result.error || "Post content contains inappropriate content"
+      });
     }
-  );
+  });
 
 /**
  * Enhanced comment validation with bannable words check
@@ -108,18 +112,19 @@ export const COMMENT_WITH_BANNABLE_CHECK = z
   .string()
   .min(1)
   .max(500)
-  .refine(
-    async (comment) => {
-      if (!comment) return true;
+  .superRefine(async (comment, ctx) => {
+    if (!comment) return;
 
-      const config = getConfigFromEnv();
-      const result = await validateText(comment, 'comment', config);
-      return result.isValid;
-    },
-    {
-      message: "Comment contains inappropriate content"
+    const config = getConfigFromEnv();
+    const result = await validateText(comment, 'comment', config);
+
+    if (!result.isValid) {
+      ctx.addIssue({
+        code: "custom",
+        message: result.error || "Comment contains inappropriate content"
+      });
     }
-  );
+  });
 
 /**
  * Generic text validation with bannable words check
@@ -133,16 +138,17 @@ export function createTextWithBannableCheck(
     .string()
     .min(minLength)
     .max(maxLength)
-    .refine(
-      async (text) => {
-        if (!text) return true;
+    .superRefine(async (text, ctx) => {
+      if (!text) return;
 
-        const config = getConfigFromEnv();
-        const result = await validateText(text, fieldName, config);
-        return result.isValid;
-    },
-    {
-      message: `${fieldName} contains inappropriate content`
-    }
-  );
+      const config = getConfigFromEnv();
+      const result = await validateText(text, fieldName, config);
+
+      if (!result.isValid) {
+        ctx.addIssue({
+          code: "custom",
+          message: result.error || `${fieldName} contains inappropriate content`
+        });
+      }
+    });
 }

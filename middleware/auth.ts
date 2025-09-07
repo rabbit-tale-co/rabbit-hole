@@ -1,27 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createClient } from '@/lib/supabase-cookies';
+import { verifySupabaseJWT } from '@/lib/jwt-utils';
 
 
 /**
  * Middleware to secure API endpoints
- * Checks JWT token and verifies it in the database
+ * Checks JWT token from Authorization header or cookies
  */
-export async function validateAuthToken(): Promise<{ userId: string } | null> {
+export async function validateAuthToken(request?: NextRequest): Promise<{ userId: string } | null> {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
+    let userId: string | null = null;
 
-    if (error || !user) {
-      return null;
+    // Try to get token from Authorization header first
+    if (request) {
+      const authHeader = request.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        const authResult = await verifySupabaseJWT(token);
+        if (authResult) {
+          userId = authResult.userId;
+        }
+      }
     }
 
-    // 2. Check if token is assigned to user in the database
+    // Fallback to cookies if no header token
+    if (!userId) {
+      const supabase = await createClient();
+      const { data: { user }, error } = await supabase.auth.getUser();
+
+      if (error || !user) {
+        return null;
+      }
+      userId = user.id;
+    }
+
+    // Check if user exists in database
     const { data: profile, error: profileError } = await supabaseAdmin
       .schema('social_art')
       .from('profiles')
       .select('user_id')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (profileError || !profile) {
@@ -29,10 +48,7 @@ export async function validateAuthToken(): Promise<{ userId: string } | null> {
       return null;
     }
 
-    // 3. Supabase Auth handles session management automatically
-    // No need to manually create or update sessions
-
-    return { userId: user.id };
+    return { userId };
   } catch (error) {
     console.error('Auth validation error:', error);
     return null;
@@ -45,7 +61,7 @@ export async function validateAuthToken(): Promise<{ userId: string } | null> {
  */
 export function withAuth(handler: (request: NextRequest, context: { userId: string }) => Promise<NextResponse>) {
   return async (request: NextRequest): Promise<NextResponse> => {
-    const authResult = await validateAuthToken();
+    const authResult = await validateAuthToken(request);
 
     if (!authResult) {
       return NextResponse.json(
@@ -69,8 +85,8 @@ export function withAuth(handler: (request: NextRequest, context: { userId: stri
 /**
  * Middleware to check admin privileges
  */
-export async function validateAdminAuth(): Promise<{ userId: string } | null> {
-  const authResult = await validateAuthToken();
+export async function validateAdminAuth(request?: NextRequest): Promise<{ userId: string } | null> {
+  const authResult = await validateAuthToken(request);
   if (!authResult) return null;
 
   try {
@@ -99,7 +115,7 @@ export async function validateAdminAuth(): Promise<{ userId: string } | null> {
  */
 export function withAdminAuth(handler: (request: NextRequest, context: { userId: string }) => Promise<NextResponse>) {
   return async (request: NextRequest): Promise<NextResponse> => {
-    const authResult = await validateAdminAuth();
+    const authResult = await validateAdminAuth(request);
 
     if (!authResult) {
       return NextResponse.json(

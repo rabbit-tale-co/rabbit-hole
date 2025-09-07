@@ -55,7 +55,7 @@ async function requireActiveUser(expectedUserId?: string): Promise<{ error?: str
 export async function createPost(input: unknown) {
   console.log(`[JWT] CreatePost function called with input:`, input);
 
-  const parsed = CreatePost.safeParse(input);
+  const parsed = await CreatePost.safeParseAsync(input);
   if (!parsed.success) {
     console.log(`[JWT] CreatePost validation failed:`, parsed.error);
     return { error: "Invalid payload" };

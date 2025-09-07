@@ -15,7 +15,7 @@ import { SettingsThemeRow } from "@/components/theme-toggle"
 import { upsertProfile } from "@/app/actions/profile"
 
 export function Appearance() {
-  const { user: auth_user, profile } = useAuth()
+  const { user: auth_user, profile, getToken } = useAuth()
   // const { setTheme } = useTheme()
 
   // Local state for accent color to handle updates
@@ -46,12 +46,13 @@ export function Appearance() {
       // Persist as HEX in DB via server action
       if (!profile) throw new Error('No profile loaded')
       const hex = getAccentColorValue(colorToUse, 500)
+      const token = await getToken();
       const res = await upsertProfile({
         username: profile.username,
         display_name: profile.display_name,
         accent_color: hex,
         cover_url: profile.cover_url ?? null,
-      })
+      }, token || undefined)
       if (typeof res === 'object' && res && 'error' in res && (res as { error?: string }).error) throw new Error((res as { error?: string }).error || 'update failed')
       setLocalAccentColor(colorToUse)
       toast.success(`Accent color updated to ${colorToUse}!`)
@@ -59,7 +60,7 @@ export function Appearance() {
       console.error('❌ Error updating accent color:', error)
       toast.error('Failed to update accent color')
     }
-  }, [currentAccentColor, profile])
+  }, [currentAccentColor, profile, getToken])
 
   // Prevent automatic color updates - only update when explicitly called
   const handleColorChange = useCallback((newColor: AccentColor) => {

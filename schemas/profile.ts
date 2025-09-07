@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { UUID, HEX6 } from "./_shared";
+import { UUID, HEX6, USERNAME } from "./_shared";
 import {
   USERNAME_WITH_BANNABLE_CHECK,
   BIO_WITH_BANNABLE_CHECK,
@@ -38,5 +38,5 @@ export const UpsertProfileClient = z.object({
 });
 
 export const InitProfile = z.object({
-  username: USERNAME_WITH_BANNABLE_CHECK.optional(),
+  username: USERNAME.optional(),
 });

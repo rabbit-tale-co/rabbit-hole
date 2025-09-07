@@ -53,7 +53,7 @@ const profileSchema = z.object({
 interface ProfileProps { user: { id: string; email?: string } | null }
 
 export function Profile({ user }: ProfileProps) {
-  const { profile, refreshProfile } = useAuth()
+  const { profile, refreshProfile, getToken, session } = useAuth()
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleting, setDeleting] = React.useState(false)
   const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({})
@@ -135,7 +135,15 @@ export function Profile({ user }: ProfileProps) {
       try {
         console.log('Calling upsertProfile...');
 
-        const result = await upsertProfile(payload);
+        console.log('Session available:', !!session);
+        console.log('Session access_token available:', !!session?.access_token);
+
+        const token = await getToken();
+        console.log('Token obtained:', token ? 'Yes' : 'No');
+        if (token) {
+          console.log('Token preview:', token.substring(0, 20) + '...');
+        }
+        const result = await upsertProfile(payload, token || undefined);
 
         console.log('upsertProfile completed, result:', result);
         console.log('Result type:', typeof result);
@@ -197,7 +205,7 @@ export function Profile({ user }: ProfileProps) {
       }
       console.error('Error updating profile:', error)
     }
-  }, [formData, markAsSaved, user?.email, checkForChanges])
+  }, [formData, markAsSaved, user?.email, checkForChanges, getToken, session])
 
   // Register save function with context so toast can call it
   React.useEffect(() => {
