@@ -86,7 +86,7 @@ export default function RegisterForm() {
       return;
     }
 
-    // We don’t collect display_name in this compact form; derive it from username.
+    // We don't collect display_name in this compact form; derive it from username.
     const { error } = await signUp({
       email,
       password,
@@ -98,6 +98,7 @@ export default function RegisterForm() {
     setLoading(false);
 
     if (error) {
+      console.error('Signup error:', error);
       setError(error);
     } else {
       // If email confirmation is required, show success screen and keep dialog open.

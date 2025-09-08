@@ -15,9 +15,9 @@ import { renderBioContent } from "@/lib/profile";
 import { SolidCarrot } from "../icons/Icons";
 import { useFollow } from "@/hooks/useFollow";
 import { useGlobalFollowStats } from "@/hooks/useGlobalFollowStats";
-import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
+import { FollowButton } from "@/components/user/FollowButton";
 
 /** Minimal card with bg-white, ring-1, rounded, no shadows. */
 function UserCard({ user: u }: {
@@ -111,19 +111,15 @@ function UserCard({ user: u }: {
             accentHex={avatarAccentHex}
           />
           {followStats && !isSuspended && !isOwnProfile && (
-            <Button
-              variant={followStats.isFollowing ? "secondary" : "default"}
-              size="sm"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                toggleFollow();
-              }}
-              disabled={followLoading}
-              className="absolute right-2 top-2"
-            >
-              {followStats.isFollowing ? "Following" : "Follow"}
-            </Button>
+            <div className="absolute right-2 top-2">
+              <FollowButton
+                isFollowing={followStats.isFollowing}
+                loading={followLoading}
+                canFollow={true}
+                onToggle={toggleFollow}
+                size="sm"
+              />
+            </div>
           )}
         </div>
 

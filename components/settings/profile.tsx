@@ -127,27 +127,27 @@ export function Profile({ user }: ProfileProps) {
         try { await supabase.auth.refreshSession() } catch { }
       }
 
-      console.log('About to call upsertProfile with payload:', payload);
+      // console.log('About to call upsertProfile with payload:', payload);
 
       // Show loading toast
       toast.loading('Updating profile...', { id: 'profile-update' });
 
       try {
-        console.log('Calling upsertProfile...');
+        // console.log('Calling upsertProfile...');
 
-        console.log('Session available:', !!session);
-        console.log('Session access_token available:', !!session?.access_token);
+        // console.log('Session available:', !!session);
+        // console.log('Session access_token available:', !!session?.access_token);
 
         const token = await getToken();
-        console.log('Token obtained:', token ? 'Yes' : 'No');
-        if (token) {
-          console.log('Token preview:', token.substring(0, 20) + '...');
-        }
+        // console.log('Token obtained:', token ? 'Yes' : 'No');
+        // if (token) {
+        //   console.log('Token preview:', token.substring(0, 20) + '...');
+        // }
         const result = await upsertProfile(payload, token || undefined);
 
-        console.log('upsertProfile completed, result:', result);
-        console.log('Result type:', typeof result);
-        console.log('Result has error property:', result && typeof result === 'object' && 'error' in result);
+        // console.log('upsertProfile completed, result:', result);
+        // console.log('Result type:', typeof result);
+        // console.log('Result has error property:', result && typeof result === 'object' && 'error' in result);
 
         if (result && typeof result === 'object' && 'error' in result && result.error) {
           // Handle specific error types
@@ -164,9 +164,9 @@ export function Profile({ user }: ProfileProps) {
         }
 
         // Success
-        console.log('No error, showing success toast');
+        // console.log('No error, showing success toast');
         toast.success('Profile updated successfully!', { id: 'profile-update' });
-        console.log('Profile updated successfully');
+        // console.log('Profile updated successfully');
 
       } catch (error) {
         console.error('Unexpected error updating profile:', error);
@@ -205,7 +205,7 @@ export function Profile({ user }: ProfileProps) {
       }
       console.error('Error updating profile:', error)
     }
-  }, [formData, markAsSaved, user?.email, checkForChanges, getToken, session])
+  }, [formData, markAsSaved, user?.email, checkForChanges, getToken])
 
   // Register save function with context so toast can call it
   React.useEffect(() => {
@@ -780,10 +780,11 @@ export function Profile({ user }: ProfileProps) {
           if (!user?.id) return;
           setDeleting(true);
           try {
-            // 1) sign out first to clear local storage and sessions
-            await supabase.auth.signOut();
-            // 2) delete account on server
-            const res = await deleteAccount(user.id);
+            // Get JWT token for authentication
+            const token = await getToken();
+
+            // 1) delete account on server first (while user is still authenticated)
+            const res = await deleteAccount(user.id, token || undefined);
 
             if ((res as { error?: string }).error) {
               const error = (res as { error?: string }).error;
@@ -795,9 +796,12 @@ export function Profile({ user }: ProfileProps) {
               } else {
                 toast.error(`Failed to delete account: ${error}`);
               }
-            } else {
-              toast.success("Account deleted successfully");
+              return;
             }
+
+            // 2) sign out after successful deletion
+            await supabase.auth.signOut();
+            toast.success("Account deleted successfully");
           } catch (error) {
             console.error('Unexpected error deleting account:', error);
             toast.error('An unexpected error occurred while deleting account.');

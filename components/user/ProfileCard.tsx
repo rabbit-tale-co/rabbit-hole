@@ -6,12 +6,12 @@ import { buildPublicUrl } from "@/lib/publicUrl";
 import * as React from "react";
 import { useState } from "react";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
-import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { generateAccentColor, getAccentColorStyle, getStyleFromHexShade, getAccentColorValue } from "@/lib/accent-colors";
 import { cn } from "@/lib/utils";
 import { PremiumBadge } from "./PremiumBadge";
 import { useFollowLazy } from "@/hooks/useFollowLazy";
+import { FollowButton } from "./FollowButton";
 
 // FIXME: posts have different numbers for same user
 
@@ -49,8 +49,10 @@ export function UserChipHoverCard({
   const { loading: followLoading, isFollowing, followers, following, canFollow, toggleFollow, loaded } =
     useFollowLazy(user_id, isHoverOpen);
 
-  const handleFollow = async (e: React.MouseEvent) => {
-    e.preventDefault(); // prevent link navigation on button click
+  const handleFollow = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault(); // prevent link navigation on button click
+    }
     if (followLoading || !canFollow) return;
     toggleFollow();
   };
@@ -158,14 +160,13 @@ export function UserChipHoverCard({
                 </div>
               </div>
               <div className="flex-shrink-0 ml-2 absolute right-2 top-2">
-                <Button
+                <FollowButton
+                  isFollowing={isFollowing}
+                  loading={followLoading}
+                  canFollow={canFollow}
+                  onToggle={handleFollow}
                   size="sm"
-                  variant={isFollowing ? "secondary" : "default"}
-                  onClick={handleFollow}
-                  disabled={followLoading || !canFollow}
-                >
-                  {isFollowing ? "Following" : "Follow"}
-                </Button>
+                />
               </div>
             </div>
           </div>

@@ -22,6 +22,16 @@ export function useFollow(targetUserId?: string | null, initialStats?: { isFollo
     return true;
   }, [targetUserId, user?.id]);
 
+  // Update state when initialStats change (from batch follow stats)
+  useEffect(() => {
+    if (initialStats) {
+      setIsFollowing(initialStats.isFollowing);
+      setFollowers(initialStats.followers);
+      setFollowing(initialStats.following);
+      setLoading(false);
+    }
+  }, [initialStats, targetUserId]);
+
   useEffect(() => {
     let cancelled = false;
     if (!targetUserId || initialStats) return; // Skip if we have initial stats

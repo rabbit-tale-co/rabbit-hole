@@ -18,7 +18,7 @@ import { OutlineCarrot, OutlineCrown, OutlineLogout, OutlineSettings, OutlineUse
 import { Badge } from '@/components/ui/badge'
 import { PremiumBadge } from './PremiumBadge'
 
-export function UserProfileMenu() {
+export function UserProfileMenu({ className }: { className?: string }) {
   const { user: auth_user, profile: user, signOut } = useAuth()
   const [settingsOpen, setSettingsOpen] = React.useState(false)
 
@@ -52,6 +52,7 @@ export function UserProfileMenu() {
               avatarUrl={user.avatar_url || undefined}
               size="sm"
               accentHex={user.accent_color || undefined}
+              className={className}
             />
           </Button>
         </DropdownMenuTrigger>

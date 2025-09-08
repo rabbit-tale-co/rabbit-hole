@@ -9,13 +9,13 @@ import { verifySupabaseJWT } from "@/lib/jwt-utils";
 // import { getBatchFollowStats } from "./follow"; // No longer needed - follow stats loaded on hover
 
 export async function upsertProfile(input: unknown, token?: string) {
-  const callId = Math.random().toString(36).substring(7);
-  console.log(`[${callId}] upsertProfile called at ${new Date().toISOString()}`);
+  // const callId = Math.random().toString(36).substring(7);
+  // console.log(`[${callId}] upsertProfile called at ${new Date().toISOString()}`);
 
   // Parse client input (without user_id)
   const parsed = await UpsertProfileClient.safeParseAsync(input);
   if (!parsed.success) {
-    console.log(`[${callId}] Validation failed:`, parsed.error.issues);
+    // console.log(`[${callId}] Validation failed:`, parsed.error.issues);
     // Extract bannable words errors specifically
     const bannableWordsErrors = parsed.error.issues
       .filter(issue => issue.code === "custom" && issue.message?.includes("inappropriate content"))
@@ -31,37 +31,37 @@ export async function upsertProfile(input: unknown, token?: string) {
   }
 
   // Verify user authentication - try JWT token first, then cookies
-  console.log(`[${callId}] Starting authentication verification...`);
+  // console.log(`[${callId}] Starting authentication verification...`);
   let userId: string;
 
   try {
     // Try JWT token first if provided
     if (token) {
-      console.log(`[${callId}] [AUTH] Attempting JWT authentication with token:`, token.substring(0, 20) + '...');
+      // console.log(`[${callId}] [AUTH] Attempting JWT authentication with token:`, token.substring(0, 20) + '...');
       const authResult = await verifySupabaseJWT(token);
       if (authResult) {
         userId = authResult.userId;
-        console.log(`[${callId}] [AUTH] Profile update (JWT auth): ${userId}`);
+        // console.log(`[${callId}] [AUTH] Profile update (JWT auth): ${userId}`);
       } else {
-        console.log(`[${callId}] [AUTH] JWT token verification failed`);
+        // console.log(`[${callId}] [AUTH] JWT token verification failed`);
         throw new Error('Invalid JWT token');
       }
     } else {
-      console.log(`[${callId}] [AUTH] No JWT token provided, trying cookies...`);
+      // console.log(`[${callId}] [AUTH] No JWT token provided, trying cookies...`);
       // Fallback to cookies
       const supabase = await createClient();
       const { data: { user }, error } = await supabase.auth.getUser();
 
       if (error || !user) {
-        console.log(`[${callId}] Authentication failed:`, error?.message || 'No user');
+        // console.log(`[${callId}] Authentication failed:`, error?.message || 'No user');
         return { error: "Unauthorized" };
       }
 
       userId = user.id;
-      console.log(`[${callId}] [AUTH] Profile update (cookie auth): ${userId}`);
+      // console.log(`[${callId}] [AUTH] Profile update (cookie auth): ${userId}`);
     }
   } catch (error) {
-    console.error(`[${callId}] [AUTH] Authentication error:`, error);
+    // console.error(`[${callId}] [AUTH] Authentication error:`, error);
     return { error: "Unauthorized" };
   }
 
@@ -106,32 +106,40 @@ export async function upsertProfile(input: unknown, token?: string) {
   return { profile: data };
 }
 
-export async function deleteAccount(userId: string) {
+export async function deleteAccount(userId: string, token?: string) {
   // Verify user authentication
-  const { data: auth } = await supabaseAdmin.auth.getUser();
-  if (!auth.user?.id) {
+  let authenticatedUserId: string;
+
+  if (token) {
+    // Use JWT token for authentication
+    try {
+      const authResult = await verifySupabaseJWT(token);
+      if (!authResult) {
+        // console.error('[JWT] Account deletion - JWT verification failed');
+        return { error: "Unauthorized" };
+      }
+      authenticatedUserId = authResult.userId;
+      // console.log(`[JWT] Account deletion (JWT auth): ${authenticatedUserId}`);
+    } catch (error) {
+      // console.error('[JWT] Account deletion auth error:', error);
+      return { error: "Unauthorized" };
+    }
+  } else {
     // Fallback to client-side authentication
     try {
       const { supabase } = await import("@/lib/supabase");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) return { error: "Unauthorized" };
-
-      // Verify user can only delete their own account
-      if (user.id !== userId) return { error: "Forbidden" };
-
-      // Log JWT usage for account deletion
-      console.log(`[JWT] Account deletion (client auth): ${user.id}`);
+      authenticatedUserId = user.id;
+      // console.log(`[JWT] Account deletion (client auth): ${authenticatedUserId}`);
     } catch (error) {
-      console.error('[JWT] Account deletion auth error:', error);
+      // console.error('[JWT] Account deletion auth error:', error);
       return { error: "Unauthorized" };
     }
-  } else {
-    // Verify user can only delete their own account
-    if (auth.user.id !== userId) return { error: "Forbidden" };
-
-    // Log JWT usage for account deletion
-    console.log(`[JWT] Account deletion (server auth): ${auth.user.id}`);
   }
+
+  // Verify user can only delete their own account
+  if (authenticatedUserId !== userId) return { error: "Forbidden" };
 
   const sb = supabaseAdmin;
   // delete reactions and comments first (cascades may help, but do it explicitly)

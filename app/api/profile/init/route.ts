@@ -116,26 +116,42 @@ export async function POST(req: NextRequest) {
   try {
     // 1. Verify authentication first
     const authHeader = req.headers.get('authorization');
+    // console.log('Auth header:', authHeader ? authHeader.substring(0, 20) + '...' : 'null');
     if (!authHeader?.startsWith('Bearer ')) {
+      // console.error('Missing or invalid authorization header');
       return Response.json({ error: "Missing or invalid authorization header" }, { status: 401 });
     }
 
     const token = authHeader.substring(7);
+    // console.log('Token extracted:', token.substring(0, 20) + '...');
     const authResult = await verifySupabaseJWT(token);
     if (!authResult) {
+      // console.error('JWT verification failed');
       return Response.json({ error: "Invalid or expired token" }, { status: 401 });
     }
+    // console.log('JWT verification successful, userId:', authResult.userId);
 
     const authenticatedUserId = authResult.userId;
 
     // 2. Parse and validate request
     const json = await req.json().catch(() => ({}));
+    // console.log('Profile init request body:', json);
     const parsed = InitProfile.safeParse(json);
     if (!parsed.success) {
+      // console.error('Profile init payload validation failed:', parsed.error);
       return Response.json({ error: "invalid payload" }, { status: 400 });
     }
 
-    const { username: desiredUsername } = parsed.data;
+    // Try to get username from request body first, then from JWT user_metadata
+    let desiredUsername = parsed.data.username;
+    // console.log('Profile init - username from body:', desiredUsername);
+    if (!desiredUsername) {
+      // Fallback to user_metadata from JWT token
+      const { getUserMetadataFromToken } = await import('@/lib/jwt-utils');
+      const userMetadata = await getUserMetadataFromToken(token);
+      desiredUsername = userMetadata?.username as string;
+      // console.log('Using username from JWT user_metadata:', desiredUsername);
+    }
 
     // 3. Check for bannable words (only if username is provided)
     if (desiredUsername) {

@@ -60,13 +60,23 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           }
           if (sess?.user?.id) {
             // ensure profile row exists then fetch it
+            // Try to get username from user_metadata
+            const username = sess.user.user_metadata?.username;
+            // console.log('Auth state change - user metadata:', sess.user.user_metadata);
+            // console.log('Auth state change - username from metadata:', username);
+
+            const body: { username?: string } = {};
+            if (username) {
+              body.username = username;
+            }
+
             fetch("/api/profile/init", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${sess.access_token}`,
               },
-              body: JSON.stringify({}),
+              body: JSON.stringify(body),
             }).catch(() => { });
 
             (async () => {
@@ -133,36 +143,64 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   const signUp: AuthCtx["signUp"] = async (params) => {
     const { email, password, ...meta } = params;
+    // console.log('SignUp params:', { email, meta });
     const { error, data } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          username: meta.username,
+          display_name: meta.display_name,
+        }
+      }
     });
     if (error) return { error: error.message };
 
-    // Hit init endpoint once user exists to mirror profile row.
-    try {
-      const res = await fetch("/api/profile/init", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${data.session?.access_token}`,
-        },
-        body: JSON.stringify({
-          username: meta.username,
-        }),
-      });
-      if (!res.ok) {
-        if (res.status === 409) {
-          return { error: "Username is already taken." };
+    // Only try to initialize profile if we have a session (no email confirmation required)
+    if (data.session?.access_token) {
+      // console.log('Signup: Initializing profile with session');
+      // console.log('Session data:', {
+      //   user: data.session.user?.id,
+      //   email: data.session.user?.email,
+      //   tokenLength: data.session.access_token.length
+      // });
+      try {
+        const res = await fetch("/api/profile/init", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${data.session.access_token}`,
+          },
+          body: JSON.stringify({
+            username: meta.username,
+          }),
+        });
+        if (!res.ok) {
+          // console.error('Profile init failed:', res.status, res.statusText);
+          if (res.status === 409) {
+            return { error: "Username is already taken." };
+          }
+          let message = "Failed to initialize profile.";
+          try {
+            const j = await res.json();
+            // console.error('Profile init error response:', j);
+            if (j?.error && typeof j.error === "string") message = j.error;
+          } catch { }
+          return { error: message };
         }
-        let message = "Failed to initialize profile.";
-        try {
-          const j = await res.json();
-          if (j?.error && typeof j.error === "string") message = j.error;
-        } catch { }
-        return { error: message };
+        // console.log('Profile initialized successfully');
+      } catch (error) {
+        // console.error('Profile init exception:', error);
       }
-    } catch { }
+    } else {
+      // console.log('Signup: No session available, email confirmation may be required');
+      // console.log('Data from signup:', {
+      //   user: data.user?.id,
+      //   email: data.user?.email,
+      //   session: data.session
+      // });
+    }
+    // If no session (email confirmation required), profile will be initialized on first login
 
     // Supabase may require email confirm depending on project settings.
     return {};

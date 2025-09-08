@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, memo } from "react";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,10 +10,13 @@ import { PremiumBadge } from "./PremiumBadge";
 import { useInfiniteFollowers, type FollowerItem } from "@/hooks/useInfiniteFollowers";
 import { useInfiniteFollowing, type FollowingItem } from "@/hooks/useInfiniteFollowing";
 import { useFollow } from "@/hooks/useFollow";
+import { useBatchFollowStats } from "@/hooks/useBatchFollowStats";
 import { useAuth } from "@/providers/AuthProvider";
 import { generateAccentColor } from "@/lib/accent-colors";
 import { buildPublicUrl } from "@/lib/publicUrl";
 import { renderBioContent } from "@/lib/profile";
+import { FollowListSkeleton } from "./FollowSkeleton";
+import { FollowButton } from "./FollowButton";
 
 interface FollowDialogProps {
   open: boolean;
@@ -31,15 +34,17 @@ const tabsList =
 
 /* -------------- User item -------------- */
 
-function UserListItem({
+const UserListItem = memo(function UserListItem({
   user,
   showFollowButton = true,
+  batchStats,
 }: {
   user: FollowerItem | FollowingItem;
   showFollowButton?: boolean;
+  batchStats?: { isFollowing: boolean; followers: number; following: number };
 }) {
   const { user: currentUser } = useAuth();
-  const { loading: followLoading, isFollowing, toggleFollow } = useFollow(user.user_id);
+  const { loading: followLoading, isFollowing, toggleFollow } = useFollow(user.user_id, batchStats);
   const accent = useMemo(() => generateAccentColor(user.username), [user.username]);
 
   const canFollow = Boolean(currentUser?.id) && currentUser!.id !== user.user_id;
@@ -84,36 +89,31 @@ function UserListItem({
 
         {showFollowButton && canFollow && (
           <div className="flex-shrink-0 self-center">
-            <Button
-              variant={isFollowing ? "secondary" : "default"}
+            <FollowButton
+              isFollowing={isFollowing}
+              loading={followLoading}
+              canFollow={canFollow}
+              onToggle={toggleFollow}
               size="sm"
-              disabled={followLoading}
-              onClick={toggleFollow}
-              aria-pressed={isFollowing}
-              className="rounded-full"
-            >
-
-              {isFollowing ? (
-                <span className="inline-flex items-center gap-1">
-                  Following
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1">
-                  Follow
-                </span>
-              )}
-            </Button>
+            />
           </div>
         )}
       </div>
     </li>
   );
-}
+});
 
 /* -------------- Followers list -------------- */
 
 function FollowersList({ targetUserId, targetUsername }: { targetUserId: string; targetUsername: string }) {
   const { items, loadMore, loading, error, hasMore } = useInfiniteFollowers(targetUserId);
+
+  // Get user IDs for batch follow stats
+  const userIds = items.map(item => item.user_id);
+  const { getUserStats, hasLoadedAllUsers } = useBatchFollowStats({
+    userIds,
+    enabled: userIds.length > 0
+  });
 
   if (error) {
     return (
@@ -126,21 +126,36 @@ function FollowersList({ targetUserId, targetUsername }: { targetUserId: string;
     );
   }
 
+  if (loading && items.length === 0) {
+    return <FollowListSkeleton count={6} />;
+  }
+
   if (items.length === 0 && !loading) {
     return (
       <div className="p-12 text-center text-neutral-600">
         <p className="text-base font-medium">No followers yet</p>
-        <p className="text-sm mt-1">When someone follows @{targetUsername}, they’ll appear here.</p>
+        <p className="text-sm mt-1">When someone follows @{targetUsername}, they&apos;ll appear here.</p>
       </div>
     );
+  }
+
+  // Show skeleton while follow stats are loading for the first batch of users
+  if (items.length > 0 && !hasLoadedAllUsers()) {
+    return <FollowListSkeleton count={Math.min(items.length, 6)} />;
   }
 
   return (
     <>
       <ul className="space-y-2">
         {items.map((u) => (
-          <UserListItem key={u.user_id} user={u} showFollowButton />
+          <UserListItem
+            key={u.user_id}
+            user={u}
+            showFollowButton
+            batchStats={getUserStats(u.user_id)}
+          />
         ))}
+        {loading && <FollowListSkeleton count={3} />}
       </ul>
 
       <div className="relative">
@@ -163,6 +178,13 @@ function FollowersList({ targetUserId, targetUsername }: { targetUserId: string;
 function FollowingList({ targetUserId, targetUsername }: { targetUserId: string; targetUsername: string }) {
   const { items, loadMore, loading, error, hasMore } = useInfiniteFollowing(targetUserId);
 
+  // Get user IDs for batch follow stats
+  const userIds = items.map(item => item.user_id);
+  const { getUserStats, hasLoadedAllUsers } = useBatchFollowStats({
+    userIds,
+    enabled: userIds.length > 0
+  });
+
   if (error) {
     return (
       <div className="p-8 text-center text-neutral-600">
@@ -174,21 +196,36 @@ function FollowingList({ targetUserId, targetUsername }: { targetUserId: string;
     );
   }
 
+  if (loading && items.length === 0) {
+    return <FollowListSkeleton count={6} />;
+  }
+
   if (items.length === 0 && !loading) {
     return (
       <div className="p-12 text-center text-neutral-600">
         <p className="text-base font-medium">Not following anyone yet</p>
-        <p className="text-sm mt-1">When @{targetUsername} follows someone, they’ll appear here.</p>
+        <p className="text-sm mt-1">When @{targetUsername} follows someone, they&apos;ll appear here.</p>
       </div>
     );
+  }
+
+  // Show skeleton while follow stats are loading for the first batch of users
+  if (items.length > 0 && !hasLoadedAllUsers()) {
+    return <FollowListSkeleton count={Math.min(items.length, 6)} />;
   }
 
   return (
     <>
       <ul className="space-y-2">
         {items.map((u) => (
-          <UserListItem key={u.user_id} user={u} showFollowButton />
+          <UserListItem
+            key={u.user_id}
+            user={u}
+            showFollowButton
+            batchStats={getUserStats(u.user_id)}
+          />
         ))}
+        {loading && <FollowListSkeleton count={3} />}
       </ul>
 
       <div className="relative">

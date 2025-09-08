@@ -1,135 +1,192 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 
-export interface FollowStats {
-  isFollowing: boolean;
-  followers: number;
-  following: number;
+export interface BatchFollowStats {
+  [userId: string]: {
+    isFollowing: boolean;
+    followers: number;
+    following: number;
+  };
 }
 
-// Global cache for follow stats
-const followStatsCache = new Map<string, FollowStats>();
-const pendingRequests = new Set<string>();
+interface UseBatchFollowStatsOptions {
+  userIds: string[];
+  enabled?: boolean;
+  refetchInterval?: number;
+}
 
-export function useBatchFollowStats(userId: string) {
-  const [followStats, setFollowStats] = useState<FollowStats | null>(
-    followStatsCache.get(userId) || null
-  );
+export function useBatchFollowStats({
+  userIds,
+  enabled = true,
+  refetchInterval
+}: UseBatchFollowStatsOptions) {
+  const { user, getToken } = useAuth();
+  const [stats, setStats] = useState<BatchFollowStats>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
-  const requestTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const inFlightRef = useRef(false);
+  const lastFetchedRef = useRef<string>("");
+  const cacheTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchStats = useCallback(async () => {
-    if (followStats || loading || pendingRequests.has(userId)) return;
+    if (!enabled || !user?.id || userIds.length === 0) return;
 
-    // If no user is logged in, set default stats and return
-    if (!user) {
-      const defaultStats: FollowStats = { isFollowing: false, followers: 0, following: 0 };
-      setFollowStats(defaultStats);
+    // Create a unique key for this request to avoid duplicate requests
+    const requestKey = userIds.sort().join(',');
+
+    // Skip if we already have data for these exact users
+    if (lastFetchedRef.current === requestKey) {
       return;
     }
 
-    // Add to pending requests
-    pendingRequests.add(userId);
+    // Skip if request is already in flight
+    if (inFlightRef.current) {
+      return;
+    }
+
+    // Check cache first
+    try {
+      const cached = localStorage.getItem(`batch-follow-stats-${requestKey}`);
+      if (cached) {
+        const { data: cachedData, timestamp } = JSON.parse(cached);
+        // Use cache if it's less than 5 minutes old
+        if (Date.now() - timestamp < 5 * 60 * 1000) {
+          setStats(cachedData);
+          lastFetchedRef.current = requestKey;
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Error checking cache:", e);
+      // Ignore cache errors
+    }
+
+    inFlightRef.current = true;
     setLoading(true);
     setError(null);
 
-    // Debounce requests - wait 100ms to batch them
-    if (requestTimeoutRef.current) {
-      clearTimeout(requestTimeoutRef.current);
+    try {
+      // Get JWT token from AuthProvider
+      const token = await getToken();
+
+      if (!token) {
+        setError("No authentication token");
+        return;
+      }
+
+      const response = await fetch("/api/users/batch-follow-stats", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userIds }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const newStats = data.stats || {};
+      setStats(newStats);
+      lastFetchedRef.current = requestKey;
+
+      // Cache the results for 5 minutes
+      try {
+        localStorage.setItem(`batch-follow-stats-${requestKey}`, JSON.stringify({
+          data: newStats,
+          timestamp: Date.now()
+        }));
+      } catch {
+        // Ignore localStorage errors
+      }
+    } catch (err) {
+      console.error("Error fetching batch follow stats:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch follow stats");
+    } finally {
+      setLoading(false);
+      inFlightRef.current = false;
+    }
+  }, [user?.id, userIds, enabled, getToken]);
+
+  // Debounced fetch
+  useEffect(() => {
+    if (!enabled || userIds.length === 0) return;
+
+    // Clear previous debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
     }
 
-    requestTimeoutRef.current = setTimeout(async () => {
-      try {
-        // Get JWT token from Supabase session
-        const { data: { session } } = await import("@/lib/supabase").then(m => m.supabase.auth.getSession());
-        const token = session?.access_token;
+    // Debounce the request by 300ms
+    debounceRef.current = setTimeout(() => {
+      fetchStats();
+    }, 300);
 
-        if (!token) {
-          setError("No authentication token");
-          return;
-        }
-
-        // Get all visible user IDs from the page
-        const visibleUserIds = Array.from(
-          new Set(
-            Array.from(document.querySelectorAll('[data-user-id]'))
-              .map(el => el.getAttribute('data-user-id'))
-              .filter(Boolean) as string[]
-          )
-        );
-
-        // Filter out already cached users
-        const uncachedUserIds = visibleUserIds.filter(id => !followStatsCache.has(id));
-
-        if (uncachedUserIds.length === 0) {
-          // All users are already cached
-          const cachedStats = followStatsCache.get(userId);
-          if (cachedStats) {
-            setFollowStats(cachedStats);
-          }
-          return;
-        }
-
-        // Batch request for all uncached users
-        const response = await fetch('/api/users/batch-follow-stats', {
-          method: 'POST',
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ userIds: uncachedUserIds }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Cache all results
-        for (const [id, stats] of Object.entries(data.followStats)) {
-          followStatsCache.set(id, stats as FollowStats);
-        }
-
-        // Set stats for current user
-        const userStats = followStatsCache.get(userId);
-        if (userStats) {
-          setFollowStats(userStats);
-        }
-
-      } catch (err) {
-        console.error("Error fetching batch follow stats:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch follow stats");
-      } finally {
-        setLoading(false);
-        pendingRequests.delete(userId);
-      }
-    }, 100);
-
-  }, [userId, user, followStats, loading]);
-
-  // Auto-fetch stats when component mounts
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
+    // Cleanup
     return () => {
-      if (requestTimeoutRef.current) {
-        clearTimeout(requestTimeoutRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
       }
+    };
+  }, [fetchStats, enabled, userIds.length]);
+
+  // Refetch interval
+  useEffect(() => {
+    if (!refetchInterval || !enabled) return;
+
+    const interval = setInterval(fetchStats, refetchInterval);
+    return () => clearInterval(interval);
+  }, [fetchStats, refetchInterval, enabled]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    const debounce = debounceRef.current;
+    const cacheTimeout = cacheTimeoutRef.current;
+
+    return () => {
+      if (debounce) {
+        clearTimeout(debounce);
+      }
+      if (cacheTimeout) {
+        clearTimeout(cacheTimeout);
+      }
+      inFlightRef.current = false;
     };
   }, []);
 
+  // Memoized individual user stats
+  const getUserStats = useCallback((userId: string) => {
+    return stats[userId] || { isFollowing: false, followers: 0, following: 0 };
+  }, [stats]);
+
+  // Memoized loading state for specific users
+  const isLoadingUser = useCallback((userId: string) => {
+    return loading && !stats[userId];
+  }, [loading, stats]);
+
+  // Check if we have loaded data for specific users
+  const hasLoadedUser = useCallback((userId: string) => {
+    return stats[userId] !== undefined;
+  }, [stats]);
+
+  // Check if we have loaded data for all provided user IDs
+  const hasLoadedAllUsers = useCallback(() => {
+    return userIds.length > 0 && userIds.every(userId => stats[userId] !== undefined);
+  }, [userIds, stats]);
+
   return {
-    followStats,
+    stats,
     loading,
     error,
-    fetchStats,
+    refetch: fetchStats,
+    getUserStats,
+    isLoadingUser,
+    hasLoadedUser,
+    hasLoadedAllUsers,
   };
 }

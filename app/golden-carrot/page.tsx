@@ -39,7 +39,7 @@ interface SubscriptionStatus {
 
 
 function GoldenCarrotContent() {
-  const { user } = useAuth()
+  const { user, getToken } = useAuth()
   const [tab, setTab] = useState<"monthly" | "annual" | "day">("monthly")
   const [isLoading, setIsLoading] = useState(false)
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>({ isActive: false })
@@ -55,7 +55,17 @@ function GoldenCarrotContent() {
 
     try {
       // console.log('🔍 Fetching subscription status for user:', user.id)
-      const response = await fetch(`/api/user/subscription-status?userId=${user.id}`)
+      const token = await getToken()
+      if (!token) {
+        console.error('❌ No authentication token available')
+        return
+      }
+
+      const response = await fetch(`/api/user/subscription-status?userId=${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       // console.log('📡 Response status:', response.status)
 
       if (response.ok) {
@@ -79,7 +89,7 @@ function GoldenCarrotContent() {
     } catch (error) {
       console.error("Failed to fetch subscription status:", error)
     }
-  }, [user?.id])
+  }, [user?.id, getToken])
 
   useEffect(() => {
     fetchSubscriptionStatus()
@@ -95,9 +105,18 @@ function GoldenCarrotContent() {
 
       const syncPremiumStatus = async () => {
         try {
+          const token = await getToken()
+          if (!token) {
+            console.error('❌ No authentication token available for sync')
+            return
+          }
+
           const response = await fetch("/api/user/subscription-status", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
           })
 
           if (response.ok) {
@@ -113,7 +132,7 @@ function GoldenCarrotContent() {
     } else if (canceled) {
       toast.error("Payment was canceled. You can try again anytime.")
     }
-  }, [searchParams, fetchSubscriptionStatus])
+  }, [searchParams, fetchSubscriptionStatus, getToken])
 
   return (
     <div className="mx-auto max-w-4xl py-16 px-6 flex flex-col items-center">
@@ -139,8 +158,8 @@ function GoldenCarrotContent() {
         <Tabs value={tab} onValueChange={(v) => setTab(v as "monthly" | "annual" | "day")}>
           <div className="flex items-center justify-center">
             <TabsList className="grid grid-cols-2 w-[480px]">
-              <TabsTrigger className="h-10" value="monthly">Monthly</TabsTrigger>
-              <TabsTrigger className="h-10 relative" value="annual">
+              <TabsTrigger value="monthly">Monthly</TabsTrigger>
+              <TabsTrigger className="relative" value="annual">
                 Annual
                 <Badge className="absolute -right-6 rotate-12 -top-4 bg-green-100 text-green-800 border-green-200">{`-${SAVINGS_PCT}%`}</Badge>
               </TabsTrigger>

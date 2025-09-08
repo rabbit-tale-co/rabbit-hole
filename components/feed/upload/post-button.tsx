@@ -40,7 +40,7 @@ export default function PostButton({ className }: { className?: string }) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className={cn("rounded-full", className)}>
+      <Button onClick={() => setOpen(true)} className={cn("", className)}>
         New Post
       </Button>
 

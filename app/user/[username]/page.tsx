@@ -5,6 +5,7 @@ import { UserProfile } from '@/components/user/Profile';
 import Feed from '@/components/feed/Index';
 import { EmptyState } from '@/components/feed/Empty';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useUserStats } from '@/hooks/useUserStats';
 import { useAuth } from '@/providers/AuthProvider';
 import Center from '@/components/Center';
 import { OutlineUser } from '@/components/icons/Icons';
@@ -16,6 +17,7 @@ export default function UserProfilePage() {
   const username = params.username as string;
 
   const { profile, isOwn, loading } = useUserProfile(username);
+  const { stats: userStats, loading: userStatsLoading } = useUserStats(username);
   useAuth();
 
   if (loading) {
@@ -50,8 +52,12 @@ export default function UserProfilePage() {
       {/* UserProfile component */}
       <UserProfile
         profile={profile}
-        stats={{ posts: 0 }}
+        stats={{
+          posts: userStats?.posts || 0,
+          views: userStats?.views || 0
+        }}
         isOwnProfile={isOwn}
+        isLoading={userStatsLoading}
       />
 
       {!isSuspended ? (

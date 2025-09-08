@@ -41,27 +41,39 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+--color-athens-gray-50: oklch(0.9732 0.0041 271.37);
+--color-athens-gray-100: oklch(0.9555 0.0054 274.96);
+--color-athens-gray-200: oklch(0.8921 0.014 272.68);
+--color-athens-gray-300: oklch(0.8159 0.0228 274.68);
+--color-athens-gray-400: oklch(0.7218 0.0354 274.38);
+--color-athens-gray-500: oklch(0.6461 0.0468 276.42);
+--color-athens-gray-600: oklch(0.5832 0.0536 280.77);
+--color-athens-gray-700: oklch(0.5361 0.0547 281.83);
+--color-athens-gray-800: oklch(0.4719 0.0466 284.47);
+--color-athens-gray-900: oklch(0.4166 0.0349 282.63);
+--color-athens-gray-950: oklch(0.3147 0.0195 289.39);
 }
 
 :root {
   --radius: 0.775rem;
-  --background: oklch(98.5% 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: var(--color-slate-100);
+  --foreground: var(--color-slate-950);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --primary: var(--color-slate-950);
+  --primary-foreground: var(--color-athens-gray-50);
+  --secondary: var(--color-slate-200);
+  --secondary-foreground: var(--color-slate-950);
+  --muted: var(--color-slate-200);
+  --muted-foreground: var(--color-athens-gray-950);
+  --accent: oklch(1 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --border: var(--color-slate-200);
+  --input: var(--color-slate-300);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -79,8 +91,8 @@
 }
 
 .dark {
-  --background: oklch(14.5% 0 0);
-  --foreground: oklch(0.985 0 0);
+  --background: var(--color-athens-gray-950);
+  --foreground: var(--color-athens-gray-50);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);

@@ -1,4 +1,4 @@
-import { supabaseAuthAdmin } from '@/lib/supabase-admin';
+import { supabase } from '@/lib/supabase';
 
 /**
  * Types for JWT claims according to Supabase documentation
@@ -23,12 +23,18 @@ export interface SupabaseJWTPayload {
  */
 export async function verifySupabaseJWT(token: string): Promise<{ userId: string; claims: SupabaseJWTPayload } | null> {
   try {
-    const { data: { user }, error } = await supabaseAuthAdmin.auth.getUser(token);
+    // console.log('Verifying JWT token:', token.substring(0, 20) + '...');
+    // console.log('Token length:', token.length);
+
+    const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
       console.error('Supabase client verification failed:', error);
+      // console.error('User data:', user);
       return null;
     }
+
+    // console.log('JWT verification successful for user:', user.id);
 
     // Decode token manually to get claims
     const parts = token.split('.');
@@ -46,7 +52,7 @@ export async function verifySupabaseJWT(token: string): Promise<{ userId: string
     // 'sub' is the subject identifier in JWT standard
     const userId = payload.sub || user.id;
 
-    console.log('JWT verification - user.id:', user.id, 'payload.sub:', payload.sub, 'using userId:', userId);
+    // console.log('JWT verification - user.id:', user.id, 'payload.sub:', payload.sub, 'using userId:', userId);
 
     return {
       userId: userId,

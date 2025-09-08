@@ -329,12 +329,10 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                         </Tooltip>
                       </TooltipProvider>
 
-                      {/* Post Stats - Only show for admin and premium users */}
-                      {(currentUserProfile?.is_admin || currentUserProfile?.is_premium) && (
-                        <Badge className="bg-black/50">
-                          <PostStats stats={post?.stats} />
-                        </Badge>
-                      )}
+                      {/* Post Stats */}
+                      <Badge className="bg-black/50">
+                        <PostStats stats={post?.stats} />
+                      </Badge>
                     </div>
                     {/* bottom gradient + actions row */}
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />

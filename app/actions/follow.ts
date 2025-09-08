@@ -167,6 +167,7 @@ export async function toggleFollow(targetUserId: string, currentUserId: string):
 export async function getFollowersPage(targetUserId: string, cursor?: string, limit = 24) {
   const supabase = supabaseAdmin;
 
+  // First, get the follow data
   let query = supabase
     .from('follows')
     .select(`
@@ -186,26 +187,18 @@ export async function getFollowersPage(targetUserId: string, cursor?: string, li
     }
   }
 
-  const { data, error } = await query;
+  const { data: followData, error } = await query;
   if (error) {
     console.log('[getFollowersPage] Query error:', error);
     return { error: error.message };
   }
 
-  console.log('[getFollowersPage] Raw data:', data);
-
-  type FollowRow = {
-    follower_id: string;
-    created_at: string;
-  };
-
-  // Get user profiles for the follower IDs
-  const followerIds = (data as FollowRow[] || []).map(row => row.follower_id);
-
-  if (followerIds.length === 0) {
+  if (!followData || followData.length === 0) {
     return { items: [], nextCursor: null };
   }
 
+  // Get user profiles for the follower IDs in a single query
+  const followerIds = followData.map(row => row.follower_id);
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
     .select('user_id, username, display_name, bio, avatar_url, cover_url, accent_color, is_premium')
@@ -217,7 +210,7 @@ export async function getFollowersPage(targetUserId: string, cursor?: string, li
 
   const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
-  const items = (data as FollowRow[] || [])
+  const items = followData
     .map(row => {
       const profile = profileMap.get(row.follower_id);
       if (!profile) return null;
@@ -236,17 +229,18 @@ export async function getFollowersPage(targetUserId: string, cursor?: string, li
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
-  const nextCursor = items.length === limit && data?.length === limit
-    ? Buffer.from(`${(data[data.length - 1] as FollowRow).created_at}|${items[items.length - 1].user_id}`).toString("base64")
+  const nextCursor = items.length === limit && followData?.length === limit
+    ? Buffer.from(`${followData[followData.length - 1].created_at}|${items[items.length - 1].user_id}`).toString("base64")
     : null;
 
   return { items, nextCursor };
 }
 
-// Get following list with pagination
+// Get following list with pagination - OPTIMIZED VERSION
 export async function getFollowingPage(targetUserId: string, cursor?: string, limit = 24) {
   const supabase = supabaseAdmin;
 
+  // First, get the follow data
   let query = supabase
     .from('follows')
     .select(`
@@ -266,21 +260,15 @@ export async function getFollowingPage(targetUserId: string, cursor?: string, li
     }
   }
 
-  const { data, error } = await query;
+  const { data: followData, error } = await query;
   if (error) return { error: error.message };
 
-  type FollowingRow = {
-    following_id: string;
-    created_at: string;
-  };
-
-  // Get user profiles for the following IDs
-  const followingIds = (data as FollowingRow[] || []).map(row => row.following_id);
-
-  if (followingIds.length === 0) {
+  if (!followData || followData.length === 0) {
     return { items: [], nextCursor: null };
   }
 
+  // Get user profiles for the following IDs in a single query
+  const followingIds = followData.map(row => row.following_id);
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
     .select('user_id, username, display_name, bio, avatar_url, cover_url, accent_color, is_premium')
@@ -292,7 +280,7 @@ export async function getFollowingPage(targetUserId: string, cursor?: string, li
 
   const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
-  const items = (data as FollowingRow[] || [])
+  const items = followData
     .map(row => {
       const profile = profileMap.get(row.following_id);
       if (!profile) return null;
@@ -311,8 +299,8 @@ export async function getFollowingPage(targetUserId: string, cursor?: string, li
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
-  const nextCursor = items.length === limit && data?.length === limit
-    ? Buffer.from(`${(data[data.length - 1] as FollowingRow).created_at}|${items[items.length - 1].user_id}`).toString("base64")
+  const nextCursor = items.length === limit && followData?.length === limit
+    ? Buffer.from(`${followData[followData.length - 1].created_at}|${items[items.length - 1].user_id}`).toString("base64")
     : null;
 
   return { items, nextCursor };

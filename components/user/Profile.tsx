@@ -11,6 +11,7 @@ import { ModerationMenu } from "@/components/mod/ModerationMenu";
 import { useAuth } from "@/providers/AuthProvider";
 import { PremiumBadge } from "./PremiumBadge";
 import { useFollow } from "@/hooks/useFollow";
+import { FollowButton } from "./FollowButton";
 
 interface UserProfileData {
   user_id: string;
@@ -26,12 +27,13 @@ interface UserProfileData {
 
 interface UserProfileProps {
   profile: UserProfileData;
-  stats: { posts: number }; // Only posts count from props, followers/following from useFollow
+  stats: { posts: number; views: number }; // posts and views count from props, followers/following from useFollow
   isOwnProfile: boolean;
+  isLoading?: boolean;
   onEditProfile?: () => void;
 }
 
-export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) {
+export function UserProfile({ profile, stats, isOwnProfile, isLoading = false }: UserProfileProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { profile: myProfile } = useAuth();
   const isAdmin = Boolean((myProfile as unknown as { is_admin?: boolean } | null)?.is_admin);
@@ -81,16 +83,14 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
             <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
               Edit Profile
             </Button>
-          ) : canFollow ? (
-            <Button
-              variant={isFollowing ? 'secondary' : 'default'}
-              disabled={followLoading}
-              onClick={toggleFollow}
-              aria-pressed={isFollowing}
-            >
-              {isFollowing ? 'Following' : 'Follow'}
-            </Button>
-          ) : null}
+          ) : (
+            <FollowButton
+              isFollowing={isFollowing}
+              loading={followLoading}
+              canFollow={canFollow}
+              onToggle={toggleFollow}
+            />
+          )}
           {isAdmin && !isOwnProfile && (
             <ModerationMenu
               targetUserId={profile.user_id}
@@ -125,10 +125,14 @@ export function UserProfile({ profile, stats, isOwnProfile }: UserProfileProps) 
           !isSuspended && (
             <ProfileStats
               posts={stats.posts}
+              views={stats.views}
               following={following}
               followers={followers}
               targetUserId={profile.user_id}
               targetUsername={profile.username}
+              isOwnProfile={isOwnProfile}
+              showAdminStats={isAdmin}
+              isLoading={isLoading || followLoading}
             />
           )
         }

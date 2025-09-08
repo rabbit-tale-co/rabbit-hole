@@ -34,6 +34,18 @@ export default function AuthConfirmPage() {
           return;
         }
 
+        if (type === "signup") {
+          const { error } = await supabase.auth.verifyOtp({ type: "signup", token_hash });
+          if (error) {
+            setError(error.message || "Invalid or expired confirmation link.");
+            return;
+          }
+          setDone(true);
+          // Redirect to home page after successful signup confirmation
+          router.replace("/");
+          return;
+        }
+
         // Unsupported type for now
         setError("Unsupported confirmation type.");
       } catch {

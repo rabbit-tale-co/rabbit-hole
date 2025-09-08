@@ -288,7 +288,7 @@ export async function getFeedPage(input: unknown) {
   if (data && data.length > 0) {
     try {
       const postIds = data.map(post => post.id);
-      // console.log('Fetching real stats for posts:', postIds.length);
+      console.log('Fetching real stats for posts:', postIds.length);
 
       const { data: statsData, error: statsError } = await sb
         .from('posts_stats')
@@ -297,6 +297,7 @@ export async function getFeedPage(input: unknown) {
 
       if (statsError) {
         console.error('Failed to fetch post stats:', statsError);
+        console.error('Stats error details:', statsError.message, statsError.code);
         // If stats table doesn't exist, return posts without stats
         console.log('Stats table not available, returning posts without stats');
         itemsWithStats = data.map(post => ({
@@ -317,6 +318,7 @@ export async function getFeedPage(input: unknown) {
             last_view_at: stat.last_view_at
           });
         });
+        console.log('Stats map created with', statsMap.size, 'entries');
 
         // Attach stats to each post
         itemsWithStats = data.map(post => {
@@ -325,7 +327,7 @@ export async function getFeedPage(input: unknown) {
             unique_viewers: 0,
             last_view_at: null
           };
-          // console.log(`Post ${post.id} real stats:`, stats);
+          console.log(`Post ${post.id} real stats:`, stats);
           return {
             ...post,
             stats
@@ -385,12 +387,78 @@ export async function getUserFeedPage(input: unknown) {
   const { data, error } = await query;
   if (error) return { error: error.message};
 
+  // Fetch real post stats for all posts in batch
+  let itemsWithStats = data ?? [];
+
+  if (data && data.length > 0) {
+    try {
+      const postIds = data.map(post => post.id);
+      // console.log('Fetching real stats for user posts:', postIds.length);
+
+      const { data: statsData, error: statsError } = await sb
+        .from('posts_stats')
+        .select('post_id, views_total, unique_viewers, last_view_at')
+        .in('post_id', postIds);
+
+      if (statsError) {
+        console.error('Failed to fetch user post stats:', statsError);
+        console.error('Stats error details:', statsError.message, statsError.code);
+        // If stats table doesn't exist, return posts without stats
+        // console.log('Stats table not available, returning posts without stats');
+        itemsWithStats = data.map(post => ({
+          ...post,
+          stats: {
+            views_total: 0,
+            unique_viewers: 0,
+            last_view_at: null
+          }
+        }));
+      } else {
+        // Create a map of post_id to stats for efficient lookup
+        const statsMap = new Map();
+        (statsData ?? []).forEach(stat => {
+          statsMap.set(stat.post_id, {
+            views_total: stat.views_total || 0,
+            unique_viewers: stat.unique_viewers || 0,
+            last_view_at: stat.last_view_at
+          });
+        });
+        // console.log('User stats map created with', statsMap.size, 'entries');
+
+        // Attach stats to each post
+        itemsWithStats = data.map(post => {
+          const stats = statsMap.get(post.id) || {
+            views_total: 0,
+            unique_viewers: 0,
+            last_view_at: null
+          };
+          // console.log(`User post ${post.id} real stats:`, stats);
+          return {
+            ...post,
+            stats
+          };
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching user post stats:', err);
+      // Return posts without stats on error
+      itemsWithStats = data.map(post => ({
+        ...post,
+        stats: {
+          views_total: 0,
+          unique_viewers: 0,
+          last_view_at: null
+        }
+      }));
+    }
+  }
+
   const nextCursor =
-    data && data.length
-      ? encodeCursor(data[data.length - 1].created_at as string, data[data.length - 1].id as string)
+    itemsWithStats && itemsWithStats.length
+      ? encodeCursor(itemsWithStats[itemsWithStats.length - 1].created_at as string, itemsWithStats[itemsWithStats.length - 1].id as string)
       : null;
 
-  return { items: data ?? [], nextCursor };
+  return { items: itemsWithStats, nextCursor };
 }
 
 // --- get post stats ---

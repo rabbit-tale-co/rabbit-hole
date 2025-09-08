@@ -67,11 +67,13 @@ const fetchAllVisibleStats = async (user: { id: string } | null) => {
     const data = await response.json();
 
     // Cache all results
-    for (const [id, stats] of Object.entries(data.followStats)) {
-      followStatsCache.set(id, stats as FollowStats);
+    if (data.followStats && typeof data.followStats === 'object') {
+      for (const [id, stats] of Object.entries(data.followStats)) {
+        followStatsCache.set(id, stats as FollowStats);
+      }
     }
 
-    console.log(`Cached follow stats for ${Object.keys(data.followStats).length} users`);
+    console.log(`Cached follow stats for ${data.followStats ? Object.keys(data.followStats).length : 0} users`);
 
     // Notify all subscribers
     subscribers.forEach(callback => callback());
