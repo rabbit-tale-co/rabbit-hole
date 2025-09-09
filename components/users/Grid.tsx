@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { buildPublicUrl } from "@/lib/publicUrl";
 import { useInfiniteUsers, UserListItem } from "@/hooks/useInfiniteUsers";
-import { SafeUser } from "@/types/user";
+import { User } from "@/types/user";
 import { useIntersection } from "@/hooks/useIntersection";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
@@ -21,7 +21,7 @@ import { FollowButton } from "@/components/user/FollowButton";
 
 /** Minimal card with bg-white, ring-1, rounded, no shadows. */
 function UserCard({ user: u }: {
-  user: SafeUser & {
+  user: User & {
     banned_until?: string | null;
   }
 }) {
@@ -185,6 +185,7 @@ export default function UsersGrid({ initialData }: { initialData?: { items: User
         <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((u) => (
             <UserCard key={u.username} user={{
+              user_id: u.user_id,
               username: u.username,
               display_name: u.display_name ?? null,
               avatar_url: u.avatar_url ?? null,

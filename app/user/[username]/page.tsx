@@ -10,8 +10,6 @@ import { useAuth } from '@/providers/AuthProvider';
 import Center from '@/components/Center';
 import { OutlineUser } from '@/components/icons/Icons';
 
-// Local view-only state no longer needed; we render directly from hook
-
 export default function UserProfilePage() {
   const params = useParams();
   const username = params.username as string;

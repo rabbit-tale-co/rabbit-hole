@@ -28,7 +28,6 @@ export const UpsertProfile = z.object({
   accent_color: HEX6.nullable().optional(),
 });
 
-// Client-side schema without user_id (more secure)
 export const UpsertProfileClient = z.object({
   username: USERNAME_WITH_BANNABLE_CHECK,
   display_name: DISPLAY_NAME_WITH_BANNABLE_CHECK,

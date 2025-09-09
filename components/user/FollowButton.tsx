@@ -30,10 +30,10 @@ export function FollowButton({
   if (!canFollow) return null;
 
   // Determine variant based on follow status if not explicitly provided
-  const buttonVariant = variant ?? (isFollowing ? "destructive" : "default");
+  const buttonVariant = variant ?? (isFollowing ? "secondary" : "default");
 
   // Determine text based on follow status
-  const buttonText = isFollowing ? "Unfollow" : "Follow";
+  const buttonText = isFollowing ? "Following" : "Follow";
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();

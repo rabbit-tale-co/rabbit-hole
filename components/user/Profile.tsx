@@ -39,8 +39,17 @@ export function UserProfile({ profile, stats, isOwnProfile, isLoading = false }:
   const isAdmin = Boolean((myProfile as unknown as { is_admin?: boolean } | null)?.is_admin);
   // Use provided accentColor or generate one based on username
   const currentAccentColor = useMemo(() => generateAccentColor(profile.username), [profile.username]);
-  const { loading: followLoading, isFollowing, followers, following, canFollow, toggleFollow } =
-    useFollow(profile.user_id);
+  const { loading: followLoading, followers, following, isFollowing, canFollow, toggleFollow } = useFollow(profile.user_id);
+
+  // Debug logs
+  console.log('[UserProfile] Debug:', {
+    isOwnProfile,
+    canFollow,
+    isFollowing,
+    followLoading,
+    profileUserId: profile.user_id,
+    myProfileUserId: myProfile?.user_id
+  });
 
   // Get color styles for colors
   const { coverBgStyle } = useMemo(() => {
@@ -79,16 +88,19 @@ export function UserProfile({ profile, stats, isOwnProfile, isLoading = false }:
 
         {/* Avatar Actions - Floating like UserProfile */}
         <div className="absolute bottom-4 right-0 flex items-center gap-2">
-          {isOwnProfile ? (
+          {isOwnProfile && (
             <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
               Edit Profile
             </Button>
-          ) : (
+          )}
+          {!isOwnProfile && (
             <FollowButton
               isFollowing={isFollowing}
               loading={followLoading}
               canFollow={canFollow}
               onToggle={toggleFollow}
+              size={'default'}
+              showText={true}
             />
           )}
           {isAdmin && !isOwnProfile && (

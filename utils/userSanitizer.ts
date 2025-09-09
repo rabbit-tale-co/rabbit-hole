@@ -1,10 +1,11 @@
-import { SafeUser, SafeUserListItem, InternalUser, InternalUserListItem } from '@/types/user';
+import { User, UserListItem, InternalUser, InternalUserListItem } from '@/types/user';
 
 /**
  * Sanitizes a user object by removing sensitive fields
  */
-export function sanitizeUser(user: InternalUser): SafeUser {
+export function sanitizeUser(user: InternalUser): User {
   return {
+    user_id: user.user_id,
     username: user.username,
     display_name: user.display_name,
     bio: user.bio,
@@ -19,8 +20,9 @@ export function sanitizeUser(user: InternalUser): SafeUser {
 /**
  * Sanitizes a user list item by removing sensitive fields
  */
-export function sanitizeUserListItem(user: InternalUserListItem): SafeUserListItem {
+export function sanitizeUserListItem(user: InternalUserListItem): UserListItem {
   return {
+    user_id: user.user_id,
     username: user.username,
     display_name: user.display_name,
     bio: user.bio,
@@ -35,21 +37,21 @@ export function sanitizeUserListItem(user: InternalUserListItem): SafeUserListIt
 /**
  * Sanitizes an array of users
  */
-export function sanitizeUsers(users: InternalUser[]): SafeUser[] {
+export function sanitizeUsers(users: InternalUser[]): User[] {
   return users.map(sanitizeUser);
 }
 
 /**
  * Sanitizes an array of user list items
  */
-export function sanitizeUserListItems(users: InternalUserListItem[]): SafeUserListItem[] {
+export function sanitizeUserListItems(users: InternalUserListItem[]): UserListItem[] {
   return users.map(sanitizeUserListItem);
 }
 
 /**
  * Sanitizes a user response object (for API responses)
  */
-export function sanitizeUserResponse(response: { profile: InternalUser }): { profile: SafeUser } {
+export function sanitizeUserResponse(response: { profile: InternalUser }): { profile: User } {
   return {
     profile: sanitizeUser(response.profile)
   };
@@ -62,7 +64,7 @@ export function sanitizeUsersListResponse(response: {
   items: InternalUserListItem[];
   nextCursor: string | null
 }): {
-  items: SafeUserListItem[];
+  items: UserListItem[];
   nextCursor: string | null
 } {
   return {

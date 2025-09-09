@@ -19,7 +19,7 @@ export function useUserStats(username: string | undefined) {
       setLoading(true);
       setError(null);
       try {
-        const url = `/api/users/${encodeURIComponent(username.toString())}/stats`;
+        const url = `/api/users/${encodeURIComponent(username)}/stats`;
         const res = await fetch(url);
         if (!alive) return;
         if (!res.ok) {
@@ -28,8 +28,6 @@ export function useUserStats(username: string | undefined) {
           return;
         }
         const data = await res.json();
-        console.log('useUserStats data:', data);
-        console.log('useUserStats setting stats:', data?.stats);
         setStats(data?.stats ?? null);
       } catch {
         if (!alive) return;

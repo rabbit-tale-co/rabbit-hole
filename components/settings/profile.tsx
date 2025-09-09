@@ -167,6 +167,9 @@ export function Profile({ user }: ProfileProps) {
         toast.success('Profile updated successfully!', { id: 'profile-update' });
         // console.log('Profile updated successfully');
 
+        // Refresh profile data to show updated information
+        await refreshProfile();
+
       } catch (error) {
         console.error('Unexpected error updating profile:', error);
         toast.error('An unexpected error occurred. Please try again.', { id: 'profile-update' });
@@ -204,7 +207,7 @@ export function Profile({ user }: ProfileProps) {
       }
       console.error('Error updating profile:', error)
     }
-  }, [formData, markAsSaved, user?.email, checkForChanges, getToken])
+  }, [formData, markAsSaved, user?.email, checkForChanges, getToken, refreshProfile])
 
   // Register save function with context so toast can call it
   React.useEffect(() => {
@@ -360,7 +363,7 @@ export function Profile({ user }: ProfileProps) {
             <div className="relative group/avatar">
               {/* Avatar with same design as edit-profile-dialog - Clickable for adding image */}
               <div
-                className="size-28 rounded-full overflow-hidden bg-white ring-3 ring-white dark:ring-black shadow-lg cursor-pointer transition-all relative"
+                className="size-28 rounded-full overflow-hidden bg-white ring-4 ring-white dark:ring-black shadow-lg cursor-pointer transition-all relative"
                 onClick={() => {
                   const input = document.createElement('input');
                   input.type = 'file';

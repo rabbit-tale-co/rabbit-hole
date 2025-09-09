@@ -1,6 +1,7 @@
 // Safe user types that exclude sensitive information
 
-export interface SafeUser {
+export interface User {
+  user_id: string;
   username: string;
   display_name: string | null;
   bio: string | null;
@@ -15,7 +16,8 @@ export interface SafeUser {
   };
 }
 
-export interface SafeUserListItem {
+export interface UserListItem {
+  user_id: string;
   username: string;
   display_name?: string;
   bio?: string | null;

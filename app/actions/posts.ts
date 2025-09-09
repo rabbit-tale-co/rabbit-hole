@@ -251,8 +251,82 @@ export async function getFeedPage(input: unknown) {
   const { data, error } = await query;
   if (error) return { error: error.message };
 
+  // Calculate reaction counts for all posts
+  let itemsWithReactionStats = data ?? [];
+  if (data && data.length > 0) {
+    try {
+      const postIds = data.map(post => post.id);
+
+      // Get like counts
+      const { data: likeCounts } = await sb
+        .from('likes')
+        .select('post_id')
+        .in('post_id', postIds);
+
+      // Get comment counts
+      const { data: commentCounts } = await sb
+        .from('comments')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('is_deleted', false);
+
+      // Get repost counts
+      const { data: repostCounts } = await sb
+        .from('reposts')
+        .select('post_id')
+        .in('post_id', postIds);
+
+      // Get bookmark counts
+      const { data: bookmarkCounts } = await sb
+        .from('bookmarks')
+        .select('post_id')
+        .in('post_id', postIds);
+
+      // Count occurrences
+      const likeCountMap = new Map();
+      const commentCountMap = new Map();
+      const repostCountMap = new Map();
+      const bookmarkCountMap = new Map();
+
+      (likeCounts || []).forEach(like => {
+        likeCountMap.set(like.post_id, (likeCountMap.get(like.post_id) || 0) + 1);
+      });
+
+      (commentCounts || []).forEach(comment => {
+        commentCountMap.set(comment.post_id, (commentCountMap.get(comment.post_id) || 0) + 1);
+      });
+
+      (repostCounts || []).forEach(repost => {
+        repostCountMap.set(repost.post_id, (repostCountMap.get(repost.post_id) || 0) + 1);
+      });
+
+      (bookmarkCounts || []).forEach(bookmark => {
+        bookmarkCountMap.set(bookmark.post_id, (bookmarkCountMap.get(bookmark.post_id) || 0) + 1);
+      });
+
+      // Attach reaction counts to posts
+      itemsWithReactionStats = data.map(post => ({
+        ...post,
+        like_count: likeCountMap.get(post.id) || 0,
+        comment_count: commentCountMap.get(post.id) || 0,
+        repost_count: repostCountMap.get(post.id) || 0,
+        bookmark_count: bookmarkCountMap.get(post.id) || 0,
+      }));
+    } catch (err) {
+      console.error('Error fetching reaction stats:', err);
+      // Return posts without reaction stats on error
+      itemsWithReactionStats = data.map(post => ({
+        ...post,
+        like_count: 0,
+        comment_count: 0,
+        repost_count: 0,
+        bookmark_count: 0,
+      }));
+    }
+  }
+
   // Fetch real post stats for all posts in batch
-  let itemsWithStats = data ?? [];
+  let itemsWithStats = itemsWithReactionStats;
 
   if (data && data.length > 0) {
     try {
@@ -349,8 +423,82 @@ export async function getUserFeedPage(input: unknown) {
   const { data, error } = await query;
   if (error) return { error: error.message};
 
+  // Calculate reaction counts for all posts
+  let itemsWithReactionStats = data ?? [];
+  if (data && data.length > 0) {
+    try {
+      const postIds = data.map(post => post.id);
+
+      // Get like counts
+      const { data: likeCounts } = await sb
+        .from('likes')
+        .select('post_id')
+        .in('post_id', postIds);
+
+      // Get comment counts
+      const { data: commentCounts } = await sb
+        .from('comments')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('is_deleted', false);
+
+      // Get repost counts
+      const { data: repostCounts } = await sb
+        .from('reposts')
+        .select('post_id')
+        .in('post_id', postIds);
+
+      // Get bookmark counts
+      const { data: bookmarkCounts } = await sb
+        .from('bookmarks')
+        .select('post_id')
+        .in('post_id', postIds);
+
+      // Count occurrences
+      const likeCountMap = new Map();
+      const commentCountMap = new Map();
+      const repostCountMap = new Map();
+      const bookmarkCountMap = new Map();
+
+      (likeCounts || []).forEach(like => {
+        likeCountMap.set(like.post_id, (likeCountMap.get(like.post_id) || 0) + 1);
+      });
+
+      (commentCounts || []).forEach(comment => {
+        commentCountMap.set(comment.post_id, (commentCountMap.get(comment.post_id) || 0) + 1);
+      });
+
+      (repostCounts || []).forEach(repost => {
+        repostCountMap.set(repost.post_id, (repostCountMap.get(repost.post_id) || 0) + 1);
+      });
+
+      (bookmarkCounts || []).forEach(bookmark => {
+        bookmarkCountMap.set(bookmark.post_id, (bookmarkCountMap.get(bookmark.post_id) || 0) + 1);
+      });
+
+      // Attach reaction counts to posts
+      itemsWithReactionStats = data.map(post => ({
+        ...post,
+        like_count: likeCountMap.get(post.id) || 0,
+        comment_count: commentCountMap.get(post.id) || 0,
+        repost_count: repostCountMap.get(post.id) || 0,
+        bookmark_count: bookmarkCountMap.get(post.id) || 0,
+      }));
+    } catch (err) {
+      console.error('Error fetching reaction stats:', err);
+      // Return posts without reaction stats on error
+      itemsWithReactionStats = data.map(post => ({
+        ...post,
+        like_count: 0,
+        comment_count: 0,
+        repost_count: 0,
+        bookmark_count: 0,
+      }));
+    }
+  }
+
   // Fetch real post stats for all posts in batch
-  let itemsWithStats = data ?? [];
+  let itemsWithStats = itemsWithReactionStats;
 
   if (data && data.length > 0) {
     try {

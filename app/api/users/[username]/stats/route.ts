@@ -10,9 +10,8 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ userna
   if (!parsed.success) return Response.json({ error: "bad username" }, { status: 400 });
 
   try {
-    // Get user profile first
+    // First get user_id from username
     const { data: profile, error: profileError } = await supabaseAdmin
-      .schema('social_art')
       .from("profiles")
       .select("user_id")
       .eq("username", parsed.data)
@@ -22,13 +21,12 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ userna
       console.error("/api/users/[username]/stats profile error:", profileError.message);
       return Response.json({ error: profileError.message }, { status: 500 });
     }
-    if (!profile) return Response.json({ error: "user not found" }, { status: 404 });
+    if (!profile) return Response.json({ error: "not found" }, { status: 404 });
 
     const userId = profile.user_id;
 
     // Get posts count
     const { count: postsCount, error: postsError } = await supabaseAdmin
-      .schema('social_art')
       .from('posts')
       .select('*', { count: 'exact', head: true })
       .eq('author_id', userId)
@@ -41,7 +39,6 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ userna
 
     // Get total views for user's posts
     const { data: postsData, error: postsDataError } = await supabaseAdmin
-      .schema('social_art')
       .from('posts')
       .select('id')
       .eq('author_id', userId)
@@ -58,7 +55,6 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ userna
       console.log(`Fetching views for ${postIds.length} posts for user ${userId}`);
 
       const { data: statsData, error: statsError } = await supabaseAdmin
-        .schema('social_art')
         .from('posts_stats')
         .select('views_total')
         .in('post_id', postIds);
