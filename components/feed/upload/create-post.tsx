@@ -684,6 +684,7 @@ export function CreateMediaPost({
                         fill
                         className="object-cover"
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                        quality={100}
                       />
                     )}
 
@@ -749,7 +750,7 @@ export function CreateMediaPost({
               {selected.kind === 'video' ? (
                 <VideoPlayerBlob file={selected.file} className="absolute inset-0 w-full h-full object-contain bg-black" />
               ) : (
-                <Image src={selected.preview} alt={selected.alt || 'Selected'} fill className="object-contain bg-black" />
+                <Image src={selected.preview} alt={selected.alt || 'Selected'} fill className="object-contain bg-black" quality={100} />
               )}
             </div>
           </div>

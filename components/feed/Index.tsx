@@ -69,6 +69,7 @@ function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; 
           sizes={`${widthPx}px`}
           className={`object-cover transition-opacity duration-300 ${i === idx ? 'opacity-100' : 'opacity-0'}`}
           unoptimized
+          quality={100}
           priority={false}
         />
       ))}

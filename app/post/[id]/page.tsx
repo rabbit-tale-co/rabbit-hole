@@ -207,8 +207,10 @@ export default function PostPage() {
                     alt={img.alt || "image"}
                     width={Math.max(1, img.width || 1000)}
                     height={Math.max(1, img.height || 1000)}
+                    quality={100}
+                    unoptimized
                     className="w-full h-auto max-h-[80vh] object-contain bg-neutral-50"
-                    sizes="(max-width:768px) 100vw, 768px"
+                    sizes="(max-width:768px) 100vw, (max-width:1024px) 80vw, 4000px"
                   />
                 </ImageZoom>
               )}

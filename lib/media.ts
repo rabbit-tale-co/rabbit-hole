@@ -28,7 +28,7 @@ export async function convertImageToWebP(file: File): Promise<ConvertedBlob> {
   const ctx = canvas.getContext("2d");
   if (!ctx) return { blob: file, ext: (nameExt as "webp" | "gif" | "jpg" | "jpeg" | "png") || "jpg", mime: file.type || "image/jpeg" };
   ctx.drawImage(img, 0, 0);
-  const quality = 0.9;
+  const quality = 1;
   const webpBlob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
   if (!webpBlob) return { blob: file, ext: (nameExt as "webp" | "gif" | "jpg" | "jpeg" | "png") || "jpg", mime: file.type || "image/jpeg" };
   return { blob: webpBlob, ext: "webp", mime: "image/webp" };

@@ -51,9 +51,24 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // verify Supabase session JWT from cookies
-  const user = await getUser();
-  if (!user) return new Response("Unauthorized", { status: 401 });
+  // Try Authorization header first, then fallback to cookies
+  const authHeader = req.headers.get("authorization");
+  const token = authHeader?.replace("Bearer ", "");
+
+  let user = null;
+  if (token) {
+    const { getUserFromToken } = await import("@/lib/auth");
+    user = await getUserFromToken(token);
+  }
+
+  if (!user) {
+    user = await getUser(); // Fallback to cookie auth
+  }
+
+  if (!user) {
+    console.log("[AUTH] Authentication failed: Auth session missing!");
+    return new Response("Unauthorized", { status: 401 });
+  }
 
   const body = await req.json();
   const parsed = await CreatePost.safeParseAsync(body);

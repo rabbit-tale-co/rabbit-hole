@@ -49,7 +49,7 @@ import { Container } from "@/components/container";
 
 export default function PostLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Container maxWidth="lg">
+    <Container maxWidth="4xl">
       {children}
     </Container>
   );
