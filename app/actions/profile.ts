@@ -60,7 +60,7 @@ export async function upsertProfile(input: unknown, token?: string) {
       userId = user.id;
       // console.log(`[${callId}] [AUTH] Profile update (cookie auth): ${userId}`);
     }
-  } catch (error) {
+  } catch {
     // console.error(`[${callId}] [AUTH] Authentication error:`, error);
     return { error: "Unauthorized" };
   }
@@ -120,7 +120,7 @@ export async function deleteAccount(userId: string, token?: string) {
       }
       authenticatedUserId = authResult.userId;
       // console.log(`[JWT] Account deletion (JWT auth): ${authenticatedUserId}`);
-    } catch (error) {
+    } catch {
       // console.error('[JWT] Account deletion auth error:', error);
       return { error: "Unauthorized" };
     }
@@ -132,7 +132,7 @@ export async function deleteAccount(userId: string, token?: string) {
       if (!user?.id) return { error: "Unauthorized" };
       authenticatedUserId = user.id;
       // console.log(`[JWT] Account deletion (client auth): ${authenticatedUserId}`);
-    } catch (error) {
+    } catch {
       // console.error('[JWT] Account deletion auth error:', error);
       return { error: "Unauthorized" };
     }

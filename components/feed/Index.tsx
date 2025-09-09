@@ -22,7 +22,6 @@ import { Badge } from "../ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRouter } from "next/navigation";
 import { OutlineCalendar } from "../icons/Icons";
-import { useAuth } from "@/providers/AuthProvider";
 import { TypographyP } from "../ui/typography/p";
 
 // Local hover slideshow for multi-image posts
@@ -95,7 +94,6 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(initial, 24, { authorId });
   const router = useRouter();
   const { recordImpression } = useManualImpression();
-  const { profile: currentUserProfile } = useAuth();
 
   const publicUrl = (path: string) => buildPublicUrl(path);
 

@@ -21,11 +21,7 @@ import { TypographyH1 } from "@/components/ui/typography/h1"
 import { TypographyP } from "@/components/ui/typography/p"
 
 // const DAY_PRICE = 0.99
-export const MONTHLY_PRICE = 4.99
-export const YEARLY_PRICE = 39.99
-export const SAVINGS_PCT = Math.round((1 - YEARLY_PRICE / (MONTHLY_PRICE * 12)) * 100)
-
-export const USD = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n)
+import { MONTHLY_PRICE, YEARLY_PRICE, SAVINGS_PCT, USD } from "@/lib/pricing"
 
 interface SubscriptionStatus {
   isActive: boolean

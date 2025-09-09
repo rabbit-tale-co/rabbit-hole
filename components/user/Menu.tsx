@@ -14,11 +14,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import Link from 'next/link'
 import { SettingsDialog } from '@/components/settings/Dialog'
-import { createPortal } from 'react-dom'
 import { OutlineCarrot, OutlineCrown, OutlineLogout, OutlineSettings, OutlineUser } from '../icons/Icons'
 import { Badge } from '@/components/ui/badge'
 import { PremiumBadge } from './PremiumBadge'
-import { SAVINGS_PCT } from '@/app/golden-carrot/page'
+import { SAVINGS_PCT } from '@/lib/pricing'
 
 export function UserProfileMenu({ className }: { className?: string }) {
   const { user: auth_user, profile: user, signOut } = useAuth()

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserIdOrThrow } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Get authenticated user
     const userId = await getUserIdOrThrow();
