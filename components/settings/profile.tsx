@@ -29,14 +29,14 @@ import { useProfileMedia } from "@/hooks/useProfileMedia"
 // Zod schemas for validation
 const canon = (v: unknown) =>
   typeof v === "string" ? v.normalize("NFC").replace(/\r\n/g, "\n").trim() : v;
-type DirtyShape = { displayName: string; username: string; bio: string };
-const toCanonSnapshot = (f: { displayName: string; username: string; bio?: string }): DirtyShape => ({
-  displayName: canon(f.displayName) as string,
+type DirtyShape = { display_name: string; username: string; bio: string };
+const toCanonSnapshot = (f: { display_name: string; username: string; bio?: string }): DirtyShape => ({
+  display_name: canon(f.display_name) as string,
   username: canon(f.username) as string,
   bio: canon(f.bio ?? "") as string,
 });
 const profileSchema = z.object({
-  displayName: z.string()
+  display_name: z.string()
     .min(3, "Display name must be at least 3 characters")
     .max(30, "Display name must be less than 30 characters"),
   username: z.string()
@@ -57,7 +57,7 @@ export function Profile({ user }: ProfileProps) {
   const [deleting, setDeleting] = React.useState(false)
   const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({})
   const [formData, setFormData] = React.useState({
-    displayName: profile?.display_name ?? '',
+    display_name: profile?.display_name ?? '',
     username: profile?.username ?? 'username',
     bio: profile?.bio ?? '',
     email: user?.email || '',
@@ -74,7 +74,7 @@ export function Profile({ user }: ProfileProps) {
   const baselineKeyRef = React.useRef<string>("");
   React.useEffect(() => {
     const snapshot = {
-      displayName: profile?.display_name ?? '',
+      display_name: profile?.display_name ?? '',
       username: profile?.username ?? 'username',
       bio: profile?.bio ?? '',
       email: user?.email || '',
@@ -109,7 +109,7 @@ export function Profile({ user }: ProfileProps) {
       // Create a promise for the profile update via server action
       const payload = {
         username: validatedData.username.toLowerCase(),
-        display_name: validatedData.displayName,
+        display_name: validatedData.display_name,
         bio: formData.bio || null,
       }
 
@@ -175,7 +175,7 @@ export function Profile({ user }: ProfileProps) {
 
       // After save, set current canonical values as new baseline
       const canonNow = toCanonSnapshot({
-        displayName: formData.displayName,
+        display_name: formData.display_name,
         username: formData.username,
         bio: formData.bio,
       })
@@ -231,7 +231,7 @@ export function Profile({ user }: ProfileProps) {
     // Recompute unsaved-changes state vs initial snapshot using canonical values
     try {
       checkForChanges?.(toCanonSnapshot({
-        displayName: nextForm.displayName,
+        display_name: nextForm.display_name,
         username: nextForm.username,
         bio: nextForm.bio,
       }))
@@ -596,12 +596,12 @@ export function Profile({ user }: ProfileProps) {
             <Input
               id="displayName"
               placeholder="Enter your full name or nickname"
-              value={formData.displayName}
-              onChange={(e) => handleInputChange('displayName', e.target.value)}
-              className={validationErrors.displayName ? 'border-red-500' : ''}
+              value={formData.display_name}
+              onChange={(e) => handleInputChange('display_name', e.target.value)}
+              className={validationErrors.display_name ? 'border-red-500' : ''}
             />
-            {validationErrors.displayName && (
-              <p className="text-sm text-red-500">{validationErrors.displayName}</p>
+            {validationErrors.display_name && (
+              <p className="text-sm text-red-500">{validationErrors.display_name}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -749,7 +749,7 @@ export function Profile({ user }: ProfileProps) {
                   // Recompute unsaved status for profile fields only
                   try {
                     checkForChanges?.({
-                      displayName: formData.displayName,
+                      display_name: formData.display_name,
                       username: formData.username,
                       bio: formData.bio || ''
                     })

@@ -248,9 +248,12 @@ export async function validateText(
   fieldName: string = 'text',
   config: BannableWordsConfig = DEFAULT_CONFIG
 ): Promise<{ isValid: boolean; error?: string }> {
+  console.log(`[BANNABLE] Validating ${fieldName}: "${text}"`);
   const result = await containsBannableWords(text, config);
+  console.log(`[BANNABLE] Result for "${text}":`, result);
 
   if (result.hasBannableWords) {
+    console.log(`[BANNABLE] Found bannable words in "${text}":`, result.foundWords);
     return {
       isValid: false,
       error: `${fieldName} contains inappropriate content: ${result.foundWords.join(', ')}`
