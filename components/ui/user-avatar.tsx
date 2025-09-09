@@ -46,7 +46,7 @@ export function UserAvatar({
 
   const sizeClass = sizeClasses[size];
   const fallbackSize = fallbackSizes[size];
-  const borderClass = showBorder ? 'border-4 border-white' : '';
+  const borderClass = showBorder ? 'border-4 border-white dark:border-black' : '';
 
   const isWebm = Boolean(avatarUrl && /\.webm(\?|#|$)/i.test(avatarUrl));
 

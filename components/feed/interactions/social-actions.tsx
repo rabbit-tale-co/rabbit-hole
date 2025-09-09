@@ -118,7 +118,7 @@ export function SocialActions({
             <Button
               variant="ghost"
               size={'icon'}
-              className={`hover:bg-white/12 hover:text-white ${liked ? 'text-[#f4393e] hover:bg-[#f4393e]/12 drop-shadow-[0_1px_10px_#f4393e]' : 'text-accent drop-shadow-[0_1px_10px_rgba(0,0,0,0.75)]'
+              className={`hover:bg-white/12 hover:text-white dark:text-white ${liked ? 'text-[#f4393e] hover:bg-[#f4393e]/12 drop-shadow-[0_1px_10px_#f4393e]' : 'text-accent drop-shadow-[0_1px_10px_rgba(0,0,0,0.75)]'
                 }`}
               onClick={handleLike}
               style={{ transition: 'none' }}

@@ -28,7 +28,9 @@ export const DISPLAY_NAME_WITH_BANNABLE_CHECK = z
   .max(50, "Display name must be no more than 50 characters")
   .refine(
     async (value) => {
+      console.log(`[SCHEMA] Validating display name: "${value}"`);
       const result = await validateText(value, "display name");
+      console.log(`[SCHEMA] Display name validation result:`, result);
       return result.isValid;
     },
     {

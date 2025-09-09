@@ -190,14 +190,12 @@ export default function Feed({ initial, username, isOwnProfile, onCountChange }:
   const rows = placed.length ? Math.max(...placed.map((p) => p.y + p.h)) : 0;
   const containerHeight = rows > 0 ? rows * cell + (rows - 1) * gap : Math.max(cell, 240);
 
-  // bramka animacji: włącz po dwóch rAF (po paint/layout)
   const feedReady = !loading && items.length > 0 && cell > 0;
   const [animateGate, setAnimateGate] = useState(false);
   useEffect(() => {
     if (!feedReady) { setAnimateGate(false); return; }
     const id1 = requestAnimationFrame(() => {
       const id2 = requestAnimationFrame(() => setAnimateGate(true));
-      // cleanup drugiego rAF:
       (setAnimateGate as { _id2?: number })._id2 = id2;
     });
     return () => {
@@ -241,7 +239,7 @@ export default function Feed({ initial, username, isOwnProfile, onCountChange }:
                 await recordImpression(p.tile.id);
                 router.push(`/post/${p.tile.id}`);
               }}
-              className="group absolute bg-neutral-100 rounded-2xl overflow-hidden cursor-pointer"
+              className="group absolute bg-neutral-100 dark:bg-neutral-900 ring-1 ring-ring/30 rounded-3xl overflow-hidden cursor-pointer"
               style={{ top, left, width, height, minWidth: 160, minHeight: 160 }}
               initial="rest"
               whileHover="hover"
@@ -319,7 +317,7 @@ export default function Feed({ initial, username, isOwnProfile, onCountChange }:
                       <TooltipProvider delayDuration={150}>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Badge className="bg-black/50">
+                            <Badge className="bg-black/50 text-white">
                               <OutlineCalendar />
                               {dateLabel}
                             </Badge>

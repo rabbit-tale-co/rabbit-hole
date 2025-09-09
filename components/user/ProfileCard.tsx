@@ -96,7 +96,7 @@ export function UserChipHoverCard({
         align="start"
         className={cn(
           "w-80 p-0 overflow-hidden",
-          "bg-white ring-1 ring-[--border] rounded-2xl"
+          "bg-white dark:bg-black ring-1 ring-[--border] rounded-2xl"
         )}
         onMouseDownCapture={(e) => {
           // allow clicks on internal links/buttons, but prevent dragging/selection from bubbling

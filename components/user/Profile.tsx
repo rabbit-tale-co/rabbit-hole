@@ -105,11 +105,11 @@ export function UserProfile({ profile, stats, isOwnProfile, isLoading = false }:
       {/* Profile Info */}
       <div className="text-center mt-2 px-4 space-y-2" >
         <div className="relative inline-block">
-          <h3 className="text-2xl font-bold text-neutral-950 inline-flex items-center gap-2">
+          <h3 className="text-2xl font-bold text-neutral-950 dark:text-neutral-50 inline-flex items-center gap-2">
             <span>{profile.display_name}</span>
             <PremiumBadge show={Boolean(profile.is_premium)} />
           </h3>
-          <p className="text-neutral-600">@{profile.username}</p>
+          <p className="text-neutral-600 dark:text-neutral-400">@{profile.username}</p>
         </div>
 
         {

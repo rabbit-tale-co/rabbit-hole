@@ -29,7 +29,6 @@ export function ProfileStats({
   followers,
   targetUserId,
   targetUsername,
-  showPremiumBadge = false,
   isOwnProfile = false,
   showAdminStats = false,
   isLoading = false,
@@ -115,7 +114,7 @@ export function ProfileStats({
           className="font-mono"
           onClick={onClickPosts}
         >
-          <h4 className="font-semibold text-neutral-950 mr-0.5" data-profile-posts-count>
+          <h4 className="font-semibold text-neutral-950 dark:text-neutral-50 mr-0.5" data-profile-posts-count>
             <NumberFlow
               value={shouldAnimate ? animatePosts : 0}
               className="inline-block"
@@ -125,7 +124,7 @@ export function ProfileStats({
               animated={shouldAnimate}
             />
           </h4>
-          <span className="text-neutral-500">Posts</span>
+          <span className="text-neutral-500 dark:text-neutral-400">Posts</span>
         </Button>
         {(isOwnProfile || showAdminStats) && (
           <>
@@ -136,7 +135,7 @@ export function ProfileStats({
               className="font-mono"
               onClick={onClickViews}
             >
-              <h4 className="font-semibold text-neutral-950 mr-0.5">
+              <h4 className="font-semibold text-neutral-950 dark:text-neutral-50 mr-0.5">
                 <NumberFlow
                   value={shouldAnimate ? animateViews : 0}
                   className="inline-block"
@@ -146,7 +145,7 @@ export function ProfileStats({
                   animated={shouldAnimate}
                 />
               </h4>
-              <span className="text-neutral-500">Views</span>
+              <span className="text-neutral-500 dark:text-neutral-400">Views</span>
             </Button>
           </>
         )}
@@ -157,7 +156,7 @@ export function ProfileStats({
           className="font-mono"
           onClick={handleFollowingClick}
         >
-          <h4 className="font-semibold text-neutral-950 mr-0.5">
+          <h4 className="font-semibold text-neutral-950 dark:text-neutral-50 mr-0.5">
             <NumberFlow
               value={shouldAnimate ? animateFollowing : 0}
               className="inline-block"
@@ -167,7 +166,7 @@ export function ProfileStats({
               animated={shouldAnimate}
             />
           </h4>
-          <span className="text-neutral-500">Following</span>
+          <span className="text-neutral-500 dark:text-neutral-400">Following</span>
         </Button>
         <Separator orientation="vertical" className="!h-4" />
         <Button
@@ -176,7 +175,7 @@ export function ProfileStats({
           className="font-mono"
           onClick={handleFollowersClick}
         >
-          <h4 className="font-semibold text-neutral-950 mr-0.5">
+          <h4 className="font-semibold text-neutral-950 dark:text-neutral-50 mr-0.5">
             <NumberFlow
               value={shouldAnimate ? animateFollowers : 0}
               className="inline-block"
@@ -186,15 +185,9 @@ export function ProfileStats({
               animated={shouldAnimate}
             />
           </h4>
-          <span className="text-neutral-500">Followers</span>
+          <span className="text-neutral-500 dark:text-neutral-400">Followers</span>
         </Button>
       </div>
-
-      {showPremiumBadge && (
-        <div className="flex justify-center mt-2">
-          <PremiumBadge />
-        </div>
-      )}
 
       {targetUserId && targetUsername && (
         <FollowDialog

@@ -91,8 +91,8 @@
 }
 
 .dark {
-  --background: var(--color-athens-gray-950);
-  --foreground: var(--color-athens-gray-50);
+  --background: var(--color-black);
+  --foreground: var(--color-slate-50);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);

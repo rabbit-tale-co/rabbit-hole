@@ -8,6 +8,7 @@ import AuthProvider from "@/providers/AuthProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { ThemeProvider } from "@/providers/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -74,25 +75,32 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SpeedInsights />
         <Analytics />
-        <div className="flex flex-col min-h-screen">
-          <Container>
-            <AuthProvider>
-              <Header />
-              {/* TODO: for profile page mx-auto max-w-xl */}
-              <div className="flex-1 min-h-dvh sm:pb-5">
-                {children}
-              </div>
-              <Footer />
-              <Toaster richColors />
-            </AuthProvider>
-          </Container>
-        </div>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <div className="flex flex-col min-h-screen">
+            <Container>
+              <AuthProvider>
+                <Header />
+                {/* TODO: for profile page mx-auto max-w-xl */}
+                <div className="flex-1 min-h-dvh sm:pb-5">
+                  {children}
+                </div>
+                <Footer />
+                <Toaster richColors />
+              </AuthProvider>
+            </Container>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );
