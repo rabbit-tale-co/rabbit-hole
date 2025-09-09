@@ -103,9 +103,10 @@ function UserCard({ user: u }: {
 
       {/* content area grows */}
       <div className="p-4 flex-1 flex flex-col relative">
-        <div className="-mt-11">
+        <div className="-mt-10">
           <UserAvatar
-            className="ring-2 ring-white size-14"
+            className="ring-2 ring-white"
+            size="lg"
             username={u.username}
             avatarUrl={!isSuspended && u.avatar_url ? buildPublicUrl(u.avatar_url) : undefined}
             accentHex={avatarAccentHex}
