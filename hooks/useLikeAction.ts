@@ -65,10 +65,25 @@ export function useLikeAction({
     setIsPending(true);
 
     try {
-      const { data } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getSession();
       const token = data.session?.access_token;
+
+      if (error) {
+        console.error("Session error:", error);
+        throw new Error("session_error");
+      }
+
+      if (!token) {
+        console.error("No access token found");
+        toast.error("You must be logged in to like this post");
+        // Reset to previous state since user is not authenticated
+        desiredLikedRef.current = confirmedLikedRef.current;
+        recomputeUi();
+        return;
+      }
+
       const headers: HeadersInit = {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       };
 
@@ -109,8 +124,12 @@ export function useLikeAction({
       inFlightRef.current = false;
       setIsPending(false);
 
+      // Only retry if user is authenticated and there's still a pending change
       if (desiredLikedRef.current !== confirmedLikedRef.current) {
-        setTimeout(() => void drain(), 0);
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.access_token) {
+          setTimeout(() => void drain(), 0);
+        }
       }
     }
   }, [idempotent, onSuccess, postId, recomputeUi]);

@@ -88,7 +88,7 @@ export default function RootLayout({
                 {children}
               </div>
               <Footer />
-              <Toaster />
+              <Toaster richColors />
             </AuthProvider>
           </Container>
         </div>

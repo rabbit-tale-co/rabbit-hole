@@ -45,6 +45,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
+import { Container } from "@/components/container";
+
 export default function PostLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return (
+    <Container maxWidth="lg">
+      {children}
+    </Container>
+  );
 }

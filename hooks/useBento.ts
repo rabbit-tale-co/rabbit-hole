@@ -194,24 +194,32 @@ export function packAppendGeneric<T extends { w: 1|2; h: 1|2 }>(
   return out;
 }
 
-export function useBento(tiles: Tile[]) {
+export function useBento(tiles: Tile[], containerWidth?: number, forceUpdate?: number) {
   const [cols, setCols] = useState(3);
 
-  // responsive columns with rAF-throttled resize; update only when bucket changes
+  // responsive columns based on container width or window width
   useEffect(() => {
     const computeCols = (w: number) => (w < 640 ? 1 : w < 1024 ? 2 : 3);
-    let frame = 0;
-    const onResize = () => {
-      if (frame) cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const next = computeCols(window.innerWidth);
-        setCols((prev) => (prev === next ? prev : next));
-      });
-    };
-    onResize();
-    window.addEventListener("resize", onResize, { passive: true });
-    return () => { cancelAnimationFrame(frame); window.removeEventListener("resize", onResize); };
-  }, []);
+
+    if (containerWidth && containerWidth > 0) {
+      // Use container width if provided
+      const next = computeCols(containerWidth);
+      setCols((prev) => (prev === next ? prev : next));
+    } else {
+      // Fallback to window width with resize listener
+      let frame = 0;
+      const onResize = () => {
+        if (frame) cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => {
+          const next = computeCols(window.innerWidth);
+          setCols((prev) => (prev === next ? prev : next));
+        });
+      };
+      onResize();
+      window.addEventListener("resize", onResize, { passive: true });
+      return () => { cancelAnimationFrame(frame); window.removeEventListener("resize", onResize); };
+    }
+  }, [containerWidth, forceUpdate, cols]);
 
   // compute placed purely with memo to avoid setState churn on rapid resizes
   const placed = useMemo<PlacedTile[]>(() => {

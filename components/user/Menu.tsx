@@ -14,9 +14,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import Link from 'next/link'
 import { SettingsDialog } from '@/components/settings/Dialog'
+import { createPortal } from 'react-dom'
 import { OutlineCarrot, OutlineCrown, OutlineLogout, OutlineSettings, OutlineUser } from '../icons/Icons'
 import { Badge } from '@/components/ui/badge'
 import { PremiumBadge } from './PremiumBadge'
+import { SAVINGS_PCT } from '@/app/golden-carrot/page'
 
 export function UserProfileMenu({ className }: { className?: string }) {
   const { user: auth_user, profile: user, signOut } = useAuth()
@@ -46,11 +48,10 @@ export function UserProfileMenu({ className }: { className?: string }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Button size={"icon"} variant="ghost" className="relative rounded-full">
             <UserAvatar
               username={user.username}
               avatarUrl={user.avatar_url || undefined}
-              size="sm"
               accentHex={user.accent_color || undefined}
               className={className}
             />
@@ -71,28 +72,27 @@ export function UserProfileMenu({ className }: { className?: string }) {
           <DropdownMenuSeparator />
           {items.map((item, idx) => (
             item.href ? (
-              <Link href={item.href} key={item.href}>
-                <DropdownMenuItem>
+              <DropdownMenuItem asChild key={item.href}>
+                <Link href={item.href}>
                   {item.icon && <item.icon />}
                   <span>{item.label}</span>
                   {item.label === 'Upgrade' && (
-                    <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200 text-[10px]">-42%</Badge>
+                    <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200 text-[10px]">-{SAVINGS_PCT}%</Badge>
                   )}
-                </DropdownMenuItem>
-              </Link>
+                </Link>
+              </DropdownMenuItem>
             ) : (
               <DropdownMenuItem key={`action-${idx}`} onClick={item.onClick}>
                 {item.icon && <item.icon />}
                 <span>{item.label}</span>
                 {item.label === 'Upgrade' && (
-                  <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200 px-2 py-0.5 text-[10px] font-semibold">-42%</Badge>
+                  <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200 px-2 py-0.5 text-[10px] font-semibold">-{SAVINGS_PCT}%</Badge>
                 )}
               </DropdownMenuItem>
             )
           ))}
-          {/* Settings entry is provided in links */}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => handleSignOut()}>
+          <DropdownMenuItem onClick={() => handleSignOut()} variant='destructive'>
             <OutlineLogout />
             <span>Log out</span>
           </DropdownMenuItem>

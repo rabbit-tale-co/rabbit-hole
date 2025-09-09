@@ -15,9 +15,14 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer"
 import {
   Sidebar,
   SidebarContent,
@@ -29,11 +34,11 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 
-import { Profile, Privacy, Appearance, Notifications, Content, Billing, SessionManagement } from "./index"
+import { Profile, Privacy, Appearance, Notifications, Content, Billing } from "./index"
 import { useAuth } from "@/providers/AuthProvider"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { OutlineBell, OutlineBrush, OutlineClose, OutlineImage, OutlineMonitor, OutlineReceipt, OutlineSettings, OutlineShield, OutlineUser, OutlineWarning } from "../icons/Icons"
+import { OutlineBell, OutlineBrush, OutlineClose, OutlineImage, OutlineReceipt, OutlineSettings, OutlineShield, OutlineUser, OutlineWarning } from "../icons/Icons"
 import { toast } from "sonner"
 
 // Unsaved changes provider API
@@ -53,7 +58,7 @@ export const useUnsavedChanges = () => {
   return ctx
 }
 
-type SettingsSection = "profile" | "privacy" | "appearance" | "notifications" | "content" | "billing" | "session_management";
+type SettingsSection = "profile" | "privacy" | "appearance" | "notifications" | "content" | "billing";
 type NavItem = { name: string; icon: React.ElementType; id: SettingsSection };
 
 const data: { nav: NavItem[] } = {
@@ -64,7 +69,6 @@ const data: { nav: NavItem[] } = {
     { name: "Notifications", icon: OutlineBell, id: "notifications" },
     { name: "Content", icon: OutlineImage, id: "content" },
     { name: "Billing & Subscription", icon: OutlineReceipt, id: "billing" },
-    { name: "Session Management", icon: OutlineMonitor, id: "session_management" },
   ],
 }
 
@@ -99,8 +103,6 @@ function SettingsContent({ activeSection, user }: SettingsContentProps) {
       return <Content />;
     case "billing":
       return <Billing />;
-    case "session_management":
-      return <SessionManagement />;
     default:
       return (
         <div className="flex items-center justify-center h-full">
@@ -141,7 +143,6 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
     setCancelData(null);
     if (reopenAfterConfirmRef.current) {
       reopenAfterConfirmRef.current = false;
-      // mały timeout, aby Radix zdjął atrybuty aria/inert
       setTimeout(() => setOpen(true), 60);
     }
   }, [setOpen]);
@@ -232,7 +233,7 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
   }, [activeSaveFunction])
 
   // Block navigation when there are unsaved changes
-  const handleSectionChange = (section: "profile" | "privacy" | "appearance" | "notifications" | "content" | "billing" | "session_management") => {
+  const handleSectionChange = (section: "profile" | "privacy" | "appearance" | "notifications" | "content" | "billing") => {
     if (hasUnsavedChanges) {
       // Trigger shake effect on existing unsaved changes toast
       if (typeof window !== 'undefined' && (window as Window & { triggerToastShake?: () => void }).triggerToastShake) {
@@ -303,112 +304,191 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
     }
   }, [cancelData]);
 
+  // Determine if we should show desktop or mobile version
+  const [isDesktop, setIsDesktop] = React.useState(false)
+
+  React.useEffect(() => {
+    const checkScreenSize = () => {
+      setIsDesktop(window.innerWidth >= 1024) // lg breakpoint
+    }
+
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
+
   return (
     <>
-      <Dialog open={open && !showCancelDialog} onOpenChange={handleDialogClose}>
-        <DialogContent
-          className={cn("overflow-hidden rounded-2xl p-0 md:max-h-[600px] md:max-w-4xl", {
-            "md:max-w-xl": singleSectionOnly,
-          })}
-          onPointerDownOutside={(e) => {
-            if (showCancelDialog) return;            // pozwól klikom przejść do confirm
-            if (hasUnsavedChanges) {
-              e.preventDefault()
-              if (typeof window !== 'undefined' && (window as Window & { triggerToastShake?: () => void }).triggerToastShake) {
-                (window as Window & { triggerToastShake?: () => void }).triggerToastShake!()
+      {/* Desktop Dialog - only on lg+ screens */}
+      {isDesktop && (
+        <Dialog open={open && !showCancelDialog} onOpenChange={handleDialogClose}>
+          <DialogContent
+            className={cn("overflow-hidden rounded-2xl p-0 md:max-h-[600px] md:max-w-4xl", {
+              "md:max-w-xl": singleSectionOnly,
+            })}
+            onPointerDownOutside={(e) => {
+              if (showCancelDialog) return;
+              if (hasUnsavedChanges) {
+                e.preventDefault()
+                if (typeof window !== 'undefined' && (window as Window & { triggerToastShake?: () => void }).triggerToastShake) {
+                  (window as Window & { triggerToastShake?: () => void }).triggerToastShake!()
+                }
               }
-            }
-          }}
-          onEscapeKeyDown={(e) => {
-            if (showCancelDialog) return;            // nie przechwytuj Esc
-            if (hasUnsavedChanges) {
-              e.preventDefault()
-              if (typeof window !== 'undefined' && (window as Window & { triggerToastShake?: () => void }).triggerToastShake) {
-                (window as Window & { triggerToastShake?: () => void }).triggerToastShake!()
+            }}
+            onEscapeKeyDown={(e) => {
+              if (showCancelDialog) return;            // nie przechwytuj Esc
+              if (hasUnsavedChanges) {
+                e.preventDefault()
+                if (typeof window !== 'undefined' && (window as Window & { triggerToastShake?: () => void }).triggerToastShake) {
+                  (window as Window & { triggerToastShake?: () => void }).triggerToastShake!()
+                }
               }
-            }
-          }}
-          toast={{
-            message: "Careful — you have unsaved changes!",
-            onSave: handleSaveFromToast,
-            onReset: () => {
-              // This will be handled by individual components
-              console.log('Reset triggered from dialog level')
-              setHasUnsavedChanges(false)
-            },
-            show: hasUnsavedChanges
-          }}
-        >
-          <DialogTitle className="sr-only">User Settings</DialogTitle>
-          <DialogDescription className="sr-only">
-            Customize your user settings here.
-          </DialogDescription>
+            }}
+            toast={{
+              message: "Careful — you have unsaved changes!",
+              onSave: handleSaveFromToast,
+              onReset: () => {
+                // This will be handled by individual components
+                console.log('Reset triggered from dialog level')
+                setHasUnsavedChanges(false)
+              },
+              show: hasUnsavedChanges
+            }}
+          >
+            <DialogTitle className="sr-only">User Settings</DialogTitle>
 
-          <UnsavedChangesContext.Provider value={{
-            isDirty: hasUnsavedChanges,
-            markAsSaved,
-            resetChanges,
-            checkForChanges,
-            registerSaveFunction: (fn) => setActiveSaveFunction(() => fn as unknown as () => Promise<void>),
-            runSave: handleSaveFromToast,
-          }}>
-            <SidebarProvider className="items-start">
-              {!singleSectionOnly && (
-                <Sidebar collapsible="none" className="hidden md:flex">
-                  <SidebarContent>
-                    {/* Sidebar items moved below with spacing */}
-                    <SidebarGroup>
-                      <SidebarGroupContent>
-                        <SidebarMenu>
-                          {navItems.map((item) => (
-                            <SidebarMenuItem key={item.name}>
-                              <SidebarMenuButton
-                                asChild
-                                isActive={activeSection === item.id}
-                                onClick={() => handleSectionChange(item.id)}
-                              >
-                                <Button className="w-full justify-start" variant={"ghost"}>
-                                  <item.icon className="size-4" />
-                                  <span className="ml-2">{item.name}</span>
-                                </Button>
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                          ))}
-                        </SidebarMenu>
-                      </SidebarGroupContent>
-                    </SidebarGroup>
+            <UnsavedChangesContext.Provider value={{
+              isDirty: hasUnsavedChanges,
+              markAsSaved,
+              resetChanges,
+              checkForChanges,
+              registerSaveFunction: (fn) => setActiveSaveFunction(() => fn as unknown as () => Promise<void>),
+              runSave: handleSaveFromToast,
+            }}>
+              <SidebarProvider className="items-start">
+                {!singleSectionOnly && (
+                  <Sidebar collapsible="none" className="hidden md:flex">
+                    <SidebarContent>
+                      {/* Sidebar items moved below with spacing */}
+                      <SidebarGroup>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            {navItems.map((item) => (
+                              <SidebarMenuItem key={item.name}>
+                                <SidebarMenuButton
+                                  asChild
+                                  isActive={activeSection === item.id}
+                                  onClick={() => handleSectionChange(item.id)}
+                                >
+                                  <Button className="w-full justify-start" variant={"ghost"}>
+                                    <item.icon className="size-4" />
+                                    <span className="ml-2">{item.name}</span>
+                                  </Button>
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            ))}
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
 
-                  </SidebarContent>
-                </Sidebar>
-              )}
-              <main className="flex h-[600px] flex-1 flex-col overflow-hidden">
-                <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
-                  <div className="flex items-center gap-2">
-                    {!singleSectionOnly && (
-                      <Breadcrumb>
-                        <BreadcrumbList>
-                          <BreadcrumbItem className="hidden md:block">
-                            <BreadcrumbLink href="#">Settings</BreadcrumbLink>
-                          </BreadcrumbItem>
-                          <BreadcrumbSeparator className="hidden md:block" />
-                          <BreadcrumbItem>
-                            <BreadcrumbPage>
-                              {navItems.find(item => item.id === activeSection)?.name || "Settings"}
-                            </BreadcrumbPage>
-                          </BreadcrumbItem>
-                        </BreadcrumbList>
-                      </Breadcrumb>
-                    )}
+                    </SidebarContent>
+                  </Sidebar>
+                )}
+                <main className="flex h-[600px] flex-1 flex-col overflow-hidden">
+                  <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
+                    <div className="flex items-center gap-2">
+                      {!singleSectionOnly && (
+                        <Breadcrumb>
+                          <BreadcrumbList>
+                            <BreadcrumbItem className="hidden md:block">
+                              <BreadcrumbLink href="#">Settings</BreadcrumbLink>
+                            </BreadcrumbItem>
+                            <BreadcrumbSeparator className="hidden md:block" />
+                            <BreadcrumbItem>
+                              <BreadcrumbPage>
+                                {navItems.find(item => item.id === activeSection)?.name || "Settings"}
+                              </BreadcrumbPage>
+                            </BreadcrumbItem>
+                          </BreadcrumbList>
+                        </Breadcrumb>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <DialogClose asChild>
+                        <Button variant="ghost" size="icon">
+                          <OutlineClose />
+                        </Button>
+                      </DialogClose>
+                    </div>
+                  </header>
+                  <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+                    <SettingsContent
+                      activeSection={activeSection}
+                      user={profile ? {
+                        id: profile.user_id,
+                        email: auth_user?.email ?? '',
+                        user_metadata: {
+                          displayName: profile.display_name,
+                          username: profile.username,
+                          bio: '',
+                          avatar_url: profile.avatar_url ?? undefined,
+                          coverImage: profile.cover_url ?? undefined,
+                          accentColor: profile.accent_color ?? undefined,
+                        }
+                      } : null}
+                    />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <DialogClose asChild>
-                      <Button variant="ghost" size="icon">
-                        <OutlineClose />
-                      </Button>
-                    </DialogClose>
+                </main>
+              </SidebarProvider>
+            </UnsavedChangesContext.Provider>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Mobile/Tablet Drawer - only below lg screens */}
+      {!isDesktop && (
+        <Drawer open={open && !showCancelDialog} onOpenChange={handleDialogClose}>
+          <DrawerContent className="!max-h-[95vh] !h-[95vh]">
+            <DrawerHeader className="text-center">
+              <DrawerTitle>Settings</DrawerTitle>
+            </DrawerHeader>
+
+            <UnsavedChangesContext.Provider value={{
+              isDirty: hasUnsavedChanges,
+              markAsSaved,
+              resetChanges,
+              checkForChanges,
+              registerSaveFunction: (fn) => setActiveSaveFunction(() => fn as unknown as () => Promise<void>),
+              runSave: handleSaveFromToast,
+            }}>
+              <div className="flex flex-col min-h-0">
+                {/* Mobile Navigation */}
+                {!singleSectionOnly && (
+                  <div className="flex-shrink-0 border-b px-4 py-2">
+                    <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+                      {navItems.map((item) => (
+                        <Button
+                          key={item.name}
+                          variant={activeSection === item.id ? "default" : "ghost"}
+                          size="sm"
+                          className={cn(
+                            "whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-all",
+                            activeSection === item.id
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "hover:bg-muted hover:text-foreground"
+                          )}
+                          onClick={() => handleSectionChange(item.id)}
+                        >
+                          <item.icon className="size-4 mr-2" />
+                          {item.name}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                </header>
-                <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+                )}
+
+                {/* Content Area */}
+                <div className="flex-1 min-h-0 overflow-y-auto p-4">
                   <SettingsContent
                     activeSection={activeSection}
                     user={profile ? {
@@ -425,11 +505,11 @@ export function SettingsDialog({ open: controlledOpen, onOpenChange, initialSect
                     } : null}
                   />
                 </div>
-              </main>
-            </SidebarProvider>
-          </UnsavedChangesContext.Provider>
-        </DialogContent>
-      </Dialog>
+              </div>
+            </UnsavedChangesContext.Provider>
+          </DrawerContent>
+        </Drawer>
+      )}
 
       {/* Cancel Subscription Dialog - Teleported to root */}
       {showCancelDialog && typeof window !== 'undefined' && createPortal(

@@ -159,6 +159,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   // container width (for pixel math)
   const rootRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(0);
+  const MAX_W_PX = 56 * 16; // 56rem w px = 896
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
@@ -185,7 +186,8 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
 
   // layout math
   const gap = 12;
-  const cell = cols > 0 ? Math.floor((containerW - (cols - 1) * gap) / cols) : 0;
+  const effectiveW = Math.min(containerW, MAX_W_PX);
+  const cell = cols > 0 ? Math.floor((effectiveW - (cols - 1) * gap) / cols) : 0;
   const rows = placed.length ? Math.max(...placed.map((p) => p.y + p.h)) : 0;
   const containerHeight = rows > 0 ? rows * cell + (rows - 1) * gap : Math.max(cell, 240);
 
@@ -211,7 +213,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
 
   if (firstLoad || cell <= 0) {
     return (
-      <div ref={rootRef} className="w-full mt-6">
+      <div ref={rootRef} className="w-full max-w-4xl mx-auto mt-6">
         <BentoSkeleton cols={cols} containerWidth={containerW} gap={gap} count={6} />
       </div>
     );
@@ -222,7 +224,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   }
 
   return (
-    <div ref={rootRef} className="w-full mt-6">
+    <div ref={rootRef} className="w-full max-w-4xl mx-auto mt-6">
       {/* hover slideshow handled within tiles; click-through to post page */}
 
       <div className="relative" style={{ height: containerHeight, minHeight: Math.max(240, cell) }}>

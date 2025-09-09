@@ -21,11 +21,11 @@ const sizeClasses = {
 };
 
 const fallbackSizes = {
-  sm: 16,
-  md: 20,
-  lg: 24,
-  xl: 32,
-  '2xl': 48
+  sm: 36,
+  md: 40,
+  lg: 48,
+  xl: 64,
+  '2xl': 96
 };
 
 export function UserAvatar({

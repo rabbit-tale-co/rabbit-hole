@@ -23,7 +23,6 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@
 import { DeleteAccountDialog } from "./DeleteAccountDialog"
 import { supabase } from "@/lib/supabase"
 import { useProfileMedia } from "@/hooks/useProfileMedia"
-import { SessionManagement } from "./SessionManagement"
 
 // bio formatting not persisted yet
 
@@ -53,7 +52,7 @@ const profileSchema = z.object({
 interface ProfileProps { user: { id: string; email?: string } | null }
 
 export function Profile({ user }: ProfileProps) {
-  const { profile, refreshProfile, getToken, session } = useAuth()
+  const { profile, refreshProfile, getToken } = useAuth()
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deleting, setDeleting] = React.useState(false)
   const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({})
@@ -748,12 +747,6 @@ export function Profile({ user }: ProfileProps) {
             </Button>
           </div>
         </div>
-      </div>
-
-      <Separator />
-
-      <div className="space-y-6">
-        <SessionManagement />
       </div>
 
       <Separator />
