@@ -46,8 +46,8 @@ export function useInfiniteFollowers(
     const res = await getFollowersPage(targetUserId, cursorParam, pageSize);
     if ("error" in res && res.error) {
       setError(res.error);
-    } else {
-      setPages(prev => [...prev, { items: res.items ?? [], nextCursor: res.nextCursor ?? null }]);
+    } else if ("items" in res) {
+      setPages(prev => [...prev, { items: res.items ?? [], nextCursor: res.nextCursor ?? null } as { items: FollowerItem[]; nextCursor: string | null }]);
       setCursor(res.nextCursor ?? null);
     }
 
