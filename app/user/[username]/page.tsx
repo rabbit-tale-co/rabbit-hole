@@ -62,7 +62,7 @@ export default function UserProfilePage() {
 
       {!isSuspended ? (
         <Feed
-          authorId={profile.user_id}
+          username={profile.username}
           isOwnProfile={isOwn}
           onCountChange={(n) => {
             try {

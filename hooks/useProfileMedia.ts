@@ -212,26 +212,34 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     toast.success("Avatar updated", { id: toastId });
   }
 
-  // Upload from a cropped Data URL (PNG) coming from the ImageCrop component
-  async function uploadAvatarFromCropped(dataUrl: string) {
+  // Upload from a cropped Blob coming from the ImageCrop component
+  async function uploadAvatarFromCropped(blob: Blob) {
     if (!userId) return;
-    // Convert dataURL -> Blob -> File and send to backend for processing
-    const resp = await fetch(dataUrl);
-    const blobPng = await resp.blob();
-    const file = new File([blobPng], "avatar.png", { type: blobPng.type || "image/png" });
+    console.log('[AVATAR] Uploading cropped avatar:', {
+      userId,
+      blobSize: blob.size,
+      blobType: blob.type,
+      timestamp: new Date().toISOString()
+    });
+    // Convert Blob -> File and send to backend for processing
+    const extension = blob.type.includes('webp') ? 'webp' : 'png';
+    const file = new File([blob], `avatar.${extension}`, { type: blob.type || "image/png" });
     const fd = new FormData();
     fd.append("userId", userId);
     fd.append("file", file, file.name);
     const toastId = toast.loading("Uploading avatar… 0%");
     let json: UploadResp;
         try {
+          console.log('[AVATAR] Starting upload to /api/profile/avatar');
           json = await uploadWithAuth('/api/profile/avatar', fd, (pct: number) => {
             toast(`Uploading avatar… ${pct}%`, { id: toastId });
           });
-        } catch {
-      toast.error("Upload failed", { id: toastId });
-      return;
-    }
+          console.log('[AVATAR] Upload successful:', json);
+        } catch (error) {
+          console.error('[AVATAR] Upload failed:', error);
+          toast.error("Upload failed", { id: toastId });
+          return;
+        }
     const fin = await finalizeAvatar(userId, json.url || json.path || "");
     if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
     await Promise.resolve(onRefreshed?.());
@@ -283,24 +291,32 @@ export function useProfileMedia(userId?: string | null, onRefreshed?: () => Prom
     toast.success("Cover updated", { id: toastId });
   }
 
-  async function uploadCoverFromCropped(dataUrl: string) {
+  async function uploadCoverFromCropped(blob: Blob) {
     if (!userId) return;
-    const resp = await fetch(dataUrl);
-    const blobPng = await resp.blob();
-    const file = new File([blobPng], "cover.png", { type: blobPng.type || "image/png" });
+    console.log('[COVER] Uploading cropped cover:', {
+      userId,
+      blobSize: blob.size,
+      blobType: blob.type,
+      timestamp: new Date().toISOString()
+    });
+    const extension = blob.type.includes('webp') ? 'webp' : 'png';
+    const file = new File([blob], `cover.${extension}`, { type: blob.type || "image/png" });
     const fd = new FormData();
     fd.append("userId", userId);
     fd.append("file", file, file.name);
     const toastId = toast.loading("Uploading cover… 0%");
     let json: UploadResp;
         try {
+          console.log('[COVER] Starting upload to /api/profile/cover');
           json = await uploadWithAuth('/api/profile/cover', fd, (pct: number) => {
             toast(`Uploading cover… ${pct}%`, { id: toastId });
           });
-        } catch {
-      toast.error("Upload failed", { id: toastId });
-      return;
-    }
+          console.log('[COVER] Upload successful:', json);
+        } catch (error) {
+          console.error('[COVER] Upload failed:', error);
+          toast.error("Upload failed", { id: toastId });
+          return;
+        }
     const fin = await finalizeCover(userId, json.url || json.path || "");
     if ((fin as { error?: string }).error) { toast.error((fin as { error?: string }).error || "update failed", { id: toastId }); return; }
     await Promise.resolve(onRefreshed?.());

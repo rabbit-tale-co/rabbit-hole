@@ -1,21 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SafeUserListItem } from "@/types/user";
 
-export type UserListItem = {
-  user_id: string;
-  username: string;
-  display_name?: string;
-  bio?: string | null;
-  avatar_url?: string | null;
-  cover_url?: string | null;
-  accent_color?: string | null;
-  followStats?: {
-    isFollowing: boolean;
-    followers: number;
-    following: number;
-  };
-};
+export type UserListItem = SafeUserListItem;
 
 export function useInfiniteUsers(initial?: { items: UserListItem[]; nextCursor: string | null }, pageSize = 24) {
   const [pages, setPages] = useState<{ items: UserListItem[]; nextCursor: string | null }[]>(
@@ -30,7 +18,7 @@ export function useInfiniteUsers(initial?: { items: UserListItem[]; nextCursor: 
 
   const items = useMemo(() => {
     const map = new Map<string, UserListItem>();
-    for (const p of pages) for (const it of p.items) map.set(it.user_id, it);
+    for (const p of pages) for (const it of p.items) map.set(it.username, it);
     return Array.from(map.values());
   }, [pages]);
 

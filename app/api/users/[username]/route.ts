@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { sanitizeUserResponse } from "@/utils/userSanitizer";
 
 const Username = z.string().min(3).max(20).regex(/^[a-z0-9_]+$/);
 
@@ -33,5 +34,5 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ userna
     .maybeSingle();
 
   const profile = { ...data, banned_until: (susp as { banned_until?: string | null } | null)?.banned_until ?? null };
-  return Response.json({ profile });
+  return Response.json(sanitizeUserResponse({ profile }));
 }

@@ -54,8 +54,10 @@ const getCroppedPngImage = async (
   imageSrc: HTMLImageElement,
   scaleFactor: number,
   pixelCrop: PixelCrop,
-  maxImageSize: number
-): Promise<string> => {
+  maxImageSize: number,
+  recursionCount = 0,
+  onError?: (error: string) => void
+): Promise<Blob> => {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -63,13 +65,37 @@ const getCroppedPngImage = async (
     throw new Error('Context is null, this should never happen.');
   }
 
+  // Prevent infinite recursion - max 10 attempts
+  if (recursionCount >= 10) {
+    console.warn('Maximum recursion depth reached in getCroppedPngImage');
+    // Return the image even if it's too large to prevent infinite loop
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        resolve(blob || new Blob());
+      }, 'image/png', 0.9);
+    });
+  }
+
+  // Prevent scaleFactor from becoming too small
+  const minScaleFactor = 0.2;
+  const effectiveScaleFactor = Math.max(minScaleFactor, scaleFactor);
+
   const scaleX = imageSrc.naturalWidth / imageSrc.width;
   const scaleY = imageSrc.naturalHeight / imageSrc.height;
 
   const natCropWidth = pixelCrop.width * scaleX;
   const natCropHeight = pixelCrop.height * scaleY;
-  const targetW = Math.max(1, Math.round(natCropWidth * Math.max(1, scaleFactor)));
-  const targetH = Math.max(1, Math.round(natCropHeight * Math.max(1, scaleFactor)));
+  const targetW = Math.max(1, Math.round(natCropWidth * effectiveScaleFactor));
+  const targetH = Math.max(1, Math.round(natCropHeight * effectiveScaleFactor));
+
+  console.log('[CROP] Canvas dimensions:', {
+    natCropWidth,
+    natCropHeight,
+    effectiveScaleFactor,
+    targetW,
+    targetH,
+    recursionCount
+  });
 
   canvas.width = targetW;
   canvas.height = targetH;
@@ -89,20 +115,50 @@ const getCroppedPngImage = async (
     targetH
   );
 
-  const croppedImageUrl = canvas.toDataURL('image/png');
-  const response = await fetch(croppedImageUrl);
-  const blob = await response.blob();
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        resolve(new Blob());
+        return;
+      }
 
-  if (blob.size > maxImageSize) {
-    return await getCroppedPngImage(
-      imageSrc,
-      scaleFactor * 0.9,
-      pixelCrop,
-      maxImageSize
-    );
-  }
+      // If blob is very small (< 10KB) or we've reached scale limit, don't recurse further
+      const isVerySmall = blob.size < 10240; // 10KB
+      const reachedScaleLimit = effectiveScaleFactor <= minScaleFactor;
+      const isTooLarge = blob.size > maxImageSize;
 
-  return croppedImageUrl;
+      console.log('[CROP] Blob analysis:', {
+        size: blob.size,
+        maxSize: maxImageSize,
+        isVerySmall,
+        reachedScaleLimit,
+        isTooLarge,
+        effectiveScaleFactor,
+        recursionCount
+      });
+
+      if (isTooLarge && !isVerySmall && !reachedScaleLimit && recursionCount < 5) {
+        console.log('[CROP] Attempting recursion with smaller scale factor');
+        getCroppedPngImage(
+          imageSrc,
+          effectiveScaleFactor * 0.9, // Less aggressive reduction
+          pixelCrop,
+          maxImageSize,
+          recursionCount + 1,
+          onError
+        ).then(resolve);
+      } else if (isTooLarge && recursionCount >= 5) {
+        console.log('[CROP] Maximum recursion reached, file too large');
+        const maxSizeMB = (maxImageSize / (1024 * 1024)).toFixed(1);
+        const currentSizeMB = (blob.size / (1024 * 1024)).toFixed(1);
+        onError?.(`Obraz jest za duży (${currentSizeMB}MB). Maksymalny rozmiar to ${maxSizeMB}MB.`);
+        resolve(blob); // Return the blob anyway, but show error
+      } else {
+        console.log('[CROP] Resolving with current blob (no recursion)');
+        resolve(blob);
+      }
+    }, 'image/png', 0.9);
+  });
 };
 
 type ImageCropContextType = {
@@ -112,7 +168,8 @@ type ImageCropContextType = {
   crop: PercentCrop | undefined;
   completedCrop: PixelCrop | null;
   imgRef: RefObject<HTMLImageElement | null>;
-  onCrop?: (croppedImage: string) => void;
+  onCrop?: (croppedImage: Blob) => void;
+  onError?: (error: string) => void;
   reactCropProps: Omit<ReactCropProps, 'onChange' | 'onComplete' | 'children'>;
   handleChange: (pixelCrop: PixelCrop, percentCrop: PercentCrop) => void;
   handleComplete: (
@@ -137,7 +194,8 @@ const useImageCrop = () => {
 export type ImageCropProps = {
   file: File;
   maxImageSize?: number;
-  onCrop?: (croppedImage: string) => void;
+  onCrop?: (croppedImage: Blob) => void;
+  onError?: (error: string) => void;
   children: ReactNode;
   onChange?: ReactCropProps['onChange'];
   onComplete?: ReactCropProps['onComplete'];
@@ -147,6 +205,7 @@ export const ImageCrop = ({
   file,
   maxImageSize = 1024 * 1024 * 5,
   onCrop,
+  onError,
   children,
   onChange,
   onComplete,
@@ -196,14 +255,16 @@ export const ImageCrop = ({
     }
 
     const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
-    const croppedImage = await getCroppedPngImage(
+    const croppedImageBlob = await getCroppedPngImage(
       imgRef.current,
       Math.max(1, Math.min(2, dpr)),
       completedCrop,
-      maxImageSize
+      maxImageSize,
+      0, // Start with recursion count 0
+      onError
     );
 
-    onCrop?.(croppedImage);
+    onCrop?.(croppedImageBlob);
   };
 
   const resetCrop = () => {
@@ -221,6 +282,7 @@ export const ImageCrop = ({
     completedCrop,
     imgRef,
     onCrop,
+    onError,
     reactCropProps,
     handleChange,
     handleComplete,
@@ -368,7 +430,7 @@ export const ImageCropReset = ({
 export type CropperProps = Omit<ReactCropProps, 'onChange'> & {
   file: File;
   maxImageSize?: number;
-  onCrop?: (croppedImage: string) => void;
+  onCrop?: (croppedImage: Blob) => void;
   onChange?: ReactCropProps['onChange'];
 };
 

@@ -90,9 +90,9 @@ function HoverSlideshow({ firstSrc, others, widthPx, alt }: { firstSrc: string; 
   );
 }
 
-export default function Feed({ initial, authorId, isOwnProfile, onCountChange }: { initial?: Parameters<typeof useInfiniteFeed>[0]; authorId?: string; isOwnProfile?: boolean; onCountChange?: (n: number) => void }) {
+export default function Feed({ initial, username, isOwnProfile, onCountChange }: { initial?: Parameters<typeof useInfiniteFeed>[0]; username?: string; isOwnProfile?: boolean; onCountChange?: (n: number) => void }) {
   // data
-  const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(initial, 24, { authorId });
+  const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(initial, 24, { username });
   const router = useRouter();
   const { recordImpression } = useManualImpression();
 
@@ -219,7 +219,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
   }
 
   if (!loading && items.length === 0) {
-    return authorId ? <ProfileEmptyGallery isOwnProfile={!!isOwnProfile} /> : <HomeEmptyFeed />;
+    return username ? <ProfileEmptyGallery isOwnProfile={!!isOwnProfile} /> : <HomeEmptyFeed />;
   }
 
   return (
@@ -294,7 +294,7 @@ export default function Feed({ initial, authorId, isOwnProfile, onCountChange }:
                   <>
 
                     {/* top-left user */}
-                    {profile && !authorId && (
+                    {profile && !username && (
                       <div
                         className="absolute top-2 left-2 sm:top-3 sm:left-3 z-30 text-white"
                         onClick={(e) => { e.stopPropagation(); }}

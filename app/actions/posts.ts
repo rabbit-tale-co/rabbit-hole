@@ -32,9 +32,6 @@ async function requireActiveUser(expectedUserId?: string): Promise<{ error?: str
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) return { error: "Unauthorized" };
 
-      // Log JWT usage for critical operations
-      console.log(`[JWT] User authenticated (client): ${user.id}${expectedUserId ? ` (expected: ${expectedUserId})` : ''}`);
-
       if (expectedUserId && user.id !== expectedUserId) return { error: "Forbidden" };
       return { me: { id: user.id } };
     } catch (error) {
@@ -43,9 +40,6 @@ async function requireActiveUser(expectedUserId?: string): Promise<{ error?: str
     }
   }
 
-  // Log JWT usage for critical operations
-  console.log(`[JWT] User authenticated (server): ${auth.user.id}${expectedUserId ? ` (expected: ${expectedUserId})` : ''}`);
-
   // Note: bannedUntil check moved to admin functions in admin.ts
   if (expectedUserId && auth.user.id !== expectedUserId) return { error: "Forbidden" };
   return { me: { id: auth.user.id } };
@@ -53,21 +47,13 @@ async function requireActiveUser(expectedUserId?: string): Promise<{ error?: str
 
 // --- create post (images must be already uploaded to Storage with those paths) ---
 export async function createPost(input: unknown) {
-  console.log(`[JWT] CreatePost function called with input:`, input);
-
   const parsed = await CreatePost.safeParseAsync(input);
   if (!parsed.success) {
-    console.log(`[JWT] CreatePost validation failed:`, parsed.error);
     return { error: "Invalid payload" };
   }
 
-  // Log JWT usage for post creation
-  console.log(`[JWT] Create post requested by user: ${parsed.data.author_id}`);
-
   {
-    console.log(`[JWT] Calling requireActiveUser for user: ${parsed.data.author_id}`);
     const auth = await requireActiveUser(parsed.data.author_id);
-    console.log(`[JWT] requireActiveUser result:`, auth);
     if (auth.error) return { error: auth.error };
   }
 
@@ -97,8 +83,6 @@ export async function updatePost(input: unknown) {
   const parsed = UpdatePost.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
 
-  // Log JWT usage for post update
-  console.log(`[JWT] Update post requested: ${parsed.data.post_id} by user: ${parsed.data.author_id}`);
 
   {
     const auth = await requireActiveUser(parsed.data.author_id);
@@ -137,10 +121,6 @@ export async function updatePost(input: unknown) {
 
 // --- delete post (soft delete + return paths for caller to purge if needed) ---
 export async function deletePost(post_id: string, author_id: string) {
-  // Log JWT usage for post deletion
-  console.log(`[JWT] Delete post requested: ${post_id} by user: ${author_id}`);
-  console.log(`[JWT] Delete post - author_id type: ${typeof author_id}, value: ${JSON.stringify(author_id)}`);
-
   // Note: Authorization is already verified by the caller (API endpoint)
   // We just need to verify that the user can delete this specific post
   const sb = supabaseAdmin;
@@ -153,7 +133,6 @@ export async function deletePost(post_id: string, author_id: string) {
 
   // Verify that the authenticated user is the author of the post
   if (post.author_id !== author_id) {
-    console.log(`[JWT] Delete post - Forbidden: user ${author_id} cannot delete post by ${post.author_id}`);
     return { error: "Forbidden" };
   }
 
@@ -185,8 +164,6 @@ export async function setLike(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
 
-  // Log JWT usage for like operation
-  console.log(`[JWT] Like ${on ? 'added' : 'removed'} for post: ${parsed.data.post_id} by user: ${parsed.data.user_id}`);
 
   {
     const auth = await requireActiveUser(parsed.data.user_id);
@@ -198,8 +175,6 @@ export async function setBookmark(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
 
-  // Log JWT usage for bookmark operation
-  console.log(`[JWT] Bookmark ${on ? 'added' : 'removed'} for post: ${parsed.data.post_id} by user: ${parsed.data.user_id}`);
 
   {
     const auth = await requireActiveUser(parsed.data.user_id);
@@ -211,8 +186,6 @@ export async function setRepost(input: unknown, on: boolean) {
   const parsed = PostIdUserId.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
 
-  // Log JWT usage for repost operation
-  console.log(`[JWT] Repost ${on ? 'added' : 'removed'} for post: ${parsed.data.post_id} by user: ${parsed.data.user_id}`);
 
   {
     const auth = await requireActiveUser(parsed.data.user_id);
@@ -226,8 +199,6 @@ export async function addComment(input: unknown) {
   const parsed = CommentCreate.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
 
-  // Log JWT usage for comment creation
-  console.log(`[JWT] Comment added to post: ${parsed.data.post_id} by user: ${parsed.data.author_id}`);
 
   {
     const auth = await requireActiveUser(parsed.data.author_id);
@@ -242,8 +213,6 @@ export async function removeComment(input: unknown) {
   const parsed = CommentDelete.safeParse(input);
   if (!parsed.success) return { error: "Invalid payload" };
 
-  // Log JWT usage for comment deletion
-  console.log(`[JWT] Comment removed: ${parsed.data.comment_id} by user: ${parsed.data.author_id}`);
 
   {
     const auth = await requireActiveUser(parsed.data.author_id);
@@ -288,7 +257,6 @@ export async function getFeedPage(input: unknown) {
   if (data && data.length > 0) {
     try {
       const postIds = data.map(post => post.id);
-      console.log('Fetching real stats for posts:', postIds.length);
 
       const { data: statsData, error: statsError } = await sb
         .from('posts_stats')
@@ -296,10 +264,7 @@ export async function getFeedPage(input: unknown) {
         .in('post_id', postIds);
 
       if (statsError) {
-        console.error('Failed to fetch post stats:', statsError);
-        console.error('Stats error details:', statsError.message, statsError.code);
         // If stats table doesn't exist, return posts without stats
-        console.log('Stats table not available, returning posts without stats');
         itemsWithStats = data.map(post => ({
           ...post,
           stats: {
@@ -318,7 +283,6 @@ export async function getFeedPage(input: unknown) {
             last_view_at: stat.last_view_at
           });
         });
-        console.log('Stats map created with', statsMap.size, 'entries');
 
         // Attach stats to each post
         itemsWithStats = data.map(post => {
@@ -327,7 +291,6 @@ export async function getFeedPage(input: unknown) {
             unique_viewers: 0,
             last_view_at: null
           };
-          console.log(`Post ${post.id} real stats:`, stats);
           return {
             ...post,
             stats
@@ -353,7 +316,6 @@ export async function getFeedPage(input: unknown) {
       ? encodeCursor(data[data.length - 1].created_at as string, data[data.length - 1].id as string)
       : null;
 
-  // console.log('Returning items with real stats, first item stats:', itemsWithStats[0]?.stats);
   return { items: itemsWithStats, nextCursor };
 }
 
@@ -393,7 +355,6 @@ export async function getUserFeedPage(input: unknown) {
   if (data && data.length > 0) {
     try {
       const postIds = data.map(post => post.id);
-      // console.log('Fetching real stats for user posts:', postIds.length);
 
       const { data: statsData, error: statsError } = await sb
         .from('posts_stats')
@@ -401,10 +362,7 @@ export async function getUserFeedPage(input: unknown) {
         .in('post_id', postIds);
 
       if (statsError) {
-        console.error('Failed to fetch user post stats:', statsError);
-        console.error('Stats error details:', statsError.message, statsError.code);
         // If stats table doesn't exist, return posts without stats
-        // console.log('Stats table not available, returning posts without stats');
         itemsWithStats = data.map(post => ({
           ...post,
           stats: {
@@ -423,7 +381,6 @@ export async function getUserFeedPage(input: unknown) {
             last_view_at: stat.last_view_at
           });
         });
-        // console.log('User stats map created with', statsMap.size, 'entries');
 
         // Attach stats to each post
         itemsWithStats = data.map(post => {
@@ -432,7 +389,6 @@ export async function getUserFeedPage(input: unknown) {
             unique_viewers: 0,
             last_view_at: null
           };
-          // console.log(`User post ${post.id} real stats:`, stats);
           return {
             ...post,
             stats

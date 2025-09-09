@@ -459,11 +459,18 @@ export function Profile({ user }: ProfileProps) {
               aspect={1}
               circularCrop
               file={cropAvatarFile}
-              maxImageSize={1024 * 1024}
+              maxImageSize={1024 * 1024 * 5}
               onComplete={(px) => { try { setGifPixelCrop(px) } catch { } }}
-              onCrop={async (dataUrl) => {
+              onError={(error) => {
+                toast.error(error)
+                setCropping(null)
+                setCropAvatarFile(null)
+              }}
+              onCrop={async (blob) => {
                 if (cropping === 'avatar') {
-                  await uploadAvatarFromCropped(dataUrl)
+                  await uploadAvatarFromCropped(blob)
+                  setCropping(null)
+                  setCropAvatarFile(null)
                 }
               }}
             >
@@ -517,11 +524,18 @@ export function Profile({ user }: ProfileProps) {
             <ImageCrop
               aspect={3 / 1}
               file={cropCoverFile}
-              maxImageSize={1024 * 1024 * 2}
+              maxImageSize={1024 * 1024 * 5}
               onComplete={(px) => { try { setGifPixelCrop(px) } catch { } }}
-              onCrop={async (dataUrl) => {
+              onError={(error) => {
+                toast.error(error)
+                setCropping(null)
+                setCropCoverFile(null)
+              }}
+              onCrop={async (blob) => {
                 if (cropping === 'cover') {
-                  await uploadCoverFromCropped(dataUrl)
+                  await uploadCoverFromCropped(blob)
+                  setCropping(null)
+                  setCropCoverFile(null)
                 }
               }}
             >

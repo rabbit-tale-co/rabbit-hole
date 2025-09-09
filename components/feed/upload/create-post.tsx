@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/lib/supabase';
-// import { convertImageToWebP, convertVideoToWebM } from '@/lib/media';
+import { convertImageToWebP, convertVideoToWebM } from '@/lib/media';
 import { randomUUIDv7 } from '@/lib/uuid';
 import { useAuth } from '@/providers/AuthProvider';
 import { Sortable, SortableItem, SortableItemHandle } from '@/components/ui/sortable';
@@ -321,10 +321,27 @@ export function CreateMediaPost({
   // ---------- upload core ----------------------------------------------------
 
   const uploadOne = useCallback(async (it: Item, postId: string, onProgress: (pct: number) => void) => {
-    // no client-side conversion; backend converts to webp/webm
-    const blob: Blob = it.file;
+    // Convert images to WebP and videos to WebM on client side
+    let blob: Blob = it.file;
     let ext = (it.file.name.split('.').pop() || 'bin').toLowerCase();
     let mime = it.file.type || 'application/octet-stream';
+
+    try {
+      if (it.kind === 'image' || it.kind === 'gif') {
+        const converted = await convertImageToWebP(it.file);
+        blob = converted.blob;
+        ext = converted.ext;
+        mime = converted.mime;
+      } else if (it.kind === 'video') {
+        const converted = await convertVideoToWebM(it.file);
+        blob = converted.blob;
+        ext = converted.ext;
+        mime = converted.mime;
+      }
+    } catch (error) {
+      console.warn('Conversion failed, using original file:', error);
+      // Continue with original file if conversion fails
+    }
 
     console.debug('[uploadOne] start', { kind: it.kind, size: it.file.size, type: it.file.type, name: it.file.name });
 

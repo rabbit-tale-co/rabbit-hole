@@ -2,6 +2,7 @@
 'use server';
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { SafeUserListItem } from '@/types/user';
 
 type FollowStats = {
   isFollowing: boolean;
@@ -164,7 +165,7 @@ export async function toggleFollow(targetUserId: string, currentUserId: string):
 }
 
 // Get followers list with pagination
-export async function getFollowersPage(targetUserId: string, cursor?: string, limit = 24) {
+export async function getFollowersPage(targetUserId: string, cursor?: string, limit = 24): Promise<{ items: SafeUserListItem[]; nextCursor: string | null } | { error: string }> {
   const supabase = supabaseAdmin;
 
   // First, get the follow data
@@ -216,7 +217,6 @@ export async function getFollowersPage(targetUserId: string, cursor?: string, li
       if (!profile) return null;
 
       return {
-        user_id: row.follower_id,
         username: profile.username,
         display_name: profile.display_name,
         bio: profile.bio,
@@ -230,14 +230,14 @@ export async function getFollowersPage(targetUserId: string, cursor?: string, li
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
   const nextCursor = items.length === limit && followData?.length === limit
-    ? Buffer.from(`${followData[followData.length - 1].created_at}|${items[items.length - 1].user_id}`).toString("base64")
+    ? Buffer.from(`${followData[followData.length - 1].created_at}|${items[items.length - 1].username}`).toString("base64")
     : null;
 
   return { items, nextCursor };
 }
 
 // Get following list with pagination - OPTIMIZED VERSION
-export async function getFollowingPage(targetUserId: string, cursor?: string, limit = 24) {
+export async function getFollowingPage(targetUserId: string, cursor?: string, limit = 24): Promise<{ items: SafeUserListItem[]; nextCursor: string | null } | { error: string }> {
   const supabase = supabaseAdmin;
 
   // First, get the follow data
@@ -286,7 +286,6 @@ export async function getFollowingPage(targetUserId: string, cursor?: string, li
       if (!profile) return null;
 
       return {
-        user_id: row.following_id,
         username: profile.username,
         display_name: profile.display_name,
         bio: profile.bio,
@@ -300,7 +299,7 @@ export async function getFollowingPage(targetUserId: string, cursor?: string, li
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
   const nextCursor = items.length === limit && followData?.length === limit
-    ? Buffer.from(`${followData[followData.length - 1].created_at}|${items[items.length - 1].user_id}`).toString("base64")
+    ? Buffer.from(`${followData[followData.length - 1].created_at}|${items[items.length - 1].username}`).toString("base64")
     : null;
 
   return { items, nextCursor };

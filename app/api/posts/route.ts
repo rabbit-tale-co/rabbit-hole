@@ -1,7 +1,6 @@
 // app/api/posts/route.ts
 import { NextRequest } from "next/server";
 import { CreatePost, Cursor } from "@/lib/validation";
-import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getUser } from "@/lib/auth";
 import { getFeedPage, getUserFeedPage } from "@/app/actions/posts";
@@ -17,14 +16,34 @@ export async function GET(req: NextRequest) {
   const user = await getUser();
   const { cursor, limit } = parsed.data;
 
-  const userIdParam = searchParams.get("userId");
+  const usernameParam = searchParams.get("username");
 
-  if (userIdParam) {
-    const uid = z.uuid().safeParse(userIdParam);
-    if (!uid.success) return Response.json({ error: "bad userId" }, { status: 400 });
+  if (usernameParam) {
+    // Validate username format
+    const usernameRegex = /^[a-z0-9_]{3,20}$/;
+    if (!usernameRegex.test(usernameParam)) {
+      return Response.json({ error: "Invalid username format" }, { status: 400 });
+    }
+
+    // First get user_id from username
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .schema('social_art')
+      .from("profiles")
+      .select("user_id")
+      .eq("username", usernameParam)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      return Response.json({ error: "Database error" }, { status: 500 });
+    }
+
+    if (!profile) {
+      return Response.json({ error: "User not found" }, { status: 404 });
+    }
 
     // Use getUserFeedPage for user-specific feeds
-    const result = await getUserFeedPage({ cursor, limit, author_id: userIdParam });
+    const result = await getUserFeedPage({ cursor, limit, author_id: profile.user_id });
     if (result.error) return Response.json({ error: result.error }, { status: 400 });
     return Response.json(result);
   }
@@ -66,7 +85,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (!user) {
-    console.log("[AUTH] Authentication failed: Auth session missing!");
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -76,10 +94,6 @@ export async function POST(req: NextRequest) {
 
   const { images, text } = parsed.data;
 
-  // Log JWT usage for post creation
-  console.log(`[JWT] Create post requested by user: ${user.id}`);
-  console.log(`[JWT] Post content: ${text ? `"${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"` : 'no text'}`);
-  console.log(`[JWT] Post images count: ${images?.length || 0}`);
 
   // Insert post
   const { data, error } = await supabaseAdmin
@@ -93,11 +107,8 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    console.log(`[JWT] Create post failed: ${error.message}`);
     return Response.json({ error: error.message }, { status: 500 });
   }
-
-  console.log(`[JWT] Post created successfully: ${data.id}`);
 
   return Response.json({ post: data }, { status: 201 });
 }

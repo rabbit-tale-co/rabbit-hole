@@ -6,6 +6,7 @@ import { UpsertProfileClient } from "@/schemas/profile";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { verifySupabaseJWT } from "@/lib/jwt-utils";
+import { sanitizeUsersListResponse } from "@/utils/userSanitizer";
 // import { getBatchFollowStats } from "./follow"; // No longer needed - follow stats loaded on hover
 
 export async function upsertProfile(input: unknown, token?: string) {
@@ -272,5 +273,6 @@ export async function getUsersPage(input: unknown) {
     banned_until: suspMap.get(r.user_id) ?? null,
     followStats: followStatsMap.get(r.user_id) || { isFollowing: false, followers: 0, following: 0 }
   }));
-  return { items, nextCursor };
+
+  return sanitizeUsersListResponse({ items, nextCursor });
 }

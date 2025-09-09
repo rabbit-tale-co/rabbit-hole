@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { buildPublicUrl } from "@/lib/publicUrl";
 import { useInfiniteUsers, UserListItem } from "@/hooks/useInfiniteUsers";
+import { SafeUser } from "@/types/user";
 import { useIntersection } from "@/hooks/useIntersection";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
@@ -16,29 +17,21 @@ import { SolidCarrot } from "../icons/Icons";
 import { useFollow } from "@/hooks/useFollow";
 import { useGlobalFollowStats } from "@/hooks/useGlobalFollowStats";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/providers/AuthProvider";
 import { FollowButton } from "@/components/user/FollowButton";
 
 /** Minimal card with bg-white, ring-1, rounded, no shadows. */
 function UserCard({ user: u }: {
-  user: {
-    user_id: string; username: string; display_name: string | null;
-    avatar_url: string | null; cover_url: string | null; accent_color: string | null; bio?: string | null; is_premium: boolean; banned_until?: string | null;
-    followStats?: {
-      isFollowing: boolean;
-      followers: number;
-      following: number;
-    };
+  user: SafeUser & {
+    banned_until?: string | null;
   }
 }) {
   const avatarAccentHex =
     u.accent_color || getAccentColorValue(generateAccentColor(u.username), 500);
   const isSuspended = Boolean(u.banned_until && Date.parse(u.banned_until) > Date.now());
-  const { user } = useAuth();
-  const isOwnProfile = user?.id === u.user_id;
+  const isOwnProfile = false; // Cannot determine ownership without user_id
 
   // Use follow stats from the user data (counts) and update follow status client-side
-  const { followStats: clientFollowStats, loading: followStatsLoading } = useGlobalFollowStats(u.user_id);
+  const { followStats: clientFollowStats, loading: followStatsLoading } = useGlobalFollowStats(u.username);
   const serverFollowStats = u.followStats;
 
   // Merge server stats (counts) with client stats (follow status)
@@ -47,7 +40,7 @@ function UserCard({ user: u }: {
     isFollowing: clientFollowStats?.isFollowing ?? serverFollowStats.isFollowing
   } : clientFollowStats;
 
-  const { loading: followLoading, toggleFollow } = useFollow(u.user_id, followStats || { isFollowing: false, followers: 0, following: 0 });
+  const { loading: followLoading, toggleFollow } = useFollow(u.username, followStats || { isFollowing: false, followers: 0, following: 0 });
 
   const router = useRouter();
 
@@ -58,7 +51,7 @@ function UserCard({ user: u }: {
   return (
     <article
       className="group h-[280px] sm:h-[300px] lg:h-[320px] ring-1 ring-border flex flex-col rounded-2xl bg-white hover:bg-neutral-50 transition-colors duration-150 cursor-pointer"
-      data-user-id={u.user_id}
+      data-username={u.username}
       onClick={handleCardClick}
     >
       {/* cover: fixed height */}
@@ -191,15 +184,14 @@ export default function UsersGrid({ initialData }: { initialData?: { items: User
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((u) => (
-            <UserCard key={u.user_id} user={{
-              user_id: u.user_id,
+            <UserCard key={u.username} user={{
               username: u.username,
               display_name: u.display_name ?? null,
               avatar_url: u.avatar_url ?? null,
               cover_url: u.cover_url ?? null,
               accent_color: u.accent_color ?? null,
-              bio: (u as { bio?: string | null }).bio ?? null,
-              is_premium: (u as { is_premium?: boolean }).is_premium ?? false,
+              bio: u.bio ?? null,
+              is_premium: u.is_premium ?? false,
               banned_until: (u as { banned_until?: string | null }).banned_until ?? null,
               followStats: u.followStats,
             }} />
