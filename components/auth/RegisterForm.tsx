@@ -186,8 +186,8 @@ export default function RegisterForm() {
         </InputGroup>
       </div>
 
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? (<><OutlineLoading className="mr-2 h-4 w-4 animate-spin" />Creating account…</>)
+      <Button size={'lg'} type="submit" className="w-full rounded-full" disabled={loading}>
+        {loading ? (<><OutlineLoading className="animate-spin" />Creating account…</>)
           : "Create account"}
       </Button>
     </form>

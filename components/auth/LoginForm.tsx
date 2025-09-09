@@ -69,8 +69,8 @@ export default function LoginForm({ onSuccess, onForgot }: { onSuccess?: () => v
         </InputGroup>
       </div>
 
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? (<><OutlineLoading className="mr-2 h-4 w-4 animate-spin" />Signing in…</>) : "Sign in"}
+      <Button size={'lg'} type="submit" className="w-full rounded-full" disabled={loading}>
+        {loading ? (<><OutlineLoading className="animate-spin" />Signing in…</>) : "Sign in"}
       </Button>
 
       <div className="flex items-center justify-end text-xs">
