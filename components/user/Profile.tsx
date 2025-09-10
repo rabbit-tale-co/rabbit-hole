@@ -134,30 +134,6 @@ export function UserProfile({
         </div>
       </div>
 
-      {/* Avatar Actions - Floating like UserProfile */}
-      <div className="absolute bottom-4 right-0 flex items-center gap-2">
-        {isOwnProfile ? (
-          <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
-            Edit Profile
-          </Button>
-        ) : (
-          <FollowButton
-            isFollowing={isFollowing}
-            loading={followLoading}
-            canFollow={canFollow}
-            onToggle={toggleFollow}
-            size={"default"}
-            showText={true}
-          />
-        )}
-        {isAdmin && !isOwnProfile && (
-          <ModerationMenu
-            targetUserId={profile.user_id}
-            isSuspended={isSuspended}
-            onAfter={() => { }}
-          />
-        )}
-      </div>
 
       {/* Profile Info */}
       <div className="text-center mt-2 px-4 space-y-2">

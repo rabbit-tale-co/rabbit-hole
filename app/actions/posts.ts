@@ -145,8 +145,18 @@ export async function deletePost(post_id: string, author_id: string) {
 		.single();
 	if (getErr) return { error: getErr.message };
 
-	// Verify that the authenticated user is the author of the post
-	if (post.author_id !== author_id) {
+	// Check if user is admin
+	const { data: prof, error: profErr } = await sb
+		.schema("social_art")
+		.from("profiles")
+		.select("is_admin")
+		.eq("user_id", author_id)
+		.maybeSingle();
+	if (profErr) return { error: profErr.message };
+	const isAdmin = Boolean((prof as { is_admin?: boolean } | null)?.is_admin);
+
+	// Verify that the authenticated user is either the author of the post OR an admin
+	if (post.author_id !== author_id && !isAdmin) {
 		return { error: "Forbidden" };
 	}
 

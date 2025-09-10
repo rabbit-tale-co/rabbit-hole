@@ -47,7 +47,7 @@ export interface PostWithAuthor extends Post {
 
 // Main usePost hook for post-related functionality
 export function usePost(postId?: string) {
-	const { user } = useAuth();
+	const { user, profile } = useAuth();
 
 	// Post state
 	const [post, setPost] = useState<Post | null>(null);
@@ -146,9 +146,9 @@ export function usePost(postId?: string) {
 	// Check if current user is admin
 	const isAdmin = useMemo(() => {
 		return Boolean(
-			(user as unknown as { is_admin?: boolean } | null)?.is_admin,
+			(profile as unknown as { is_admin?: boolean } | null)?.is_admin,
 		);
-	}, [user]);
+	}, [profile]);
 
 	// Auto-fetch post when postId changes
 	useEffect(() => {
