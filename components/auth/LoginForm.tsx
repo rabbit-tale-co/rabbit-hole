@@ -1,16 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { useAuth } from "@/providers/AuthProvider";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input, InputAddon, InputGroup } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import ShowPassword from "./ShowPassword";
-import Link from "next/link";
+import { useAuth } from "@/providers/AuthProvider";
 import { OutlineLoading } from "../icons/Icons";
+import ShowPassword from "./ShowPassword";
 
-export default function LoginForm({ onSuccess, onForgot }: { onSuccess?: () => void; onForgot?: () => void }) {
+export default function LoginForm({
+  onSuccess,
+  onForgot,
+}: {
+  onSuccess?: () => void;
+  onForgot?: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -36,9 +42,10 @@ export default function LoginForm({ onSuccess, onForgot }: { onSuccess?: () => v
         </Alert>
       )}
 
-
       <div className="space-y-1">
-        <Label htmlFor="email" className="text-xs">Email</Label>
+        <Label htmlFor="email" className="text-xs">
+          Email
+        </Label>
         <Input
           id="email"
           type="email"
@@ -51,7 +58,9 @@ export default function LoginForm({ onSuccess, onForgot }: { onSuccess?: () => v
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="password" className="text-xs">Password</Label>
+        <Label htmlFor="password" className="text-xs">
+          Password
+        </Label>
         <InputGroup>
           <Input
             id="password"
@@ -69,15 +78,38 @@ export default function LoginForm({ onSuccess, onForgot }: { onSuccess?: () => v
         </InputGroup>
       </div>
 
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? (<><OutlineLoading className="mr-2 h-4 w-4 animate-spin" />Signing in…</>) : "Sign in"}
+      <Button
+        size={"lg"}
+        type="submit"
+        className="w-full rounded-full"
+        disabled={loading}
+      >
+        {loading ? (
+          <>
+            <OutlineLoading className="animate-spin" />
+            Signing in…
+          </>
+        ) : (
+          "Sign in"
+        )}
       </Button>
 
       <div className="flex items-center justify-end text-xs">
         {onForgot ? (
-          <button type="button" onClick={onForgot} className="text-muted-foreground underline underline-offset-2">Forgot password?</button>
+          <button
+            type="button"
+            onClick={onForgot}
+            className="text-muted-foreground underline underline-offset-2"
+          >
+            Forgot password?
+          </button>
         ) : (
-          <Link href="/auth/forgot-password" className="text-muted-foreground underline underline-offset-2">Forgot password?</Link>
+          <Link
+            href="/auth/forgot-password"
+            className="text-muted-foreground underline underline-offset-2"
+          >
+            Forgot password?
+          </Link>
         )}
       </div>
       {/* success message handled on dedicated /auth/forgot-password page */}

@@ -1,8 +1,8 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/sync-premium-status",
-      "schedule": "0 0 * * *"
-    }
-  ]
+	"crons": [
+		{
+			"path": "/api/cron/sync-premium-status",
+			"schedule": "0 0 * * *"
+		}
+	]
 }

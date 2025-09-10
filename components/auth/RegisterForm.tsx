@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/providers/AuthProvider";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input, InputAddon, InputGroup } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import ShowPassword from "./ShowPassword";
+import { useAuth } from "@/providers/AuthProvider";
 import { OutlineLoading, OutlineMail } from "../icons/Icons";
+import ShowPassword from "./ShowPassword";
 
 export default function RegisterForm() {
   const [username, setUsername] = useState("");
@@ -19,7 +19,9 @@ export default function RegisterForm() {
   const [success, setSuccess] = useState(false);
   const { signUp } = useAuth();
   const usernamePattern = useMemo(() => /^[a-z0-9_]{3,20}$/i, []);
-  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [usernameStatus, setUsernameStatus] = useState<
+    "idle" | "checking" | "available" | "taken"
+  >("idle");
   const [usernameHelper, setUsernameHelper] = useState<string | null>(null);
 
   // Debounced availability check
@@ -52,7 +54,10 @@ export default function RegisterForm() {
         setUsernameHelper(null);
       }
     }, 300);
-    return () => { alive = false; clearTimeout(t); };
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
   }, [username, usernamePattern]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,7 +91,7 @@ export default function RegisterForm() {
       return;
     }
 
-    // We don’t collect display_name in this compact form; derive it from username.
+    // We don't collect display_name in this compact form; derive it from username.
     const { error } = await signUp({
       email,
       password,
@@ -98,6 +103,7 @@ export default function RegisterForm() {
     setLoading(false);
 
     if (error) {
+      console.error("Signup error:", error);
       setError(error);
     } else {
       // If email confirmation is required, show success screen and keep dialog open.
@@ -112,12 +118,16 @@ export default function RegisterForm() {
           <OutlineMail className="w-8 h-8 text-green-600" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Check your email</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Check your email
+          </h3>
           <p className="text-sm text-gray-600 mb-4">
-            We&apos;ve sent a confirmation link to <span className="font-medium">{email}</span>
+            We&apos;ve sent a confirmation link to{" "}
+            <span className="font-medium">{email}</span>
           </p>
           <p className="text-xs text-gray-500">
-            Click the link in your email to complete your registration and sign in.
+            Click the link in your email to complete your registration and sign
+            in.
           </p>
         </div>
       </div>
@@ -133,7 +143,9 @@ export default function RegisterForm() {
       )}
 
       <div className="space-y-1">
-        <Label htmlFor="username" className="text-xs">Username</Label>
+        <Label htmlFor="username" className="text-xs">
+          Username
+        </Label>
         <Input
           id="username"
           type="text"
@@ -152,7 +164,9 @@ export default function RegisterForm() {
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="email" className="text-xs">Email</Label>
+        <Label htmlFor="email" className="text-xs">
+          Email
+        </Label>
         <Input
           id="email"
           type="email"
@@ -166,7 +180,9 @@ export default function RegisterForm() {
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="password" className="text-xs">Password</Label>
+        <Label htmlFor="password" className="text-xs">
+          Password
+        </Label>
         <InputGroup>
           <Input
             id="password"
@@ -177,7 +193,6 @@ export default function RegisterForm() {
             required
             minLength={8}
             disabled={loading}
-
           />
           <InputAddon className="px-0">
             <ShowPassword showPwd={showPwd} setShowPwd={setShowPwd} />
@@ -185,9 +200,20 @@ export default function RegisterForm() {
         </InputGroup>
       </div>
 
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? (<><OutlineLoading className="mr-2 h-4 w-4 animate-spin" />Creating account…</>)
-          : "Create account"}
+      <Button
+        size={"lg"}
+        type="submit"
+        className="w-full rounded-full"
+        disabled={loading}
+      >
+        {loading ? (
+          <>
+            <OutlineLoading className="animate-spin" />
+            Creating account…
+          </>
+        ) : (
+          "Create account"
+        )}
       </Button>
     </form>
   );

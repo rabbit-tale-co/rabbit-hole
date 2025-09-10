@@ -1,14 +1,20 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/providers/AuthProvider';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { SolidCarrot, OutlineShield } from '@/components/icons/Icons';
-import { toast } from 'sonner';
-import Link from 'next/link';
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { OutlineShield, SolidCarrot } from "@/components/icons/Icons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { useUser } from "@/hooks/useUser";
 
 interface BillingInfo {
   is_premium: boolean;
@@ -19,67 +25,22 @@ interface BillingInfo {
 }
 
 export default function BillingPage() {
-  const { user } = useAuth();
-  const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, billingInfo, billingLoading, manageSubscription } = useUser();
   const [isPortalLoading, setIsPortalLoading] = useState(false);
-
-  const fetchBillingInfo = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/user/subscription-status?userId=${user?.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        // Map the API response to the expected format
-        setBillingInfo({
-          is_premium: data.isPremium || false,
-          premium_plan: data.plan || undefined,
-          premium_status: data.subscriptionStatus || 'none',
-          premium_started_at: data.profile?.is_premium ? new Date().toISOString() : undefined,
-          last_payment_at: data.nextBillingDate || undefined,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to fetch billing info:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (user?.id) {
-      fetchBillingInfo();
-    }
-  }, [user?.id, fetchBillingInfo]);
-
   const handleManageSubscription = async () => {
     if (!user?.id) return;
 
     setIsPortalLoading(true);
     try {
-      const response = await fetch('/api/stripe/portal', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: user.id }),
-      });
-
-      if (response.ok) {
-        const { url } = await response.json();
-        window.location.href = url;
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Failed to open billing portal');
-      }
+      await manageSubscription();
     } catch (error) {
-      console.error('Portal error:', error);
-      toast.error('Something went wrong. Please try again.');
+      console.error("Portal error:", error);
     } finally {
       setIsPortalLoading(false);
     }
   };
 
-  if (isLoading) {
+  if (billingLoading) {
     return (
       <div className="max-w-2xl mx-auto py-10">
         <div className="space-y-4">
@@ -107,12 +68,16 @@ export default function BillingPage() {
                 <SolidCarrot className="size-5" />
                 <CardTitle>Golden Carrot Active</CardTitle>
               </div>
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
+              <Badge
+                variant="secondary"
+                className="bg-green-100 text-green-800"
+              >
                 Active
               </Badge>
             </div>
             <CardDescription>
-              You&apos;re currently subscribed to the {billingInfo.premium_plan} plan.
+              You&apos;re currently subscribed to the {billingInfo.premium_plan}{" "}
+              plan.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -120,20 +85,22 @@ export default function BillingPage() {
               <div>
                 <p className="text-neutral-600">Plan</p>
                 <p className="font-medium capitalize">
-                  {billingInfo.premium_plan || 'Unknown'}
+                  {billingInfo.premium_plan || "Unknown"}
                 </p>
               </div>
               <div>
                 <p className="text-neutral-600">Status</p>
                 <p className="font-medium capitalize">
-                  {billingInfo.premium_status || 'Active'}
+                  {billingInfo.premium_status || "Active"}
                 </p>
               </div>
               {billingInfo.premium_started_at && (
                 <div>
                   <p className="text-neutral-600">Started</p>
                   <p className="font-medium">
-                    {new Date(billingInfo.premium_started_at).toLocaleDateString()}
+                    {new Date(
+                      billingInfo.premium_started_at,
+                    ).toLocaleDateString()}
                   </p>
                 </div>
               )}
@@ -155,10 +122,11 @@ export default function BillingPage() {
                 disabled={isPortalLoading}
                 className="w-full"
               >
-                {isPortalLoading ? 'Loading...' : 'Manage Subscription'}
+                {isPortalLoading ? "Loading..." : "Manage Subscription"}
               </Button>
               <p className="text-xs text-neutral-500 text-center">
-                Update payment method, view invoices, or cancel your subscription
+                Update payment method, view invoices, or cancel your
+                subscription
               </p>
             </div>
           </CardContent>
@@ -190,17 +158,15 @@ export default function BillingPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-neutral-600">
+          <p>• All payments are processed securely by Stripe</p>
+          <p>• We never store your payment information</p>
+          <p>• You can cancel your subscription anytime</p>
           <p>
-            • All payments are processed securely by Stripe
-          </p>
-          <p>
-            • We never store your payment information
-          </p>
-          <p>
-            • You can cancel your subscription anytime
-          </p>
-          <p>
-            • See our <Link href="/legal/privacy" className="underline">Privacy Policy</Link> for more details
+            • See our{" "}
+            <Link href="/legal/privacy" className="underline">
+              Privacy Policy
+            </Link>{" "}
+            for more details
           </p>
         </CardContent>
       </Card>

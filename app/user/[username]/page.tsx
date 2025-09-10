@@ -1,13 +1,14 @@
 "use client";
 
-import { useParams } from 'next/navigation';
-import { UserProfile } from '@/components/user/Profile';
-import Feed from '@/components/feed/Index';
-import { EmptyState } from '@/components/feed/Empty';
-import { useUserProfile } from '@/hooks/useUserProfile';
-import { useAuth } from '@/providers/AuthProvider';
-import Center from '@/components/Center';
-import { OutlineUser } from '@/components/icons/Icons';
+import { useParams } from "next/navigation";
+import Center from "@/components/Center";
+import { EmptyState } from "@/components/feed/Empty";
+import Feed from "@/components/feed/Index";
+import { OutlineUser } from "@/components/icons/Icons";
+import { UserProfile } from "@/components/user/Profile";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { useUserStats } from "@/hooks/useUserStats";
+import { useAuth } from "@/providers/AuthProvider";
 
 // Local view-only state no longer needed; we render directly from hook
 
@@ -16,6 +17,8 @@ export default function UserProfilePage() {
   const username = params.username as string;
 
   const { profile, isOwn, loading } = useUserProfile(username);
+  const { stats: userStats, loading: userStatsLoading } =
+    useUserStats(username);
   useAuth();
 
   if (loading) {
@@ -36,31 +39,41 @@ export default function UserProfilePage() {
           <div className="size-24 rounded-full bg-neutral-100 text-neutral-950 flex items-center justify-center">
             <OutlineUser size={48} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">User not found</h1>
-          <p className="text-gray-600">The user you&apos;re looking for doesn&apos;t exist.</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            User not found
+          </h1>
+          <p className="text-gray-600">
+            The user you&apos;re looking for doesn&apos;t exist.
+          </p>
         </div>
       </Center>
     );
   }
 
-  const isSuspended = Boolean(profile.banned_until && Date.parse(profile.banned_until) > Date.now());
+  const isSuspended = Boolean(
+    profile.banned_until && Date.parse(profile.banned_until) > Date.now(),
+  );
 
   return (
     <>
       {/* UserProfile component */}
       <UserProfile
         profile={profile}
-        stats={{ posts: 0 }}
+        stats={{
+          posts: userStats?.posts || 0,
+          views: userStats?.views || 0,
+        }}
         isOwnProfile={isOwn}
+        isLoading={userStatsLoading}
       />
 
       {!isSuspended ? (
         <Feed
-          authorId={profile.user_id}
+          username={profile.username}
           isOwnProfile={isOwn}
           onCountChange={(n) => {
             try {
-              const el = document.querySelector('[data-profile-posts-count]');
+              const el = document.querySelector("[data-profile-posts-count]");
               if (el) el.textContent = String(n);
             } catch { }
           }}
@@ -73,7 +86,6 @@ export default function UserProfilePage() {
           description="Posts are hidden while the account is under review."
         />
       )}
-
     </>
   );
 }

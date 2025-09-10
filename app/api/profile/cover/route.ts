@@ -1,10 +1,7 @@
-import { NextResponse } from "next/server";
-import { randomUUID } from "crypto";
-import path from "path";
-import os from "os";
-import { promises as fs } from "fs";
-import { execFile } from "child_process";
-import { promisify } from "util";
+import { type NextRequest, NextResponse } from "next/server";
+import { logSecureError } from "@/lib/secure-db";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { withAuth } from "@/middleware/auth";
 
 let ffmpegPath: string | null = null;
 try {
@@ -19,142 +16,139 @@ export const dynamic = "force-dynamic";
 export const preferredRegion = "auto";
 export const maxDuration = 60;
 
-const execFileAsync = promisify(execFile);
+// External API endpoint for media processing
+const EXTERNAL_API_URL =
+	process.env.NEXT_PUBLIC_BACKEND ||
+	process.env.NEXT_PUBLIC_MEDIA_API_URL ||
+	"https://api.rabbittale.co";
 
-type ConvertResult = {
-  buffer: Buffer; ext: "gif" | "webm";
-  mime: string
-};
+export const POST = withAuth(
+	async (req: NextRequest, { userId: authenticatedUserId }) => {
+		try {
+			const form = await req.formData();
+			const requestedUserId = String(form.get("userId") || "");
+			const file = form.get("file");
+			const cropX = Number(form.get("crop_x") || 0);
+			const cropY = Number(form.get("crop_y") || 0);
+			const cropW = Number(form.get("crop_w") || 0);
+			const cropH = Number(form.get("crop_h") || 0);
 
-async function resolveFfmpegCommand(): Promise<string | null> {
-  const fromEnv = (process.env.FFMPEG_PATH || "").trim();
-  if (fromEnv) {
-    try { await fs.access(fromEnv); return fromEnv; } catch {}
-  }
-  if (ffmpegPath && typeof ffmpegPath === "string") {
-    try { await fs.access(ffmpegPath); return ffmpegPath; } catch {}
-  }
-  return "ffmpeg";
-}
+			// SECURITY: Verify that user can only modify their own profile
+			if (requestedUserId !== authenticatedUserId) {
+				logSecureError(
+					"cover_unauthorized_access",
+					new Error("User tried to modify another user's cover"),
+					authenticatedUserId,
+				);
+				return NextResponse.json(
+					{ error: "Unauthorized - You can only modify your own cover" },
+					{ status: 403 },
+				);
+			}
 
-async function convertGifToWebM(buffer: Buffer, crop?: { x: number; y: number; w: number; h: number }): Promise<ConvertResult> {
-  const cmd = await resolveFfmpegCommand();
-  console.log("[cover] convert start: ffmpeg=%s crop=%o", cmd, crop);
-  if (!cmd) {
-    return { buffer, ext: "gif", mime: "image/gif" };
-  }
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cover-"));
-  const inPath = path.join(tmpDir, "in.gif");
-  const outPath = path.join(tmpDir, "out.webm");
-  await fs.writeFile(inPath, buffer);
-  try {
-    const args = [
-      "-y",
-      "-i", inPath,
-    ];
-    if (crop && crop.w > 0 && crop.h > 0) {
-      args.push("-vf", `crop=${Math.floor(crop.w)}:${Math.floor(crop.h)}:${Math.floor(crop.x)}:${Math.floor(crop.y)}`);
-    }
-    args.push(
-      "-c:v", "libvpx-vp9",
-      "-b:v", "0",
-      "-crf", "32",
-      "-pix_fmt", "yuv420p",
-      "-an",
-      outPath,
-    );
-    console.log("[cover] ffmpeg cmd:", cmd, "args:", args.join(" "));
-    await execFileAsync(cmd, args, { maxBuffer: 1024 * 1024 * 32 });
-    const out = await fs.readFile(outPath);
-    console.log("[cover] ffmpeg ok: bytes=%d", out.length);
-    return { buffer: out, ext: "webm", mime: "video/webm" };
-  } catch (e) {
-    console.error("[cover] ffmpeg fail:", e);
-    return { buffer, ext: "gif", mime: "image/gif" };
-  } finally {
-    fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
-  }
-}
+			console.log(
+				"[cover] request: userId=%s name=%s type=%s size=%d crop=%d,%d %dx%d",
+				authenticatedUserId,
+				(file as File).name,
+				(file as File).type,
+				(file as File).size,
+				cropX,
+				cropY,
+				cropW,
+				cropH,
+			);
+			if (!(file instanceof File))
+				return NextResponse.json({ error: "No file" }, { status: 400 });
 
-export async function POST(req: Request) {
-  try {
-    const form = await req.formData();
-    const userId = String(form.get("userId") || "");
-    const file = form.get("file");
-    const cropX = Number(form.get("crop_x") || 0);
-    const cropY = Number(form.get("crop_y") || 0);
-    const cropW = Number(form.get("crop_w") || 0);
-    const cropH = Number(form.get("crop_h") || 0);
-    console.log("[cover] request: userId=%s name=%s type=%s size=%d crop=%d,%d %dx%d", userId, (file as File).name, (file as File).type, (file as File).size, cropX, cropY, cropW, cropH);
-    if (!userId) return NextResponse.json({ error: "Missing userId" }, { status: 400 });
-    if (!(file instanceof File)) return NextResponse.json({ error: "No file" }, { status: 400 });
+			// Check if file is GIF and validate premium status
+			const isGif =
+				(file.type || "").toLowerCase() === "image/gif" ||
+				(file.name || "").toLowerCase().endsWith(".gif");
 
-    const arrayBuffer = await file.arrayBuffer();
-    const input = Buffer.from(arrayBuffer);
-    const isGif = (file.type || "").toLowerCase() === "image/gif" || (file.name || "").toLowerCase().endsWith(".gif");
+			if (isGif) {
+				// Check if user has premium status
+				const { data: profile, error: profileError } = await supabaseAdmin
+					.from("profiles")
+					.select("is_premium")
+					.eq("user_id", authenticatedUserId)
+					.single();
 
-    let out: ConvertResult | { buffer: Buffer; ext: string; mime: string } = { buffer: input, ext: "bin", mime: file.type || "application/octet-stream" };
-    if (isGif) {
-      const crop = cropW > 0 && cropH > 0 ? { x: cropX, y: cropY, w: cropW, h: cropH } : undefined;
-      out = await convertGifToWebM(input, crop);
-    } else {
-      out = { buffer: input, ext: (file.name.split(".").pop() || "bin").toLowerCase(), mime: file.type || "application/octet-stream" };
-    }
+				if (profileError) {
+					logSecureError(
+						"cover_premium_check_error",
+						profileError,
+						authenticatedUserId,
+					);
+					return NextResponse.json(
+						{ error: "Failed to verify premium status" },
+						{ status: 500 },
+					);
+				}
 
-    const baseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object`;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
-    if (!baseUrl || !serviceKey) return NextResponse.json({ error: "Missing Supabase env" }, { status: 500 });
+				if (!profile?.is_premium) {
+					logSecureError(
+						"cover_gif_unauthorized",
+						new Error("Non-premium user tried to upload GIF cover"),
+						authenticatedUserId,
+					);
+					return NextResponse.json(
+						{
+							error:
+								"GIF covers are available only for Golden Carrot subscribers",
+						},
+						{ status: 403 },
+					);
+				}
+			}
 
-    const bucket = "social-art";
-    const uid = randomUUID();
-    const key = `covers/${userId}/cover-${uid}.${out.ext}`;
+			// Forward request to external API for processing
+			const externalFormData = new FormData();
+			externalFormData.append("userId", authenticatedUserId);
+			externalFormData.append("file", file);
+			if (cropX > 0 || cropY > 0 || cropW > 0 || cropH > 0) {
+				externalFormData.append("crop_x", String(cropX));
+				externalFormData.append("crop_y", String(cropY));
+				externalFormData.append("crop_w", String(cropW));
+				externalFormData.append("crop_h", String(cropH));
+			}
 
-    // Clean existing cover files
-    try {
-      const listUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/list/${bucket}`;
-      await fetch(listUrl, {
-        method: "POST",
-        headers: { authorization: `Bearer ${serviceKey}`, "content-type": "application/json" },
-        body: JSON.stringify({ prefix: `covers/${userId}` }),
-      }).then(async (r) => {
-        const j = (await r.json().catch(() => null)) as unknown;
-        if (Array.isArray(j)) {
-          const removes = (j as Array<{ name: string }>).map((it) => `covers/${userId}/${it.name}`);
-          if (removes.length) {
-            await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/${bucket}`, {
-              method: "DELETE",
-              headers: { authorization: `Bearer ${serviceKey}`, "content-type": "application/json" },
-              body: JSON.stringify(removes),
-            }).catch(() => {});
-          }
-        }
-      }).catch(() => {});
-    } catch {}
+			const externalResponse = await fetch(
+				`${EXTERNAL_API_URL}/social/v1/profile/cover`,
+				{
+					method: "POST",
+					body: externalFormData,
+				},
+			);
 
-    const uploadRes = await fetch(`${baseUrl}/${bucket}/${key}`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${serviceKey}`, "x-upsert": "true" },
-      body: (() => {
-        const fd = new FormData();
-        const view = new Uint8Array(out.buffer.buffer, out.buffer.byteOffset, out.buffer.byteLength);
-        const ab = new ArrayBuffer(view.byteLength);
-        new Uint8Array(ab).set(view);
-        const blob = new Blob([ab], { type: out.mime });
-        fd.append("file", blob, path.basename(key));
-        return fd;
-      })(),
-    });
-    if (!uploadRes.ok) {
-      const txt = await uploadRes.text().catch(() => "");
-      console.error("[cover] upload fail: %s", txt);
-      return NextResponse.json({ error: "storage_upload_failed", details: txt }, { status: 500 });
-    }
+			if (!externalResponse.ok) {
+				const errorText = await externalResponse
+					.text()
+					.catch(() => "External API error");
+				console.error("[cover] external API error:", errorText);
+				return NextResponse.json(
+					{ error: "External processing failed", details: errorText },
+					{ status: 500 },
+				);
+			}
 
-    console.log("[cover] done path=%s mime=%s", key, out.mime);
-    return NextResponse.json({ path: key, mime: out.mime, ext: (out as ConvertResult).ext, crop: { x: cropX, y: cropY, w: cropW, h: cropH } });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[cover] error:", msg);
-    return NextResponse.json({ error: "server_error", message: msg }, { status: 500 });
-  }
-}
+			const result = await externalResponse.json();
+			console.log("[cover] external API success:", result);
+
+			return NextResponse.json({
+				path: result.path,
+				url: result.url || `${EXTERNAL_API_URL}/${result.path}`,
+				mime: result.mime,
+				ext: result.ext || (result.mime?.includes("webm") ? "webm" : "webp"),
+				crop: { x: cropX, y: cropY, w: cropW, h: cropH },
+			});
+		} catch (e: unknown) {
+			const msg = e instanceof Error ? e.message : String(e);
+			logSecureError("cover_upload_error", e, authenticatedUserId);
+			console.error("[cover] error:", msg);
+			return NextResponse.json(
+				{ error: "server_error", message: msg },
+				{ status: 500 },
+			);
+		}
+	},
+);

@@ -1,79 +1,108 @@
-"use client"
+"use client";
 
-import * as React from "react"
-// icons available if needed: Moon, Sun, Monitor
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
-import { Button } from "@/components/ui/button"
-import { useAuth } from "@/providers/AuthProvider"
-import { generateAccentColor, generateRandomAccentColor, ACCENT_COLORS, getAccentColorStyle, type AccentColor, getAccentColorValue, findAccentBy500Hex } from "@/lib/accent-colors"
-import { useCallback } from "react"
-import { toast } from "sonner"
+import * as React from "react";
+import { useCallback } from "react";
+import { toast } from "sonner";
+import { upsertProfile } from "@/app/actions/profile";
 // import { useTheme } from "next-themes"
-import { SettingsThemeRow } from "@/components/theme-toggle"
-import { upsertProfile } from "@/app/actions/profile"
+import { SettingsThemeRow } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+// icons available if needed: Moon, Sun, Monitor
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import {
+  ACCENT_COLORS,
+  type AccentColor,
+  findAccentBy500Hex,
+  generateAccentColor,
+  generateRandomAccentColor,
+  getAccentColorStyle,
+  getAccentColorValue,
+} from "@/lib/accent-colors";
+import { useAuth } from "@/providers/AuthProvider";
 
 export function Appearance() {
-  const { user: auth_user, profile } = useAuth()
+  const { user: auth_user, profile, getToken } = useAuth();
   // const { setTheme } = useTheme()
 
   // Local state for accent color to handle updates
-  const [localAccentColor, setLocalAccentColor] = React.useState<AccentColor>(() => generateAccentColor(auth_user?.id || ''))
+  const [localAccentColor, setLocalAccentColor] = React.useState<AccentColor>(
+    () => generateAccentColor(auth_user?.id || ""),
+  );
 
   // Update local accent color only when user metadata changes
   React.useEffect(() => {
     if (profile?.accent_color) {
-      const mapped = findAccentBy500Hex(profile.accent_color)
+      const mapped = findAccentBy500Hex(profile.accent_color);
       if (mapped) {
-        setLocalAccentColor(mapped)
-        return
+        setLocalAccentColor(mapped);
+        return;
       }
     }
-    setLocalAccentColor(generateAccentColor(auth_user?.id || ''))
-  }, [auth_user?.id, profile?.accent_color])
+    setLocalAccentColor(generateAccentColor(auth_user?.id || ""));
+  }, [auth_user?.id, profile?.accent_color]);
 
   // Get current accent color from local state
-  const currentAccentColor = localAccentColor
+  const currentAccentColor = localAccentColor;
 
   // Function to update accent color
-  const handleUpdateAccentColor = useCallback(async (newColor?: AccentColor) => {
-    // If no color provided, generate a random one different from current
-    const colorToUse = newColor || generateRandomAccentColor(currentAccentColor)
-    console.log('🎨 Updating accent color:', { current: currentAccentColor, new: colorToUse })
+  const handleUpdateAccentColor = useCallback(
+    async (newColor?: AccentColor) => {
+      // If no color provided, generate a random one different from current
+      const colorToUse =
+        newColor || generateRandomAccentColor(currentAccentColor);
+      console.log("🎨 Updating accent color:", {
+        current: currentAccentColor,
+        new: colorToUse,
+      });
 
-    try {
-      // Persist as HEX in DB via server action
-      if (!profile) throw new Error('No profile loaded')
-      const hex = getAccentColorValue(colorToUse, 500)
-      const res = await upsertProfile({
-        user_id: (profile.user_id as unknown) as import("@/types/db").UUID,
-        username: profile.username,
-        display_name: profile.display_name,
-        accent_color: hex,
-        cover_url: profile.cover_url ?? null,
-      })
-      if (typeof res === 'object' && res && 'error' in res && (res as { error?: string }).error) throw new Error((res as { error?: string }).error || 'update failed')
-      setLocalAccentColor(colorToUse)
-      toast.success(`Accent color updated to ${colorToUse}!`)
-    } catch (error) {
-      console.error('❌ Error updating accent color:', error)
-      toast.error('Failed to update accent color')
-    }
-  }, [currentAccentColor, profile])
+      try {
+        // Persist as HEX in DB via server action
+        if (!profile) throw new Error("No profile loaded");
+        const hex = getAccentColorValue(colorToUse, 500);
+        const token = await getToken();
+        const res = await upsertProfile(
+          {
+            username: profile.username,
+            display_name: profile.display_name,
+            accent_color: hex,
+            cover_url: profile.cover_url ?? null,
+          },
+          token || undefined,
+        );
+        if (
+          typeof res === "object" &&
+          res &&
+          "error" in res &&
+          (res as { error?: string }).error
+        )
+          throw new Error((res as { error?: string }).error || "update failed");
+        setLocalAccentColor(colorToUse);
+        toast.success(`Accent color updated to ${colorToUse}!`);
+      } catch (error) {
+        console.error("❌ Error updating accent color:", error);
+        toast.error("Failed to update accent color");
+      }
+    },
+    [currentAccentColor, profile, getToken],
+  );
 
   // Prevent automatic color updates - only update when explicitly called
-  const handleColorChange = useCallback((newColor: AccentColor) => {
-    console.log('🎯 handleColorChange called with:', newColor)
-    console.log('🎯 currentAccentColor:', currentAccentColor)
+  const handleColorChange = useCallback(
+    (newColor: AccentColor) => {
+      console.log("🎯 handleColorChange called with:", newColor);
+      console.log("🎯 currentAccentColor:", currentAccentColor);
 
-    if (newColor !== currentAccentColor) {
-      console.log('🎯 Calling handleUpdateAccentColor...')
-      handleUpdateAccentColor(newColor)
-    } else {
-      console.log('🎯 No change detected, skipping update')
-    }
-  }, [currentAccentColor, handleUpdateAccentColor])
+      if (newColor !== currentAccentColor) {
+        console.log("🎯 Calling handleUpdateAccentColor...");
+        handleUpdateAccentColor(newColor);
+      } else {
+        console.log("🎯 No change detected, skipping update");
+      }
+    },
+    [currentAccentColor, handleUpdateAccentColor],
+  );
 
   // Function to handle theme change
   // Example: const handleThemeChange = useCallback((newTheme: 'light' | 'dark' | 'system') => { setTheme(newTheme); toast.success(`Theme changed to ${newTheme}!`) }, [setTheme])
@@ -115,7 +144,9 @@ export function Appearance() {
       <div className="space-y-6">
         <div className="space-y-1">
           <h3 className="text-lg font-semibold">Theme</h3>
-          <p className="text-sm text-gray-600 mb-3">Choose your preferred theme for the application</p>
+          <p className="text-sm text-gray-600 mb-3">
+            Choose your preferred theme for the application
+          </p>
           <SettingsThemeRow />
         </div>
 
@@ -124,32 +155,34 @@ export function Appearance() {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Accent Color</h3>
           <div className="space-y-3">
-            <p className="text-sm text-gray-600 mb-2">Choose your preferred accent color for profile elements</p>
+            <p className="text-sm text-gray-600 mb-2">
+              Choose your preferred accent color for profile elements
+            </p>
             <div className="flex flex-wrap gap-2">
               {ACCENT_COLORS.map((color: AccentColor) => {
-                const isSelected = currentAccentColor === color
+                const isSelected = currentAccentColor === color;
 
                 return (
                   <Button
                     key={color}
-                    size={'lg'}
+                    size={"lg"}
                     onClick={() => handleColorChange(color)}
                     className={`rounded-lg ring-2 ring-offset-2 ring-offset-white transition-all duration-200 flex items-center justify-center ${isSelected
-                      ? 'ring-opacity-100'
-                      : 'ring-transparent hover:ring-opacity-30'
+                      ? "ring-opacity-100"
+                      : "ring-transparent hover:ring-opacity-30"
                       }`}
-                    style={getAccentColorStyle(color, 200, 'backgroundColor')}
+                    style={getAccentColorStyle(color, 200, "backgroundColor")}
                     data-selected={isSelected}
                     data-color={color}
                   >
                     <span
                       className="text-sm capitalize drop-shadow-sm"
-                      style={getAccentColorStyle(color, 950, 'color')}
+                      style={getAccentColorStyle(color, 950, "color")}
                     >
                       {color}
                     </span>
                   </Button>
-                )
+                );
               })}
             </div>
           </div>
@@ -182,5 +215,5 @@ export function Appearance() {
         </div>
       </div>
     </>
-  )
+  );
 }

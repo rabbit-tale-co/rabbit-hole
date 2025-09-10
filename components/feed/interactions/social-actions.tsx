@@ -1,11 +1,17 @@
 "use client";
-import { Button } from "@/components/ui/button";
-import { useEffect, useState, useRef } from "react";
+import NumberFlow from "@number-flow/react";
 import type { MouseEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  OutlineBookmark,
+  OutlineChat,
+  OutlineHeart,
+  OutlineRepeat02,
+  SolidHeart,
+} from "@/components/icons/Icons";
+import { Button } from "@/components/ui/button";
 import { useLikeAction } from "@/hooks/useLikeAction";
 import { cn } from "@/lib/utils";
-import NumberFlow from "@number-flow/react";
-import { OutlineBookmark, OutlineChat, OutlineHeart, OutlineRepeat02, SolidHeart } from "@/components/icons/Icons";
 
 interface SocialActionsProps {
   postId: string; // required so the component can call the API
@@ -44,7 +50,7 @@ export function SocialActions({
   showCommentsCount = true,
   showRepostsCount = true,
   showBookmarksCount = true,
-  animateGate = false
+  animateGate = false,
 }: SocialActionsProps) {
   const { liked, likesCount, handleLike, updateState } = useLikeAction({
     postId,
@@ -52,14 +58,19 @@ export function SocialActions({
     initialCount: likes,
     onSuccess: () => {
       if (onLike) {
-        const fakeEvent = { preventDefault: () => { }, stopPropagation: () => { } } as MouseEvent;
+        const fakeEvent = {
+          preventDefault: () => { },
+          stopPropagation: () => { },
+        } as MouseEvent;
         onLike(fakeEvent);
       }
-    }
+    },
   });
 
   // Keep local state in sync if props change
-  useEffect(() => { updateState(isLiked, likes); }, [isLiked, likes, updateState]);
+  useEffect(() => {
+    updateState(isLiked, likes);
+  }, [isLiked, likes, updateState]);
 
   // Enable animations only when component is visible in viewport
   const [shouldAnimate, setShouldAnimate] = useState(false);
@@ -99,47 +110,59 @@ export function SocialActions({
       },
       {
         threshold: 0.6,
-        rootMargin: '0px'
-      }
+        rootMargin: "0px",
+      },
     );
     obs.observe(el);
     return () => obs.disconnect();
   }, [animateGate, likesCount]);
 
-
-
   return (
-    <div ref={containerRef} className="flex items-center justify-between text-white">
+    <div
+      ref={containerRef}
+      className="flex items-center justify-between text-white pointer-events-auto"
+    >
       <div className="flex items-center gap-3">
         {/* Like button */}
         <div className="flex items-center">
-          <div
-          >
+          <div>
             <Button
               variant="ghost"
-              size={'icon'}
-              className={`hover:bg-white/12 hover:text-white ${liked ? 'text-[#f4393e] hover:bg-[#f4393e]/12 drop-shadow-[0_1px_10px_#f4393e]' : 'text-accent drop-shadow-[0_1px_10px_rgba(0,0,0,0.75)]'
+              size={"icon"}
+              className={`hover:bg-white/12 hover:text-white dark:text-white ${liked
+                ? "text-[#f4393e] hover:bg-[#f4393e]/12 drop-shadow-[0_1px_10px_#f4393e]"
+                : "text-accent drop-shadow-[0_1px_10px_rgba(0,0,0,0.75)]"
                 }`}
               onClick={handleLike}
-              style={{ transition: 'none' }}
+              style={{ transition: "none" }}
             >
-              {liked ? <SolidHeart className="text-[#f4393e]" /> : <OutlineHeart />}
+              {liked ? (
+                <SolidHeart className="text-[#f4393e]" />
+              ) : (
+                <OutlineHeart />
+              )}
             </Button>
           </div>
           {showLikesCount && (
             <span
               className={cn(
                 "ml-1 text-sm transition-opacity",
-                liked ? "text-[#f4393e] drop-shadow-[0_1px_1px_rgba(0,0,0,0.75)]" : "text-white",
-                likesCount === 0 ? "opacity-0" : (shouldAnimate ? "opacity-100" : "opacity-0")
+                liked
+                  ? "text-[#f4393e] drop-shadow-[0_1px_1px_rgba(0,0,0,0.75)]"
+                  : "text-white",
+                likesCount === 0
+                  ? "opacity-0"
+                  : shouldAnimate
+                    ? "opacity-100"
+                    : "opacity-0",
               )}
             >
               <NumberFlow
                 value={animateValue}
                 className="inline-block"
-                transformTiming={{ duration: 400, easing: 'ease-out' }}
-                spinTiming={{ duration: 300, easing: 'ease-out' }}
-                opacityTiming={{ duration: 200, easing: 'ease-out' }}
+                transformTiming={{ duration: 400, easing: "ease-out" }}
+                spinTiming={{ duration: 300, easing: "ease-out" }}
+                opacityTiming={{ duration: 200, easing: "ease-out" }}
                 animated={shouldAnimate}
               />
             </span>
@@ -150,11 +173,11 @@ export function SocialActions({
         <div className="flex items-center">
           <Button
             variant="ghost"
-            size={'icon'}
+            size={"icon"}
             // TODO: add isCommented
             className={`hover:bg-white/12 hover:text-white text-white drop-shadow-[0_0px_2px_rgba(0,0,0,0.75)] $`}
             onClick={onComment}
-            style={{ transition: 'none' }}
+            style={{ transition: "none" }}
           >
             <OutlineChat />
           </Button>
@@ -162,15 +185,19 @@ export function SocialActions({
             <span
               className={cn(
                 "ml-1 text-sm text-white transition-opacity",
-                comments === 0 ? "opacity-0" : (shouldAnimate ? "opacity-100" : "opacity-0")
+                comments === 0
+                  ? "opacity-0"
+                  : shouldAnimate
+                    ? "opacity-100"
+                    : "opacity-0",
               )}
             >
               <NumberFlow
                 value={shouldAnimate ? comments : 0}
                 className="inline-block"
-                transformTiming={{ duration: 400, easing: 'ease-out' }}
-                spinTiming={{ duration: 300, easing: 'ease-out' }}
-                opacityTiming={{ duration: 200, easing: 'ease-out' }}
+                transformTiming={{ duration: 400, easing: "ease-out" }}
+                spinTiming={{ duration: 300, easing: "ease-out" }}
+                opacityTiming={{ duration: 200, easing: "ease-out" }}
                 animated={shouldAnimate}
               />
             </span>
@@ -181,8 +208,8 @@ export function SocialActions({
         <div className="flex items-center">
           <Button
             variant="ghost"
-            size={'icon'}
-            className={`hover:bg-white/12 hover:text-white ${isReposted ? 'text-green-500 hover:text-green-500 hover:bg-green-500/12' : 'text-white drop-shadow-[0_0px_2px_rgba(0,0,0,0.75)]'}`}
+            size={"icon"}
+            className={`hover:bg-white/12 hover:text-white ${isReposted ? "text-green-500 hover:text-green-500 hover:bg-green-500/12" : "text-white drop-shadow-[0_0px_2px_rgba(0,0,0,0.75)]"}`}
             onClick={onRepost}
           >
             <OutlineRepeat02 />
@@ -192,15 +219,19 @@ export function SocialActions({
               className={cn(
                 "ml-1 text-sm transition-opacity",
                 isReposted ? "text-green-500" : "text-white",
-                reposts === 0 ? "opacity-0" : (shouldAnimate ? "opacity-100" : "opacity-0")
+                reposts === 0
+                  ? "opacity-0"
+                  : shouldAnimate
+                    ? "opacity-100"
+                    : "opacity-0",
               )}
             >
               <NumberFlow
                 value={shouldAnimate ? reposts : 0}
                 className="inline-block"
-                transformTiming={{ duration: 400, easing: 'ease-out' }}
-                spinTiming={{ duration: 300, easing: 'ease-out' }}
-                opacityTiming={{ duration: 200, easing: 'ease-out' }}
+                transformTiming={{ duration: 400, easing: "ease-out" }}
+                spinTiming={{ duration: 300, easing: "ease-out" }}
+                opacityTiming={{ duration: 200, easing: "ease-out" }}
                 animated={shouldAnimate}
               />
             </span>
@@ -212,28 +243,30 @@ export function SocialActions({
       <div className="flex items-center">
         <Button
           variant="ghost"
-          size={'icon'}
-          className={`hover:bg-white/12 hover:text-white ${isBookmarked ? 'text-yellow-500 hover:text-yellow-500 hover:bg-yellow-500/12' : 'text-white drop-shadow-[0_0px_2px_rgba(0,0,0,0.75)]'}`}
+          size={"icon"}
+          className={`hover:bg-white/12 hover:text-white ${isBookmarked ? "text-yellow-500 hover:text-yellow-500 hover:bg-yellow-500/12" : "text-white drop-shadow-[0_0px_2px_rgba(0,0,0,0.75)]"}`}
           onClick={onBookmark}
         >
-          <OutlineBookmark
-            className={cn(isBookmarked ? 'fill-current' : '')}
-          />
+          <OutlineBookmark className={cn(isBookmarked ? "fill-current" : "")} />
         </Button>
         {showBookmarksCount && (
           <span
             className={cn(
               "ml-1 text-sm transition-opacity",
               isBookmarked ? "text-yellow-500" : "text-white",
-              bookmarks === 0 ? "opacity-0" : (shouldAnimate ? "opacity-100" : "opacity-0")
+              bookmarks === 0
+                ? "opacity-0"
+                : shouldAnimate
+                  ? "opacity-100"
+                  : "opacity-0",
             )}
           >
             <NumberFlow
               value={shouldAnimate ? bookmarks : 0}
               className="inline-block"
-              transformTiming={{ duration: 400, easing: 'ease-out' }}
-              spinTiming={{ duration: 300, easing: 'ease-out' }}
-              opacityTiming={{ duration: 200, easing: 'ease-out' }}
+              transformTiming={{ duration: 400, easing: "ease-out" }}
+              spinTiming={{ duration: 300, easing: "ease-out" }}
+              opacityTiming={{ duration: 200, easing: "ease-out" }}
               animated={shouldAnimate}
             />
           </span>

@@ -1,133 +1,209 @@
 "use server";
 
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { randomUUID } from "crypto";
+import { buildPublicUrl } from "@/lib/publicUrl";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const BUCKET = "social-art";
 const FOLDER_AVATARS = "avatar"; // avatar/<userUUID>/avatar.ext
-const FOLDER_POSTS = "posts";   // posts/<postUUID>/<imageUUID>.ext
+const FOLDER_POSTS = "posts"; // posts/<postUUID>/<imageUUID>.ext
 
-type PresignResp = { path: string; url: string; token: string; imageId: string };
+type PresignResp = {
+	path: string;
+	url: string;
+	token: string;
+	imageId: string;
+};
 
-export async function presignPostImageUpload(postId: string, ext: "jpg" | "jpeg" | "png" | "webp", authorId: string): Promise<{ error?: string; data?: PresignResp }> {
-  if (!postId || !authorId) return { error: "Missing ids" };
-  const sb = supabaseAdmin;
-  const imageId = randomUUID();
-  const targetExt = ext; // keep original extension to avoid client-side conversion issues
-  const path = `${FOLDER_POSTS}/${postId}/${imageId}.${targetExt}`;
-  // 15 min
-  const { data, error } = await sb.storage.from(BUCKET).createSignedUploadUrl(path);
-  if (error) return { error: error.message };
-  return { data: { path, url: data.signedUrl, token: data.token, imageId } };
+export async function presignPostImageUpload(
+	postId: string,
+	ext: "jpg" | "jpeg" | "png" | "webp" | "gif" | "mp4" | "webm",
+	authorId: string,
+): Promise<{ error?: string; data?: PresignResp }> {
+	if (!postId || !authorId) return { error: "Missing ids" };
+
+	// Log JWT usage for post image upload
+	console.log(
+		`[JWT] Post image upload presigned for user: ${authorId}, post: ${postId}`,
+	);
+
+	const sb = supabaseAdmin;
+	const imageId = randomUUID();
+	const targetExt = ext; // keep original extension to avoid client-side conversion issues
+	const path = `${FOLDER_POSTS}/${postId}/${imageId}.${targetExt}`;
+	// 15 min
+	const { data, error } = await sb.storage
+		.from(BUCKET)
+		.createSignedUploadUrl(path);
+	if (error) return { error: error.message };
+	return { data: { path, url: data.signedUrl, token: data.token, imageId } };
 }
 
-export async function presignAvatarUpload(userId: string, ext: "jpg"|"jpeg"|"png"|"webp"|"gif"): Promise<{ error?: string; data?: PresignResp }> {
-  if (!userId) return { error: "Missing userId" };
-  const sb = supabaseAdmin;
-  const targetExt = ext; // keep original extension (gif allowed)
-  // Clean up any existing avatar files for this user to prevent clutter and conflicts
-  try {
-    const { data: listed } = await sb.storage.from(BUCKET).list(`${FOLDER_AVATARS}/${userId}`);
-    const toRemove = (listed || []).map((it) => `${FOLDER_AVATARS}/${userId}/${it.name}`);
-    if (toRemove.length > 0) { await sb.storage.from(BUCKET).remove(toRemove); }
-  } catch { }
-  // Use unique name to avoid "resource already exists"
-  const uid = randomUUID();
-  const path = `${FOLDER_AVATARS}/${userId}/avatar-${uid}.${targetExt}`;
-  const { data, error } = await sb.storage.from(BUCKET).createSignedUploadUrl(path);
-  if (error) return { error: error.message };
-  return { data: { path, url: data.signedUrl, token: data.token, imageId: "avatar" } };
+export async function presignAvatarUpload(
+	userId: string,
+	ext: "jpg" | "jpeg" | "png" | "webp" | "gif",
+): Promise<{ error?: string; data?: PresignResp }> {
+	if (!userId) return { error: "Missing userId" };
+
+	// Log JWT usage for avatar upload
+	console.log(`[JWT] Avatar upload presigned for user: ${userId}`);
+
+	const sb = supabaseAdmin;
+	const targetExt = ext; // keep original extension (gif allowed)
+	// Clean up any existing avatar files for this user to prevent clutter and conflicts
+	try {
+		const { data: listed } = await sb.storage
+			.from(BUCKET)
+			.list(`${FOLDER_AVATARS}/${userId}`);
+		const toRemove = (listed || []).map(
+			(it) => `${FOLDER_AVATARS}/${userId}/${it.name}`,
+		);
+		if (toRemove.length > 0) {
+			await sb.storage.from(BUCKET).remove(toRemove);
+		}
+	} catch {}
+	// Use unique name to avoid "resource already exists"
+	const uid = randomUUID();
+	const path = `${FOLDER_AVATARS}/${userId}/avatar-${uid}.${targetExt}`;
+	const { data, error } = await sb.storage
+		.from(BUCKET)
+		.createSignedUploadUrl(path);
+	if (error) return { error: error.message };
+	return {
+		data: { path, url: data.signedUrl, token: data.token, imageId: "avatar" },
+	};
 }
 
 export async function finalizeAvatar(userId: string, pathOrUrl: string) {
-  const sb = supabaseAdmin;
-  const isFull = /^(https?:)?\/\//i.test(pathOrUrl);
-  const s3Endpoint = (process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.SOCIAL_S3_ENDPOINT || "").replace(/\/$/, "");
-  const s3Bucket = process.env.NEXT_PUBLIC_S3_BUCKET || process.env.SOCIAL_S3_BUCKET || "";
-  let publicUrl = isFull
-    ? pathOrUrl
-    : (s3Endpoint && s3Bucket)
-      ? `${s3Endpoint}/${s3Bucket}/${pathOrUrl}`
-      : pathOrUrl;
-  try {
-    const u = new URL(publicUrl.startsWith('http') ? publicUrl : `https://${publicUrl}`);
-    u.searchParams.set('v', String(Date.now()));
-    publicUrl = u.toString();
-  } catch { }
-  const { error } = await sb.from("profiles").update({ avatar_url: publicUrl }).eq("user_id", userId);
-  if (error) return { error: error.message };
-  return { ok: true, avatar_url: publicUrl };
+	// Log JWT usage for avatar finalization
+	console.log(`[JWT] Avatar finalized for user: ${userId}`);
+
+	const sb = supabaseAdmin;
+
+	// Use buildPublicUrl to ensure consistent S3 URL generation
+	let publicUrl = buildPublicUrl(pathOrUrl);
+
+	// Add cache busting parameter
+	try {
+		const u = new URL(
+			publicUrl.startsWith("http") ? publicUrl : `https://${publicUrl}`,
+		);
+		u.searchParams.set("v", String(Date.now()));
+		publicUrl = u.toString();
+	} catch {}
+
+	const { error } = await sb
+		.from("profiles")
+		.update({ avatar_url: publicUrl })
+		.eq("user_id", userId);
+	if (error) return { error: error.message };
+	return { ok: true, avatar_url: publicUrl };
 }
 
-export async function presignCoverUpload(userId: string, ext: "jpg"|"jpeg"|"png"|"webp"|"gif"): Promise<{ error?: string; data?: PresignResp }> {
-  if (!userId) return { error: "Missing userId" };
-  const sb = supabaseAdmin;
-  const targetExt = ext; // keep original extension
-  try {
-    const { data: listed } = await sb.storage.from(BUCKET).list(`covers/${userId}`);
-    const toRemove = (listed || []).map((it) => `covers/${userId}/${it.name}`);
-    if (toRemove.length > 0) { await sb.storage.from(BUCKET).remove(toRemove); }
-  } catch { }
-  const uid = randomUUID();
-  const path = `covers/${userId}/cover-${uid}.${targetExt}`;
-  const { data, error } = await sb.storage.from(BUCKET).createSignedUploadUrl(path);
-  if (error) return { error: error.message };
-  return { data: { path, url: data.signedUrl, token: data.token, imageId: "cover" } };
+export async function presignCoverUpload(
+	userId: string,
+	ext: "jpg" | "jpeg" | "png" | "webp" | "gif",
+): Promise<{ error?: string; data?: PresignResp }> {
+	if (!userId) return { error: "Missing userId" };
+	const sb = supabaseAdmin;
+	const targetExt = ext; // keep original extension
+	try {
+		const { data: listed } = await sb.storage
+			.from(BUCKET)
+			.list(`covers/${userId}`);
+		const toRemove = (listed || []).map((it) => `covers/${userId}/${it.name}`);
+		if (toRemove.length > 0) {
+			await sb.storage.from(BUCKET).remove(toRemove);
+		}
+	} catch {}
+	const uid = randomUUID();
+	const path = `covers/${userId}/cover-${uid}.${targetExt}`;
+	const { data, error } = await sb.storage
+		.from(BUCKET)
+		.createSignedUploadUrl(path);
+	if (error) return { error: error.message };
+	return {
+		data: { path, url: data.signedUrl, token: data.token, imageId: "cover" },
+	};
 }
 
 export async function finalizeCover(userId: string, pathOrUrl: string) {
-  const sb = supabaseAdmin;
-  const isFull = /^(https?:)?\/\//i.test(pathOrUrl);
-  const s3Endpoint = (process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.SOCIAL_S3_ENDPOINT || "").replace(/\/$/, "");
-  const s3Bucket = process.env.NEXT_PUBLIC_S3_BUCKET || process.env.SOCIAL_S3_BUCKET || "";
-  let publicUrl = isFull
-    ? pathOrUrl
-    : (s3Endpoint && s3Bucket)
-      ? `${s3Endpoint}/${s3Bucket}/${pathOrUrl}`
-      : pathOrUrl;
-  try {
-    const u = new URL(publicUrl.startsWith('http') ? publicUrl : `https://${publicUrl}`);
-    u.searchParams.set('v', String(Date.now()));
-    publicUrl = u.toString();
-  } catch { }
-  const { error } = await sb.from("profiles").update({ cover_url: publicUrl }).eq("user_id", userId);
-  if (error) return { error: error.message };
-  return { ok: true, cover_url: publicUrl };
+	// Log JWT usage for cover finalization
+	console.log(`[JWT] Cover finalized for user: ${userId}`);
+
+	const sb = supabaseAdmin;
+
+	// Use buildPublicUrl to ensure consistent S3 URL generation
+	let publicUrl = buildPublicUrl(pathOrUrl);
+
+	// Add cache busting parameter
+	try {
+		const u = new URL(
+			publicUrl.startsWith("http") ? publicUrl : `https://${publicUrl}`,
+		);
+		u.searchParams.set("v", String(Date.now()));
+		publicUrl = u.toString();
+	} catch {}
+
+	const { error } = await sb
+		.from("profiles")
+		.update({ cover_url: publicUrl })
+		.eq("user_id", userId);
+	if (error) return { error: error.message };
+	return { ok: true, cover_url: publicUrl };
 }
 
 // Optional helper to remove entire post folder when a post is deleted
 export async function deletePostFolder(postId: string) {
-  const sb = supabaseAdmin;
-  const { error } = await sb.storage.from(BUCKET).remove([`${FOLDER_POSTS}/${postId}`]);
-  if (error) return { error: error.message };
-  return { ok: true };
+	const sb = supabaseAdmin;
+	const { error } = await sb.storage
+		.from(BUCKET)
+		.remove([`${FOLDER_POSTS}/${postId}`]);
+	if (error) return { error: error.message };
+	return { ok: true };
 }
 
 // Remove user's avatar file(s) and clear profile.avatar_url
 export async function removeAvatar(userId: string) {
-  if (!userId) return { error: "Missing userId" };
-  const sb = supabaseAdmin;
-  // Remove all files in avatar folder for this user
-  try {
-    const { data: listed } = await sb.storage.from(BUCKET).list(`${FOLDER_AVATARS}/${userId}`);
-    const toRemove = (listed || []).map((it) => `${FOLDER_AVATARS}/${userId}/${it.name}`);
-    if (toRemove.length > 0) { await sb.storage.from(BUCKET).remove(toRemove); }
-  } catch { }
-  const { error } = await sb.from("profiles").update({ avatar_url: null }).eq("user_id", userId);
-  if (error) return { error: error.message };
-  return { ok: true };
+	if (!userId) return { error: "Missing userId" };
+	const sb = supabaseAdmin;
+	// Remove all files in avatar folder for this user
+	try {
+		const { data: listed } = await sb.storage
+			.from(BUCKET)
+			.list(`${FOLDER_AVATARS}/${userId}`);
+		const toRemove = (listed || []).map(
+			(it) => `${FOLDER_AVATARS}/${userId}/${it.name}`,
+		);
+		if (toRemove.length > 0) {
+			await sb.storage.from(BUCKET).remove(toRemove);
+		}
+	} catch {}
+	const { error } = await sb
+		.from("profiles")
+		.update({ avatar_url: null })
+		.eq("user_id", userId);
+	if (error) return { error: error.message };
+	return { ok: true };
 }
 
 // Remove user's cover file(s) and clear profile.cover_url
 export async function removeCover(userId: string) {
-  if (!userId) return { error: "Missing userId" };
-  const sb = supabaseAdmin;
-  try {
-    const { data: listed } = await sb.storage.from(BUCKET).list(`covers/${userId}`);
-    const toRemove = (listed || []).map((it) => `covers/${userId}/${it.name}`);
-    if (toRemove.length > 0) { await sb.storage.from(BUCKET).remove(toRemove); }
-  } catch { }
-  const { error } = await sb.from("profiles").update({ cover_url: null }).eq("user_id", userId);
-  if (error) return { error: error.message };
-  return { ok: true };
+	if (!userId) return { error: "Missing userId" };
+	const sb = supabaseAdmin;
+	try {
+		const { data: listed } = await sb.storage
+			.from(BUCKET)
+			.list(`covers/${userId}`);
+		const toRemove = (listed || []).map((it) => `covers/${userId}/${it.name}`);
+		if (toRemove.length > 0) {
+			await sb.storage.from(BUCKET).remove(toRemove);
+		}
+	} catch {}
+	const { error } = await sb
+		.from("profiles")
+		.update({ cover_url: null })
+		.eq("user_id", userId);
+	if (error) return { error: error.message };
+	return { ok: true };
 }

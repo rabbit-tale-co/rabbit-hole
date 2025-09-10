@@ -1,12 +1,13 @@
 "use client";
 
-import * as React from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import * as React from "react";
 import Center from "@/components/Center";
+import { useUser } from "@/hooks/useUser";
 
 export default function AuthConfirmPage() {
   const router = useRouter();
+  const { handleAuthConfirm } = useUser();
   const [error, setError] = React.useState<string | null>(null);
   const [done, setDone] = React.useState(false);
 
@@ -23,33 +24,25 @@ export default function AuthConfirmPage() {
           return;
         }
 
-        if (type === "recovery") {
-          const { error } = await supabase.auth.verifyOtp({ type: "recovery", token_hash });
-          if (error) {
-            setError(error.message || "Invalid or expired recovery link.");
-            return;
-          }
+        const result = await handleAuthConfirm(token_hash, type, next);
+        if (result.success) {
           setDone(true);
-          router.replace(next);
-          return;
+          router.replace(result.redirectTo);
         }
-
-        // Unsupported type for now
-        setError("Unsupported confirmation type.");
-      } catch {
-        setError("Failed to process confirmation link.");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to process confirmation link.");
       }
     })();
-  }, [router]);
+  }, [router, handleAuthConfirm]);
 
   return (
     <Center>
       <div className="w-full max-w-sm text-sm">
-        {!done && !error && (
-          <p>Verifying your link…</p>
-        )}
+        {!done && !error && <p>Verifying your link…</p>}
         {error && (
-          <div className="text-red-600" role="alert">{error}</div>
+          <div className="text-red-600" role="alert">
+            {error}
+          </div>
         )}
       </div>
     </Center>

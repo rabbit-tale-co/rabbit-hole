@@ -1,26 +1,29 @@
-export const throttle = (func: (...args: unknown[]) => void, limit: number): ((...args: unknown[]) => void) => {
-  let lastFunc: ReturnType<typeof setTimeout> | null = null;
-  let lastRan: number | null = null;
+export const throttle = (
+	func: (...args: unknown[]) => void,
+	limit: number,
+): ((...args: unknown[]) => void) => {
+	let lastFunc: ReturnType<typeof setTimeout> | null = null;
+	let lastRan: number | null = null;
 
-  return function (this: unknown, ...args: unknown[]) {
-    if (lastRan === null) {
-      func.apply(this, args);
-      lastRan = Date.now();
-    } else {
-      if (lastFunc !== null) {
-        clearTimeout(lastFunc);
-      }
-      lastFunc = setTimeout(
-        () => {
-          if (Date.now() - (lastRan as number) >= limit) {
-            func.apply(this, args);
-            lastRan = Date.now();
-          }
-        },
-        limit - (Date.now() - (lastRan as number)),
-      );
-    }
-  };
+	return function (this: unknown, ...args: unknown[]) {
+		if (lastRan === null) {
+			func.apply(this, args);
+			lastRan = Date.now();
+		} else {
+			if (lastFunc !== null) {
+				clearTimeout(lastFunc);
+			}
+			lastFunc = setTimeout(
+				() => {
+					if (Date.now() - (lastRan as number) >= limit) {
+						func.apply(this, args);
+						lastRan = Date.now();
+					}
+				},
+				limit - (Date.now() - (lastRan as number)),
+			);
+		}
+	};
 };
 
 /**
@@ -31,20 +34,20 @@ export const throttle = (func: (...args: unknown[]) => void, limit: number): ((.
  * @returns A debounced version of the provided function.
  */
 export function debounce<T extends (...args: unknown[]) => unknown>(
-  func: T,
-  wait: number,
+	func: T,
+	wait: number,
 ): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null;
+	let timeout: NodeJS.Timeout | null = null;
 
-  return function (...args: Parameters<T>): void {
-    if (timeout) {
-      clearTimeout(timeout);
-    }
+	return (...args: Parameters<T>): void => {
+		if (timeout) {
+			clearTimeout(timeout);
+		}
 
-    timeout = setTimeout(() => {
-      func(...args);
-    }, wait);
-  };
+		timeout = setTimeout(() => {
+			func(...args);
+		}, wait);
+	};
 }
 
 /**
@@ -53,7 +56,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
  * @returns A string representing the unique ID.
  */
 export function uid(): string {
-  return (Date.now() + Math.floor(Math.random() * 1000)).toString();
+	return (Date.now() + Math.floor(Math.random() * 1000)).toString();
 }
 
 /**
@@ -63,17 +66,22 @@ export function uid(): string {
  * @param count - The number of initials to return. Defaults to all initials.
  * @returns A string of initials from the name.
  */
-export const getInitials = (name: string | null | undefined, count?: number): string => {
-  if (!name || typeof name !== 'string') {
-    return '';
-  }
+export const getInitials = (
+	name: string | null | undefined,
+	count?: number,
+): string => {
+	if (!name || typeof name !== "string") {
+		return "";
+	}
 
-  const initials = name
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0].toUpperCase());
+	const initials = name
+		.split(" ")
+		.filter(Boolean)
+		.map((part) => part[0].toUpperCase());
 
-  return count && count > 0 ? initials.slice(0, count).join('') : initials.join('');
+	return count && count > 0
+		? initials.slice(0, count).join("")
+		: initials.join("");
 };
 
 /**
@@ -83,12 +91,12 @@ export const getInitials = (name: string | null | undefined, count?: number): st
  * @returns A string formatted as "Month Day, Year".
  */
 export function formatDate(input: Date | string | number): string {
-  const date = new Date(input);
-  return date.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+	const date = new Date(input);
+	return date.toLocaleDateString("en-US", {
+		month: "long",
+		day: "numeric",
+		year: "numeric",
+	});
 }
 
 /**
@@ -98,15 +106,15 @@ export function formatDate(input: Date | string | number): string {
  * @returns A string formatted as "Month Day, Year, Hour:Minute AM/PM".
  */
 export function formatDateTime(input: Date | string | number): string {
-  const date = new Date(input);
-  return date.toLocaleString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: true,
-  });
+	const date = new Date(input);
+	return date.toLocaleString("en-US", {
+		month: "long",
+		day: "numeric",
+		year: "numeric",
+		hour: "numeric",
+		minute: "numeric",
+		hour12: true,
+	});
 }
 
 /**
@@ -117,11 +125,15 @@ export function formatDateTime(input: Date | string | number): string {
  * @param locale - The locale for formatting (e.g., "en-US"). Defaults to "en-US".
  * @returns A string formatted as currency.
  */
-export function formatCurrency(amount: number, currency: string = 'USD', locale: string = 'en-US'): string {
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-  }).format(amount);
+export function formatCurrency(
+	amount: number,
+	currency: string = "USD",
+	locale: string = "en-US",
+): string {
+	return new Intl.NumberFormat(locale, {
+		style: "currency",
+		currency,
+	}).format(amount);
 }
 
 /**
@@ -131,7 +143,7 @@ export function formatCurrency(amount: number, currency: string = 'USD', locale:
  * @returns A string representing the absolute URL.
  */
 export function absoluteUrl(path: string): string {
-  return `${process.env.NEXT_PUBLIC_APP_URL}${path}`;
+	return `${process.env.NEXT_PUBLIC_APP_URL}${path}`;
 }
 
 /**
@@ -141,9 +153,9 @@ export function absoluteUrl(path: string): string {
  * @returns A string representing the absolute URL to the media asset.
  */
 export function toAbsoluteUrl(path: string): string {
-  // Remove leading slash if present to avoid double slashes
-  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-  return `/${cleanPath}`;
+	// Remove leading slash if present to avoid double slashes
+	const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+	return `/${cleanPath}`;
 }
 
 /**
@@ -152,26 +164,29 @@ export function toAbsoluteUrl(path: string): string {
 	formats their offsets (e.g., "GMT+2"), and returns them in a sorted array.
 */
 export const getTimeZones = (): { label: string; value: string }[] => {
-  // Fetch supported timezones
-  const timezones = Intl.supportedValuesOf('timeZone');
+	// Fetch supported timezones
+	const timezones = Intl.supportedValuesOf("timeZone");
 
-  return timezones
-    .map((timezone) => {
-      const formatter = new Intl.DateTimeFormat('en', {
-        timeZone: timezone,
-        timeZoneName: 'shortOffset',
-      });
-      const parts = formatter.formatToParts(new Date());
-      const offset = parts.find((part) => part.type === 'timeZoneName')?.value || '';
-      const formattedOffset = offset === 'GMT' ? 'GMT+0' : offset;
+	return timezones
+		.map((timezone) => {
+			const formatter = new Intl.DateTimeFormat("en", {
+				timeZone: timezone,
+				timeZoneName: "shortOffset",
+			});
+			const parts = formatter.formatToParts(new Date());
+			const offset =
+				parts.find((part) => part.type === "timeZoneName")?.value || "";
+			const formattedOffset = offset === "GMT" ? "GMT+0" : offset;
 
-      return {
-        value: timezone,
-        label: `(${formattedOffset}) ${timezone.replace(/_/g, ' ')}`,
-        numericOffset: parseInt(formattedOffset.replace('GMT', '').replace('+', '') || '0'),
-      };
-    })
-    .sort((a, b) => a.numericOffset - b.numericOffset);
+			return {
+				value: timezone,
+				label: `(${formattedOffset}) ${timezone.replace(/_/g, " ")}`,
+				numericOffset: parseInt(
+					formattedOffset.replace("GMT", "").replace("+", "") || "0",
+				),
+			};
+		})
+		.sort((a, b) => a.numericOffset - b.numericOffset);
 };
 
 /**
@@ -180,18 +195,18 @@ export const getTimeZones = (): { label: string; value: string }[] => {
  * @returns A slug string (e.g., "write-a-proposal")
  */
 export function getSlug(title: string): string {
-  // Return empty string for invalid input
-  if (!title || typeof title !== 'string') {
-    return '';
-  }
+	// Return empty string for invalid input
+	if (!title || typeof title !== "string") {
+		return "";
+	}
 
-  return title
-    .toLowerCase() // Convert to lowercase for consistency
-    .trim() // Remove leading/trailing whitespace
-    .normalize('NFD') // Normalize unicode (e.g., "é" -> "e")
-    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces/hyphens
-    .replaceAll(/\s+/g, '-') // Replace spaces with single hyphen
-    .replace(/-+/g, '-') // Collapse multiple hyphens
-    .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+	return title
+		.toLowerCase() // Convert to lowercase for consistency
+		.trim() // Remove leading/trailing whitespace
+		.normalize("NFD") // Normalize unicode (e.g., "é" -> "e")
+		.replace(/[\u0300-\u036f]/g, "") // Remove diacritics
+		.replace(/[^a-z0-9\s-]/g, "") // Remove special characters except spaces/hyphens
+		.replaceAll(/\s+/g, "-") // Replace spaces with single hyphen
+		.replace(/-+/g, "-") // Collapse multiple hyphens
+		.replace(/^-|-$/g, ""); // Remove leading/trailing hyphens
 }

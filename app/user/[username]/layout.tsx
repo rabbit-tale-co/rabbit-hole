@@ -1,4 +1,5 @@
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
+
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -12,28 +13,36 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
  * og:url as /user/username
  */
 
-export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
-  const { username } = await params;
-  // fetch display_name for nicer title; fall back to username
-  let displayName: string | null = null;
-  try {
-    const { data } = await supabaseAdmin
-      .from("profiles")
-      .select("display_name")
-      .eq("username", username)
-      .maybeSingle();
-    displayName = (data as { display_name?: string | null } | null)?.display_name ?? null;
-  } catch { }
-  const title = `${displayName?.trim() || username}`;
-  const url = `/user/${username}`;
-  return {
-    title,
-    openGraph: { title, url, images: [{ url: "/assets/og.webp" }] },
-    twitter: { title, images: [{ url: "/assets/og.webp" }] },
-  };
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ username: string }>;
+}): Promise<Metadata> {
+	const { username } = await params;
+	// fetch display_name for nicer title; fall back to username
+	let displayName: string | null = null;
+	try {
+		const { data } = await supabaseAdmin
+			.from("profiles")
+			.select("display_name")
+			.eq("username", username)
+			.maybeSingle();
+		displayName =
+			(data as { display_name?: string | null } | null)?.display_name ?? null;
+	} catch {}
+	const title = `${displayName?.trim() || username}`;
+	const url = `/user/${username}`;
+	return {
+		title,
+		openGraph: { title, url, images: [{ url: "/assets/og.webp" }] },
+		twitter: { title, images: [{ url: "/assets/og.webp" }] },
+	};
 }
 
-
-export default function UserLayout({ children }: { children: React.ReactNode }) {
-  return children;
+export default function UserLayout({
+	children,
+}: {
+	children: React.ReactNode;
+}) {
+	return children;
 }

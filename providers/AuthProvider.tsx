@@ -1,14 +1,25 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { supabase } from "@/lib/supabase";
-import { AuthCtx } from "@/types/auth";
+import type { AuthCtx } from "@/types/auth";
 import type { ProfileRow } from "@/types/db";
 
 const Ctx = createContext<AuthCtx | null>(null);
 
-export default function AuthProvider({ children }: { children: React.ReactNode }) {
+export default function AuthProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,7 +36,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       if (data.session?.user?.id) {
         // fetch profile from public view (RLS allows select)
         const { data: p } = await supabase
-          .schema('social_art')
+          .schema("social_art")
           .from("profiles")
           .select("*")
           .eq("user_id", data.session.user.id)
@@ -37,10 +48,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           .channel("profile-updates")
           .on(
             "postgres_changes",
-            { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${data.session.user.id}` },
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "profiles",
+              filter: `user_id=eq.${data.session.user.id}`,
+            },
             (payload) => {
               setProfile(payload.new as ProfileRow);
-            }
+            },
           )
           .subscribe();
       } else {
@@ -55,21 +71,33 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         setTimeout(() => {
           // cleanup previous channel when auth state changes
           if (profileChannel) {
-            try { profileChannel.unsubscribe(); } catch { }
+            try {
+              profileChannel.unsubscribe();
+            } catch { }
             profileChannel = null;
           }
           if (sess?.user?.id) {
             // ensure profile row exists then fetch it
+            // Try to get username from user_metadata
+            const username = sess.user.user_metadata?.username;
+
+            const body: { username?: string } = {};
+            if (username) {
+              body.username = username;
+            }
+
             fetch("/api/profile/init", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ user_id: sess.user.id }),
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${sess.access_token}`,
+              },
+              body: JSON.stringify(body),
             }).catch(() => { });
-
             (async () => {
               try {
                 const { data: p } = await supabase
-                  .schema('social_art')
+                  .schema("social_art")
                   .from("profiles")
                   .select("*")
                   .eq("user_id", sess.user.id)
@@ -84,8 +112,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
               .channel("profile-updates")
               .on(
                 "postgres_changes",
-                { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${sess.user.id}` },
-                (payload) => { setProfile(payload.new as ProfileRow); }
+                {
+                  event: "UPDATE",
+                  schema: "public",
+                  table: "profiles",
+                  filter: `user_id=eq.${sess.user.id}`,
+                },
+                (payload) => {
+                  setProfile(payload.new as ProfileRow);
+                },
               )
               .subscribe();
           } else {
@@ -102,68 +137,83 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const refreshProfile = useCallback(async () => {
     if (!user?.id) return;
     const { data: p } = await supabase
-      .schema('social_art')
+      .schema("social_art")
       .from("profiles")
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle();
     setProfile((p as ProfileRow) ?? null);
   }, [user?.id]);
-  const signIn: AuthCtx["signIn"] = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+  const signIn: AuthCtx["signIn"] = useCallback(async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     if (error) return { error: error.message };
     // session listener updates state
     return {};
-  };
+  }, []);
 
-  const resetPassword: AuthCtx["resetPassword"] = async (email) => {
+  const resetPassword: AuthCtx["resetPassword"] = useCallback(async (email) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email);
       if (error) return { error: error.message };
       return {};
     } catch (e: unknown) {
-      return { error: e instanceof Error ? e.message : "Failed to send reset email." };
+      return {
+        error: e instanceof Error ? e.message : "Failed to send reset email.",
+      };
     }
-  };
+  }, []);
 
-
-
-  const signUp: AuthCtx["signUp"] = async (params) => {
+  const signUp: AuthCtx["signUp"] = useCallback(async (params) => {
     const { email, password, ...meta } = params;
     const { error, data } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          username: meta.username,
+          display_name: meta.display_name,
+        },
+      },
     });
     if (error) return { error: error.message };
 
-    // Hit init endpoint once user exists to mirror profile row.
-    try {
-      const res = await fetch("/api/profile/init", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: data.user?.id,
-          username: meta.username,
-        }),
-      });
-      if (!res.ok) {
-        if (res.status === 409) {
-          return { error: "Username is already taken." };
+    // Only try to initialize profile if we have a session (no email confirmation required)
+    if (data.session?.access_token) {
+      try {
+        const res = await fetch("/api/profile/init", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${data.session.access_token}`,
+          },
+          body: JSON.stringify({
+            username: meta.username,
+          }),
+        });
+        if (!res.ok) {
+          if (res.status === 409) {
+            return { error: "Username is already taken." };
+          }
+          let message = "Failed to initialize profile.";
+          try {
+            const j = await res.json();
+            if (j?.error && typeof j.error === "string") message = j.error;
+          } catch { }
+          return { error: message };
         }
-        let message = "Failed to initialize profile.";
-        try {
-          const j = await res.json();
-          if (j?.error && typeof j.error === "string") message = j.error;
-        } catch { }
-        return { error: message };
+      } catch {
+        // Handle error silently
       }
-    } catch { }
-
-    // Supabase may require email confirm depending on project settings.
+    }
+    // If no session (email confirmation required), profile will be initialized on first login
     return {};
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
     } catch { }
@@ -173,30 +223,29 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       setUser(null);
       setProfile(null);
     } catch { }
-    try {
-      // Clear auth cookies in browser scope if any were left
-      // This is a no-op on many setups but helps with sticky sessions
-      document.cookie = "sb-access-token=; Max-Age=0; path=/";
-      document.cookie = "sb-refresh-token=; Max-Age=0; path=/";
-    } catch { }
-  };
+  }, []);
 
-  const value = useMemo<AuthCtx>(() => ({
-    user, session, loading, profile,
-    refreshProfile, signIn, signUp, signOut,
-    resetPassword
-  }), [user, session, loading, profile, refreshProfile]);
+  // Get JWT token for API calls
+  const getToken = useCallback(async () => {
+    if (!session?.access_token) return null;
+    return session.access_token;
+  }, [session?.access_token]);
 
-  // Dev logs for debugging auth state
-  // useEffect(() => {
-  //   try {
-  //     if (process.env.NODE_ENV !== 'production') {
-  //       console.log('[auth] session', session);
-  //       console.log('[auth] user', user);
-  //       console.log('[auth] profile', profile);
-  //     }
-  //   } catch { }
-  // }, [session, user, profile]);
+  const value = useMemo<AuthCtx>(
+    () => ({
+      user,
+      session,
+      loading,
+      profile,
+      refreshProfile,
+      signIn,
+      signUp,
+      signOut,
+      resetPassword,
+      getToken,
+    }),
+    [user, session, loading, profile, refreshProfile, signIn, signUp, signOut, resetPassword, getToken],
+  );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

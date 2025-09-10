@@ -1,19 +1,61 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Image from 'next/image';
-import { z } from 'zod';
+import Image from "next/image";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
+import {
+  OutlineAI,
+  OutlineClose,
+  OutlineDragIndicator,
+  OutlineExport,
+  OutlineImage,
+  OutlineVideo,
+} from "@/components/icons/Icons";
+import { Button } from "@/components/ui/button";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import {
+  MediaPlayerControls,
+  MediaPlayerFullscreen,
+  MediaPlayerPlay,
+  MediaPlayerSeek,
+  MediaPlayerVideo,
+  MediaPlayerVolume,
+  MediaPlayer as VideoPlayer,
+} from "@/components/ui/media-player";
+import {
+  Sortable,
+  SortableItem,
+  SortableItemHandle,
+} from "@/components/ui/sortable";
+import { Textarea } from "@/components/ui/textarea";
+import { useFileUpload } from "@/hooks/use-file-upload";
+import { convertImageToWebP, convertVideoToWebM } from "@/lib/media";
+import { supabase } from "@/lib/supabase";
+import { randomUUIDv7 } from "@/lib/uuid";
+import { useAuth } from "@/providers/AuthProvider";
 
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/lib/supabase';
-// import { convertImageToWebP, convertVideoToWebM } from '@/lib/media';
-import { randomUUIDv7 } from '@/lib/uuid';
-import { useAuth } from '@/providers/AuthProvider';
-import { Sortable, SortableItem, SortableItemHandle } from '@/components/ui/sortable';
-import { MediaPlayer as VideoPlayer, MediaPlayerVideo, MediaPlayerControls, MediaPlayerPlay, MediaPlayerSeek, MediaPlayerVolume, MediaPlayerFullscreen } from '@/components/ui/media-player';
-import { useFileUpload } from '@/hooks/use-file-upload';
-import { OutlineAI, OutlineClose, OutlineDragIndicator, OutlineExport, OutlineImage, OutlineVideo } from '@/components/icons/Icons';
+// Hook to detect mobile devices
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+}
 
 type OptimisticPost = {
   content?: string;
@@ -25,15 +67,18 @@ interface CreatePostProps {
   onPostCreated: (
     optimisticPost: OptimisticPost,
     realPost?: unknown,
-    isError?: boolean
+    isError?: boolean,
   ) => void;
   isPremium?: boolean;
   fileSizeMbMax?: number; // default 15
   formId?: string; // external form target for a header submit button
   onValidityChange?: (valid: boolean) => void;
+  trigger?: React.ReactNode; // Optional trigger for drawer
+  open?: boolean; // Controlled open state
+  onOpenChange?: (open: boolean) => void; // Open change handler
 }
 
-type Kind = 'image' | 'gif' | 'video';
+type Kind = "image" | "gif" | "video";
 
 type Item = {
   id: string;
@@ -42,14 +87,20 @@ type Item = {
   alt: string;
   kind: Kind;
   // upload meta
-  progress: number;           // 0..100
-  status: 'idle' | 'processing' | 'uploading' | 'done' | 'error';
+  progress: number; // 0..100
+  status: "idle" | "processing" | "uploading" | "done" | "error";
   error?: string;
   // generated on convert/inspect
   width?: number;
   height?: number;
   size_bytes?: number;
-  mime?: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' | 'video/webm';
+  mime?:
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "image/gif"
+  | "video/webm"
+  | "video/mp4";
   // post meta
   isCover?: boolean;
   // server results
@@ -61,75 +112,156 @@ const MAX_ALT = 140;
 
 /** Small helper — format bytes */
 const fmt = (n: number) => {
-  if (!n && n !== 0) return '';
-  const u = ['B', 'KB', 'MB', 'GB'];
-  let i = 0, v = n;
-  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  if (!n && n !== 0) return "";
+  const u = ["B", "KB", "MB", "GB"];
+  let i = 0,
+    v = n;
+  while (v >= 1024 && i < u.length - 1) {
+    v /= 1024;
+    i++;
+  }
   return `${v.toFixed(v < 10 ? 1 : 0)} ${u[i]}`;
 };
 
 // Probe media dimensions for images/gifs/videos using browser APIs
-async function probeDimensions(file: File, kind: Kind): Promise<{ width: number; height: number }> {
+async function probeDimensions(
+  file: File,
+  kind: Kind,
+): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {
     // Videos: use a <video> element to read metadata
-    if (kind === 'video') {
-      let url = '';
-      try { url = URL.createObjectURL(file); } catch { /* noop */ }
-      const v = document.createElement('video');
-      v.preload = 'metadata';
+    if (kind === "video") {
+      let url = "";
+      try {
+        url = URL.createObjectURL(file);
+      } catch {
+        /* noop */
+      }
+      const v = document.createElement("video");
+      v.preload = "metadata";
       v.onloadedmetadata = () => {
         const width = v.videoWidth || 1;
         const height = v.videoHeight || 1;
         resolve({ width, height });
-        try { if (url) { URL.revokeObjectURL(url); } } catch { }
+        try {
+          if (url) {
+            URL.revokeObjectURL(url);
+          }
+        } catch { }
       };
       v.onerror = () => {
         resolve({ width: 1, height: 1 });
-        try { if (url) { URL.revokeObjectURL(url); } } catch { }
+        try {
+          if (url) {
+            URL.revokeObjectURL(url);
+          }
+        } catch { }
       };
       v.src = url;
       return;
     }
 
     // Images/GIFs: use an Image element to read natural size
-    let url = '';
-    try { url = URL.createObjectURL(file); } catch { /* noop */ }
+    let url = "";
+    try {
+      url = URL.createObjectURL(file);
+    } catch {
+      /* noop */
+    }
     const imgEl = new window.Image();
     imgEl.onload = () => {
       const width = imgEl.naturalWidth || 1;
       const height = imgEl.naturalHeight || 1;
       resolve({ width, height });
-      try { if (url) { URL.revokeObjectURL(url); } } catch { }
+      try {
+        if (url) {
+          URL.revokeObjectURL(url);
+        }
+      } catch { }
     };
     imgEl.onerror = () => {
       resolve({ width: 1, height: 1 });
-      try { if (url) { URL.revokeObjectURL(url); } } catch { }
+      try {
+        if (url) {
+          URL.revokeObjectURL(url);
+        }
+      } catch { }
     };
     imgEl.src = url;
   });
 }
 
 // Local components to safely create/revoke fresh blob URLs
-function VideoBlob({ file, className, controls = false }: { file: File; className?: string; controls?: boolean }) {
-  const [url, setUrl] = useState<string>('');
+function VideoBlob({
+  file,
+  className,
+  controls = false,
+}: {
+  file: File;
+  className?: string;
+  controls?: boolean;
+}) {
+  const [url, setUrl] = useState<string>("");
   useEffect(() => {
-    let u = '';
-    try { u = URL.createObjectURL(file); setUrl(u); } catch { /* noop */ }
-    return () => { if (u) { try { URL.revokeObjectURL(u); } catch { } } };
+    let u = "";
+    try {
+      u = URL.createObjectURL(file);
+      setUrl(u);
+    } catch {
+      /* noop */
+    }
+    return () => {
+      if (u) {
+        try {
+          URL.revokeObjectURL(u);
+        } catch { }
+      }
+    };
   }, [file]);
-  return <video src={url || undefined} className={className} muted playsInline preload="metadata" controls={controls} />;
+  return (
+    <video
+      src={url || undefined}
+      className={className}
+      muted
+      playsInline
+      preload="metadata"
+      controls={controls}
+    />
+  );
 }
 
-function VideoPlayerBlob({ file, className }: { file: File; className?: string }) {
-  const [url, setUrl] = useState<string>('');
+function VideoPlayerBlob({
+  file,
+  className,
+}: {
+  file: File;
+  className?: string;
+}) {
+  const [url, setUrl] = useState<string>("");
   useEffect(() => {
-    let u = '';
-    try { u = URL.createObjectURL(file); setUrl(u); } catch { /* noop */ }
-    return () => { if (u) { try { URL.revokeObjectURL(u); } catch { } } };
+    let u = "";
+    try {
+      u = URL.createObjectURL(file);
+      setUrl(u);
+    } catch {
+      /* noop */
+    }
+    return () => {
+      if (u) {
+        try {
+          URL.revokeObjectURL(u);
+        } catch { }
+      }
+    };
   }, [file]);
   return (
     <VideoPlayer className={className}>
-      <MediaPlayerVideo src={url || undefined} playsInline preload="metadata" className={className} />
+      <MediaPlayerVideo
+        src={url || undefined}
+        playsInline
+        preload="metadata"
+        className={className}
+      />
       <MediaPlayerControls className="pointer-events-auto">
         <div className="flex w-full items-center gap-2 px-2">
           <MediaPlayerPlay />
@@ -147,6 +279,9 @@ export function CreateMediaPost({
   isPremium: isPremiumProp,
   fileSizeMbMax = 15,
   formId,
+  trigger,
+  open,
+  onOpenChange,
 }: CreatePostProps) {
   const { user, profile } = useAuth();
 
@@ -172,6 +307,14 @@ export function CreateMediaPost({
   const [posting, setPosting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Internal drawer state
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = open ?? internalOpen;
+  const handleOpenChange = onOpenChange ?? setInternalOpen;
+
+  // Auto-detect mobile for responsive behavior
+  const isMobile = useIsMobile();
+
   const formRef = useRef<HTMLFormElement>(null);
   const [overDrop, setOverDrop] = useState(false);
 
@@ -189,14 +332,42 @@ export function CreateMediaPost({
         const file = f.file as File;
         const isVideo = file.type?.startsWith('video/');
         const isGif = file.type === 'image/gif';
-        const kind: Kind = isVideo ? 'video' : (isGif ? 'gif' : 'image');
+
+        // Validate MIME type matches file extension to prevent manipulation
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        const expectedVideoExts = ['mp4', 'webm', 'mov', 'avi'];
+        const expectedImageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+        if (isVideo && fileExt && !expectedVideoExts.includes(fileExt)) {
+          console.warn(
+            'Video file with invalid extension rejected:',
+            file.name,
+            'MIME:',
+            file.type,
+          );
+          continue;
+        }
+
+        if (!isVideo && fileExt && !expectedImageExts.includes(fileExt)) {
+          console.warn(
+            'Image file with invalid extension rejected:',
+            file.name,
+            'MIME:',
+            file.type,
+          );
+          continue;
+        }
+
+        const kind: Kind = isVideo ? 'video' : isGif ? 'gif' : 'image';
 
         // enforce counts
         if (kind === 'video') {
           if (videoCount >= MAX_VIDEOS) continue;
           videoCount++;
         } else {
-          const imgCount = toAdd.filter(t => t.kind !== 'video').length + items.filter(i => i.kind !== 'video').length;
+          const imgCount =
+            toAdd.filter((t) => t.kind !== 'video').length +
+            items.filter((i) => i.kind !== 'video').length;
           if (imgCount >= MAX_IMAGES) continue;
         }
 
@@ -547,6 +718,7 @@ export function CreateMediaPost({
       // reset
       setCaption('');
       clearAll();
+      handleOpenChange(false); // Close drawer after successful post
     } catch (e: unknown) {
       onPostCreated(optimistic, undefined, true);
       setErr(e instanceof Error ? e.message : 'Something went wrong.');
@@ -559,22 +731,31 @@ export function CreateMediaPost({
 
   // ---------- UI -------------------------------------------------------------
 
-  return (
+  const formContent = (
     <form
       id={formId}
       ref={formRef}
       onSubmit={onSubmit}
-      className="rounded-2xl bg-white ring-1 ring-border backdrop-blur-sm"
+      className="rounded-3xl bg-white ring-1 ring-border backdrop-blur-sm"
     >
       {/* Top: Caption + limits */}
       <div className="flex flex-col gap-2 p-3">
         <div className="flex items-center justify-between gap-2 px-1">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <OutlineAI className='size-[1.5em]' />
-            <span className="truncate">{isPremium ? 'Premium' : 'Free plan'} • up to {MAX_IMAGES} images, 1 video, {MAX_CHARS} chars, {actualFileSizeMbMax}MB files</span>
+            <span className="truncate">{isPremium ? 'Premium' : 'Free plan'}</span>
             {profile === null && <span className="text-orange-500">(Loading profile...)</span>}
           </div>
-          <div className="text-[11px] text-muted-foreground">{caption.trim().length}/{MAX_CHARS}</div>
+          <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+            {caption.trim().length}/{MAX_CHARS}
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!canSubmit || posting}
+            >
+              {posting ? 'Posting…' : 'Post'}
+            </Button>
+          </div>
         </div>
 
         <Textarea
@@ -587,7 +768,7 @@ export function CreateMediaPost({
       </div>
 
       {/* Media area */}
-      <div className="border-t px-3 pb-3">
+      <div className="border-t px-3 py-3">
         {/* hidden file input (always mounted so Add works) */}
         <input {...uploadActions.getInputProps({ accept: 'image/*,video/*', multiple: true })} className="hidden" />
         {/* Dropzone when empty */}
@@ -607,7 +788,7 @@ export function CreateMediaPost({
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background/80">
               <OutlineExport className="size-[1.5em] text-muted-foreground" />
             </div>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground hidden lg:block">
               Drag & drop images or a video, paste (Ctrl/Cmd+V), or <span className="underline underline-offset-2">browse</span>
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground/80">
@@ -776,23 +957,6 @@ export function CreateMediaPost({
         </div>
       )}
 
-      {/* Footer */}
-      <div className="border-t px-3 py-2 flex items-center justify-between">
-        <div className="text-[11px] text-muted-foreground">
-          Paste (Ctrl/Cmd+V) • Reorder (drag handle) • Delete (select → Remove)
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="submit"
-            size="sm"
-            className="px-4"
-            disabled={!canSubmit || posting}
-          >
-            {posting ? 'Posting…' : 'Post'}
-          </Button>
-        </div>
-      </div>
-
       {/* Error */}
       {err && (
         <div className="px-3 pb-3">
@@ -802,6 +966,28 @@ export function CreateMediaPost({
         </div>
       )}
     </form>
+  );
+
+  // If no trigger provided, return form directly (parent component handles modal/drawer)
+  if (!trigger) {
+    return formContent;
+  }
+
+  // Return drawer when trigger is provided
+  return (
+    <Drawer open={isOpen} onOpenChange={handleOpenChange}>
+      <DrawerTrigger asChild>
+        {trigger}
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[90vh]">
+        <DrawerHeader className="text-left">
+          <DrawerTitle>Create Post</DrawerTitle>
+        </DrawerHeader>
+        <div className="px-4 pb-4 overflow-y-auto">
+          {formContent}
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

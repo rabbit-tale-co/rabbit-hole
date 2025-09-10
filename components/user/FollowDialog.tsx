@@ -1,19 +1,33 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import Link from "next/link";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { PremiumBadge } from "./PremiumBadge";
-import { useInfiniteFollowers, type FollowerItem } from "@/hooks/useInfiniteFollowers";
-import { useInfiniteFollowing, type FollowingItem } from "@/hooks/useInfiniteFollowing";
+import { useBatchFollowStats } from "@/hooks/useBatchFollowStats";
 import { useFollow } from "@/hooks/useFollow";
-import { useAuth } from "@/providers/AuthProvider";
+import {
+  type FollowerItem,
+  useInfiniteFollowers,
+} from "@/hooks/useInfiniteFollowers";
+import {
+  type FollowingItem,
+  useInfiniteFollowing,
+} from "@/hooks/useInfiniteFollowing";
 import { generateAccentColor } from "@/lib/accent-colors";
-import { buildPublicUrl } from "@/lib/publicUrl";
 import { renderBioContent } from "@/lib/profile";
+import { buildPublicUrl } from "@/lib/publicUrl";
+import { useAuth } from "@/providers/AuthProvider";
+import { FollowButton } from "./FollowButton";
+import { FollowListSkeleton } from "./FollowSkeleton";
+import { PremiumBadge } from "./PremiumBadge";
 
 interface FollowDialogProps {
   open: boolean;
@@ -26,23 +40,32 @@ interface FollowDialogProps {
 
 /* -------------- Segmented tabs styling -------------- */
 
-const tabsList =
-  "grid w-full grid-cols-2 rounded-full bg-neutral-100 p-1";;
+const tabsList = "grid w-full grid-cols-2 rounded-full bg-neutral-100 p-1";
 
 /* -------------- User item -------------- */
 
-function UserListItem({
+const UserListItem = memo(function UserListItem({
   user,
   showFollowButton = true,
+  batchStats,
 }: {
   user: FollowerItem | FollowingItem;
   showFollowButton?: boolean;
+  batchStats?: { isFollowing: boolean; followers: number; following: number };
 }) {
   const { user: currentUser } = useAuth();
-  const { loading: followLoading, isFollowing, toggleFollow } = useFollow(user.user_id);
-  const accent = useMemo(() => generateAccentColor(user.username), [user.username]);
+  const {
+    loading: followLoading,
+    isFollowing,
+    toggleFollow,
+  } = useFollow(user.user_id, batchStats);
+  const accent = useMemo(
+    () => generateAccentColor(user.username),
+    [user.username],
+  );
 
-  const canFollow = Boolean(currentUser?.id) && currentUser!.id !== user.user_id;
+  const canFollow =
+    Boolean(currentUser?.id) && currentUser!.id !== user.user_id;
 
   return (
     <li className="rounded-2xl bg-white border border-border hover:bg-neutral-50 transition overflow-hidden">
@@ -51,7 +74,9 @@ function UserListItem({
           <UserAvatar
             size="md"
             username={user.username}
-            avatarUrl={user.avatar_url ? buildPublicUrl(user.avatar_url) : undefined}
+            avatarUrl={
+              user.avatar_url ? buildPublicUrl(user.avatar_url) : undefined
+            }
             accentColor={accent}
             accentHex={user.accent_color || undefined}
             className="rounded-full ring-1 ring-black/5"
@@ -84,71 +109,103 @@ function UserListItem({
 
         {showFollowButton && canFollow && (
           <div className="flex-shrink-0 self-center">
-            <Button
-              variant={isFollowing ? "secondary" : "default"}
+            <FollowButton
+              isFollowing={isFollowing}
+              loading={followLoading}
+              canFollow={canFollow}
+              onToggle={toggleFollow}
               size="sm"
-              disabled={followLoading}
-              onClick={toggleFollow}
-              aria-pressed={isFollowing}
-              className="rounded-full"
-            >
-
-              {isFollowing ? (
-                <span className="inline-flex items-center gap-1">
-                  Following
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1">
-                  Follow
-                </span>
-              )}
-            </Button>
+            />
           </div>
         )}
       </div>
     </li>
   );
-}
+});
 
 /* -------------- Followers list -------------- */
 
-function FollowersList({ targetUserId, targetUsername }: { targetUserId: string; targetUsername: string }) {
-  const { items, loadMore, loading, error, hasMore } = useInfiniteFollowers(targetUserId);
+function FollowersList({
+  targetUserId,
+  targetUsername,
+}: {
+  targetUserId: string;
+  targetUsername: string;
+}) {
+  const { items, loadMore, loading, error, hasMore } =
+    useInfiniteFollowers(targetUserId);
+
+  // Get user IDs for batch follow stats
+  const userIds = items.map((item) => item.user_id);
+  const { getUserStats, hasLoadedAllUsers } = useBatchFollowStats({
+    userIds,
+    enabled: userIds.length > 0,
+  });
 
   if (error) {
     return (
       <div className="p-8 text-center text-neutral-600">
         <p>Failed to load followers.</p>
-        <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2 rounded-full">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.location.reload()}
+          className="mt-2 rounded-full"
+        >
           Try again
         </Button>
       </div>
     );
   }
 
+  if (loading && items.length === 0) {
+    return <FollowListSkeleton count={6} />;
+  }
+
   if (items.length === 0 && !loading) {
     return (
       <div className="p-12 text-center text-neutral-600">
         <p className="text-base font-medium">No followers yet</p>
-        <p className="text-sm mt-1">When someone follows @{targetUsername}, they’ll appear here.</p>
+        <p className="text-sm mt-1">
+          When someone follows @{targetUsername}, they&apos;ll appear here.
+        </p>
       </div>
     );
+  }
+
+  // Show skeleton while follow stats are loading for the first batch of users
+  if (items.length > 0 && !hasLoadedAllUsers()) {
+    return <FollowListSkeleton count={Math.min(items.length, 6)} />;
   }
 
   return (
     <>
       <ul className="space-y-2">
         {items.map((u) => (
-          <UserListItem key={u.user_id} user={u} showFollowButton />
+          <UserListItem
+            key={u.user_id}
+            user={u}
+            showFollowButton
+            batchStats={getUserStats(u.user_id)}
+          />
         ))}
+        {loading && <FollowListSkeleton count={3} />}
       </ul>
 
       <div className="relative">
         {/* gradient mask over list bottom */}
-        {hasMore && <div className="pointer-events-none absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-white/0 to-white" />}
+        {hasMore && (
+          <div className="pointer-events-none absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-white/0 to-white" />
+        )}
         <div className="p-4 pt-2">
           {hasMore && (
-            <Button variant="outline" size="sm" onClick={loadMore} disabled={loading} className="w-full rounded-full">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadMore}
+              disabled={loading}
+              className="w-full rounded-full"
+            >
               {loading ? "Loading…" : "Load more"}
             </Button>
           )}
@@ -160,42 +217,86 @@ function FollowersList({ targetUserId, targetUsername }: { targetUserId: string;
 
 /* -------------- Following list -------------- */
 
-function FollowingList({ targetUserId, targetUsername }: { targetUserId: string; targetUsername: string }) {
-  const { items, loadMore, loading, error, hasMore } = useInfiniteFollowing(targetUserId);
+function FollowingList({
+  targetUserId,
+  targetUsername,
+}: {
+  targetUserId: string;
+  targetUsername: string;
+}) {
+  const { items, loadMore, loading, error, hasMore } =
+    useInfiniteFollowing(targetUserId);
+
+  // Get user IDs for batch follow stats
+  const userIds = items.map((item) => item.user_id);
+  const { getUserStats, hasLoadedAllUsers } = useBatchFollowStats({
+    userIds,
+    enabled: userIds.length > 0,
+  });
 
   if (error) {
     return (
       <div className="p-8 text-center text-neutral-600">
         <p>Failed to load following.</p>
-        <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2 rounded-full">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.location.reload()}
+          className="mt-2 rounded-full"
+        >
           Try again
         </Button>
       </div>
     );
   }
 
+  if (loading && items.length === 0) {
+    return <FollowListSkeleton count={6} />;
+  }
+
   if (items.length === 0 && !loading) {
     return (
       <div className="p-12 text-center text-neutral-600">
         <p className="text-base font-medium">Not following anyone yet</p>
-        <p className="text-sm mt-1">When @{targetUsername} follows someone, they’ll appear here.</p>
+        <p className="text-sm mt-1">
+          When @{targetUsername} follows someone, they&apos;ll appear here.
+        </p>
       </div>
     );
+  }
+
+  // Show skeleton while follow stats are loading for the first batch of users
+  if (items.length > 0 && !hasLoadedAllUsers()) {
+    return <FollowListSkeleton count={Math.min(items.length, 6)} />;
   }
 
   return (
     <>
       <ul className="space-y-2">
         {items.map((u) => (
-          <UserListItem key={u.user_id} user={u} showFollowButton />
+          <UserListItem
+            key={u.user_id}
+            user={u}
+            showFollowButton
+            batchStats={getUserStats(u.user_id)}
+          />
         ))}
+        {loading && <FollowListSkeleton count={3} />}
       </ul>
 
       <div className="relative">
-        {hasMore && <div className="pointer-events-none absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-white/0 to-white" />}
+        {hasMore && (
+          <div className="pointer-events-none absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-white/0 to-white" />
+        )}
         <div className="p-4 pt-2">
           {hasMore && (
-            <Button variant="outline" size="sm" onClick={loadMore} disabled={loading} className="w-full rounded-full">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadMore}
+              disabled={loading}
+              className="w-full rounded-full"
+            >
               {loading ? "Loading…" : "Load more"}
             </Button>
           )}
@@ -213,15 +314,19 @@ export function FollowDialog({
   targetUserId,
   targetUsername,
   followersCount,
-  followingCount
+  followingCount,
 }: FollowDialogProps) {
-  const [activeTab, setActiveTab] = useState<"followers" | "following">("followers");
+  const [activeTab, setActiveTab] = useState<"followers" | "following">(
+    "followers",
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg w-[92vw] max-h-[80vh] flex flex-col overflow-hidden p-0 rounded-3xl">
         <DialogHeader className="px-6 pt-5 pb-3 border-b border-neutral-200 bg-white/80 backdrop-blur">
-          <DialogTitle className="text-[15px] font-semibold">Followers</DialogTitle>
+          <DialogTitle className="text-[15px] font-semibold">
+            Followers
+          </DialogTitle>
         </DialogHeader>
 
         <div className="px-6 pt-3 pb-4">
@@ -233,24 +338,26 @@ export function FollowDialog({
             <TabsList className={tabsList}>
               <TabsTrigger value="followers">
                 Followers
-                <span>
-                  {followersCount.toLocaleString()}
-                </span>
+                <span>{followersCount.toLocaleString()}</span>
               </TabsTrigger>
               <TabsTrigger value="following">
                 Following
-                <span>
-                  {followingCount.toLocaleString()}
-                </span>
+                <span>{followingCount.toLocaleString()}</span>
               </TabsTrigger>
             </TabsList>
 
             <div className="mt-4 max-h-[56vh] overflow-y-auto pr-1">
               <TabsContent value="followers" className="m-0">
-                <FollowersList targetUserId={targetUserId} targetUsername={targetUsername} />
+                <FollowersList
+                  targetUserId={targetUserId}
+                  targetUsername={targetUsername}
+                />
               </TabsContent>
               <TabsContent value="following" className="m-0">
-                <FollowingList targetUserId={targetUserId} targetUsername={targetUsername} />
+                <FollowingList
+                  targetUserId={targetUserId}
+                  targetUsername={targetUsername}
+                />
               </TabsContent>
             </div>
           </Tabs>

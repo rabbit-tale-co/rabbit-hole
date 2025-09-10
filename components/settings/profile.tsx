@@ -1,82 +1,121 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { OutlineAt, OutlineClose, OutlineCrop, OutlineImage, OutlineQestionMarkCrFr, OutlineRefreshCw, OutlineUser } from "@/components/icons/Icons"
-import { Button } from "@/components/ui/button"
-import { Input, InputWrapper } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Separator } from "@/components/ui/separator"
-
-import { useAuth } from "@/providers/AuthProvider"
-import { upsertProfile, deleteAccount } from "@/app/actions/profile"
-import type { UpsertProfileDTO } from "@/types/profile"
-import { z } from "zod"
-import { toast } from "sonner"
-import Image from "next/image"
-import { getAccentColorStyle, type AccentColor, getStyleFromHexShade } from "@/lib/accent-colors"
-import { useUnsavedChanges } from "./Dialog"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { ImageCrop, ImageCropApply, ImageCropContent, ImageCropReset } from "@/components/ui/kibo-ui/image-crop"
-import type { PixelCrop } from "react-image-crop"
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { DeleteAccountDialog } from "./DeleteAccountDialog"
-import { supabase } from "@/lib/supabase"
-import { useProfileMedia } from "@/hooks/useProfileMedia"
-
-// bio formatting not persisted yet
+import Image from "next/image";
+import * as React from "react";
+import type { PixelCrop } from "react-image-crop";
+import { toast } from "sonner";
+import { z } from "zod";
+import { deleteAccount, upsertProfile } from "@/app/actions/profile";
+import {
+  OutlineAt,
+  OutlineClose,
+  OutlineCrop,
+  OutlineImage,
+  OutlineQestionMarkCrFr,
+  OutlineRefreshCw,
+  OutlineUser,
+} from "@/components/icons/Icons";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input, InputWrapper } from "@/components/ui/input";
+import {
+  ImageCrop,
+  ImageCropApply,
+  ImageCropContent,
+  ImageCropReset,
+} from "@/components/ui/kibo-ui/image-crop";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useProfileMedia } from "@/hooks/useProfileMedia";
+import {
+  type AccentColor,
+  getAccentColorStyle,
+  getStyleFromHexShade,
+} from "@/lib/accent-colors";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/providers/AuthProvider";
+import { DeleteAccountDialog } from "./DeleteAccountDialog";
+import { useUnsavedChanges } from "./Dialog";
 
 // Zod schemas for validation
 const canon = (v: unknown) =>
   typeof v === "string" ? v.normalize("NFC").replace(/\r\n/g, "\n").trim() : v;
-type DirtyShape = { displayName: string; username: string; bio: string };
-const toCanonSnapshot = (f: { displayName: string; username: string; bio?: string }): DirtyShape => ({
-  displayName: canon(f.displayName) as string,
+type DirtyShape = { display_name: string; username: string; bio: string; email: string };
+const toCanonSnapshot = (f: {
+  display_name: string;
+  username: string;
+  bio?: string;
+  email: string;
+}): DirtyShape => ({
+  display_name: canon(f.display_name) as string,
   username: canon(f.username) as string,
   bio: canon(f.bio ?? "") as string,
+  email: canon(f.email) as string,
 });
 const profileSchema = z.object({
-  displayName: z.string()
+  display_name: z
+    .string()
     .min(3, "Display name must be at least 3 characters")
     .max(30, "Display name must be less than 30 characters"),
-  username: z.string()
+  username: z
+    .string()
     .min(3, "Username must be at least 3 characters")
     .max(30, "Username must be less than 30 characters")
-    .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
-  bio: z.string()
-    .max(500, "Bio must be less than 500 characters")
-    .optional(),
-})
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      "Username can only contain letters, numbers, and underscores",
+    ),
+  bio: z.string().max(100, "Bio must be less than 100 characters").optional(),
+});
 
-interface ProfileProps { user: { id: string; email?: string } | null }
+interface ProfileProps {
+  user: { id: string; email?: string } | null;
+}
 
 export function Profile({ user }: ProfileProps) {
-  const { profile, refreshProfile } = useAuth()
-  const [deleteOpen, setDeleteOpen] = React.useState(false)
-  const [deleting, setDeleting] = React.useState(false)
-  const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({})
+  const { profile, refreshProfile, getToken } = useAuth();
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [validationErrors, setValidationErrors] = React.useState<
+    Record<string, string>
+  >({});
   const [formData, setFormData] = React.useState({
-    displayName: profile?.display_name ?? '',
-    username: profile?.username ?? 'username',
-    bio: profile?.bio ?? '',
-    email: user?.email || '',
-  })
-  const [pwdCurrent, setPwdCurrent] = React.useState("")
-  const [pwdNew, setPwdNew] = React.useState("")
-  const [pwdConfirm, setPwdConfirm] = React.useState("")
-  const [pwdLoading, setPwdLoading] = React.useState(false)
+    display_name: profile?.display_name ?? "",
+    username: profile?.username ?? "username",
+    bio: profile?.bio ?? "",
+    email: user?.email || "",
+  });
+  const [pwdCurrent, setPwdCurrent] = React.useState("");
+  const [pwdNew, setPwdNew] = React.useState("");
+  const [pwdConfirm, setPwdConfirm] = React.useState("");
+  const [pwdLoading, setPwdLoading] = React.useState(false);
+  const [formKey, setFormKey] = React.useState(0);
 
   // Use the context for unsaved changes
-  const { markAsSaved, registerSaveFunction, resetChanges, checkForChanges } = useUnsavedChanges()
+  const { markAsSaved, registerSaveFunction, registerResetFunction, resetChanges, checkForChanges } =
+    useUnsavedChanges();
 
   // Update form data when user changes
   const baselineKeyRef = React.useRef<string>("");
   React.useEffect(() => {
     const snapshot = {
-      displayName: profile?.display_name ?? '',
-      username: profile?.username ?? 'username',
-      bio: profile?.bio ?? '',
-      email: user?.email || '',
+      display_name: profile?.display_name ?? "",
+      username: profile?.username ?? "username",
+      bio: profile?.bio ?? "",
+      email: user?.email || "",
     };
     const key = JSON.stringify(toCanonSnapshot(snapshot));
     if (baselineKeyRef.current === key) return;
@@ -88,140 +127,208 @@ export function Profile({ user }: ProfileProps) {
       checkForChanges?.(toCanonSnapshot(snapshot));
       markAsSaved?.();
     } catch { }
-  }, [profile?.display_name, profile?.username, profile?.bio, user?.email, resetChanges, checkForChanges, markAsSaved])
-
+  }, [
+    profile?.display_name,
+    profile?.username,
+    profile?.bio,
+    user?.email,
+    resetChanges,
+    checkForChanges,
+    markAsSaved,
+  ]);
 
   // Add handleSave function back as a regular function
   const handleSave = React.useCallback(async () => {
+    console.log("handleSave called");
     // Clear previous validation errors
-    setValidationErrors({})
+    setValidationErrors({});
 
     try {
       // Validate form data with Zod
-      const validatedData = profileSchema.parse(formData)
+      const validatedData = profileSchema.parse(formData);
+
+      // Get the token for authenticated API calls
+      const token = await getToken();
+      if (!token) {
+        throw new Error("No authentication token available");
+      }
 
       // Create a promise for the profile update via server action
-      const payload: UpsertProfileDTO = {
+      const payload = {
         user_id: user?.id as unknown as import("@/types/db").UUID,
         username: validatedData.username.toLowerCase(),
-        display_name: validatedData.displayName,
+        display_name: validatedData.display_name,
         bio: formData.bio || null,
-        // nie nadpisuj cover_url ani accent_color tutaj
-      }
+      };
 
       // update email first if changed
       if (formData.email && user?.email && formData.email.trim() !== user.email) {
-        const { error: emailErr } = await supabase.auth.updateUser({ email: formData.email.trim() })
-        if (emailErr) throw emailErr
-        try { await supabase.auth.refreshSession() } catch { }
+        const { error: emailErr } = await supabase.auth.updateUser({
+          email: formData.email.trim(),
+        });
+        if (emailErr) throw emailErr;
+        try {
+          await supabase.auth.refreshSession();
+        } catch { }
       }
 
-      const updatePromise = upsertProfile(payload)
+      // Update profile via server action
+      await upsertProfile(payload, token);
 
-      // Show toast with promise
-      toast.promise(updatePromise, {
-        loading: 'Updating profile...',
-        success: () => 'Profile updated successfully!',
-        error: (error) => {
-          console.error('Failed to update profile:', error)
-          return error instanceof Error ? error.message : 'Failed to update profile'
-        },
-      })
-
-      // Wait for the promise to resolve
-      await updatePromise
-
-      // Success - toast is already shown
-      console.log('Profile updated successfully')
+      // Success - Dialog toast system will handle the UI feedback
+      console.log("Profile updated successfully");
 
       // After save, set current canonical values as new baseline
       const canonNow = toCanonSnapshot({
-        displayName: formData.displayName,
+        display_name: formData.display_name,
         username: formData.username,
         bio: formData.bio,
-      })
+        email: formData.email,
+      });
       try {
-        checkForChanges?.(canonNow)
-        markAsSaved?.()
-        baselineKeyRef.current = JSON.stringify(canonNow)
+        checkForChanges?.(canonNow);
+        markAsSaved?.();
+        baselineKeyRef.current = JSON.stringify(canonNow);
       } catch { }
       try {
-        window.dispatchEvent(new CustomEvent('profile:updated'))
-        window.dispatchEvent(new CustomEvent('settings:requestClose'))
+        window.dispatchEvent(new CustomEvent("profile:updated"));
+        window.dispatchEvent(new CustomEvent("settings:requestClose"));
       } catch { }
       // revalidatePath wykonujemy w server action; tutaj nie musimy odswiezac routera
-
     } catch (error) {
       if (error instanceof z.ZodError) {
         // Handle validation errors
-        const errors: Record<string, string> = {}
+        const errors: Record<string, string> = {};
         error.issues.forEach((err: z.ZodIssue) => {
           if (err.path[0]) {
-            errors[err.path[0] as string] = err.message
+            errors[err.path[0] as string] = err.message;
           }
-        })
-        setValidationErrors(errors)
-        return
+        });
+        setValidationErrors(errors);
+        return;
       }
-      console.error('Error updating profile:', error)
+      console.error("Error updating profile:", error);
     }
-  }, [formData, markAsSaved, user?.id, user?.email, checkForChanges])
+  }, [formData, markAsSaved, user?.id, user?.email, checkForChanges, getToken]);
 
-  // context already destructured above
+  // Add handleReset function to reset form to original values
+  const handleReset = React.useCallback(() => {
+    console.log("handleReset called", { profile, user });
+    const originalSnapshot = {
+      display_name: profile?.display_name ?? "",
+      username: profile?.username ?? "username",
+      bio: profile?.bio ?? "",
+      email: user?.email || "",
+    };
+    console.log("Resetting to:", originalSnapshot);
 
-  // Register save function with context so toast can call it
+    // Force update by clearing baseline key first
+    baselineKeyRef.current = "";
+    setFormData(originalSnapshot);
+    // Clear validation errors
+    setValidationErrors({});
+    // Force re-render of inputs
+    setFormKey(prev => prev + 1);
+
+    // Update baseline key to new values
+    const key = JSON.stringify(toCanonSnapshot(originalSnapshot));
+    baselineKeyRef.current = key;
+  }, [profile?.display_name, profile?.username, profile?.bio, user?.email]);
+
+  // Register save and reset functions with context so toast can call them
   React.useEffect(() => {
-    registerSaveFunction(handleSave)
-  }, [handleSave, registerSaveFunction])
+    console.log("Registering functions", { handleSave, handleReset });
+    registerSaveFunction(handleSave);
+    registerResetFunction(handleReset);
+  }, [handleSave, handleReset, registerSaveFunction, registerResetFunction]);
 
   const handleInputChange = (field: string, value: string) => {
-    let processedValue = value
+    let processedValue = value;
 
     // Clean username to contain only valid characters (no @ needed in database)
-    if (field === 'username') {
+    if (field === "username") {
       // Remove any characters that aren't letters, numbers, or underscores
-      processedValue = value.replace(/[^a-zA-Z0-9_]/g, '')
+      processedValue = value.replace(/[^a-zA-Z0-9_]/g, "");
     }
 
-    const nextForm = { ...formData, [field]: processedValue }
-    setFormData(nextForm)
+    const nextForm = { ...formData, [field]: processedValue };
+    setFormData(nextForm);
 
     // Clear validation error for this field when user starts typing
     if (validationErrors[field]) {
-      setValidationErrors(prev => ({ ...prev, [field]: '' }))
+      setValidationErrors((prev) => ({ ...prev, [field]: "" }));
     }
 
     // Recompute unsaved-changes state vs initial snapshot using canonical values
     try {
-      checkForChanges?.(toCanonSnapshot({
-        displayName: nextForm.displayName,
+      const snapshot = toCanonSnapshot({
+        display_name: nextForm.display_name,
         username: nextForm.username,
         bio: nextForm.bio,
-      }))
-    } catch { /* noop */ }
-  }
+        email: nextForm.email,
+      });
+      console.log("Profile change detected:", snapshot);
+      checkForChanges?.(snapshot);
+    } catch (error) {
+      console.error("Error in checkForChanges:", error);
+    }
+  };
 
   // Get current accent color from user metadata for display purposes only
-  const currentAccentColor = 'blue' as AccentColor
-  const accentHex = profile?.accent_color || null
-  const { removeCoverSafely, removeAvatarSafely, uploadAvatarFromCropped, uploadCoverFromCropped, uploadGifAvatarWithCrop, uploadGifCoverWithCrop } = useProfileMedia(user?.id || null, refreshProfile)
-  const [cropAvatarFile, setCropAvatarFile] = React.useState<File | null>(null)
-  const [cropCoverFile, setCropCoverFile] = React.useState<File | null>(null)
-  const [cropping, setCropping] = React.useState<"avatar" | "cover" | "avatar-gif" | "cover-gif" | null>(null)
-  const [gifNatDims, setGifNatDims] = React.useState<{ w: number; h: number } | null>(null)
-  const [gifPixelCrop, setGifPixelCrop] = React.useState<PixelCrop | null>(null)
+  const currentAccentColor = "blue" as AccentColor;
+  const accentHex = profile?.accent_color || null;
+  const {
+    removeCoverSafely,
+    removeAvatarSafely,
+    uploadAvatarFromCropped,
+    uploadCoverFromCropped,
+    uploadGifAvatarWithCrop,
+    uploadGifCoverWithCrop,
+  } = useProfileMedia(user?.id || null, refreshProfile);
+  const [cropAvatarFile, setCropAvatarFile] = React.useState<File | null>(null);
+  const [cropCoverFile, setCropCoverFile] = React.useState<File | null>(null);
+  const [cropping, setCropping] = React.useState<
+    "avatar" | "cover" | "avatar-gif" | "cover-gif" | null
+  >(null);
+  const [gifNatDims, setGifNatDims] = React.useState<{
+    w: number;
+    h: number;
+  } | null>(null);
+  const [gifPixelCrop, setGifPixelCrop] = React.useState<PixelCrop | null>(
+    null,
+  );
 
   const prepareGifCrop = async (file: File, kind: "avatar" | "cover") => {
     // compute natural dimensions
-    const url = URL.createObjectURL(file)
+    const url = URL.createObjectURL(file);
     await new Promise<void>((resolve) => {
-      const im = new window.Image()
-      im.onload = () => { setGifNatDims({ w: im.naturalWidth || im.width, h: im.naturalHeight || im.height }); try { URL.revokeObjectURL(url) } catch { } resolve() }
-      im.onerror = () => { try { URL.revokeObjectURL(url) } catch { } resolve() }
-      im.src = url
-    })
-    if (kind === "avatar") { setCropAvatarFile(file); setCropping("avatar-gif") } else { setCropCoverFile(file); setCropping("cover-gif") }
-  }
+      const im = new window.Image();
+      im.onload = () => {
+        setGifNatDims({
+          w: im.naturalWidth || im.width,
+          h: im.naturalHeight || im.height,
+        });
+        try {
+          URL.revokeObjectURL(url);
+        } catch { }
+        resolve();
+      };
+      im.onerror = () => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch { }
+        resolve();
+      };
+      im.src = url;
+    });
+    if (kind === "avatar") {
+      setCropAvatarFile(file);
+      setCropping("avatar-gif");
+    } else {
+      setCropCoverFile(file);
+      setCropping("cover-gif");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -234,26 +341,39 @@ export function Profile({ user }: ProfileProps) {
           {/* Cover with same design as edit-profile-dialog - Clickable for adding image */}
           <div
             className="group/cover relative w-full h-48 rounded-2xl overflow-hidden cursor-pointer"
-            style={accentHex ? getStyleFromHexShade(accentHex, '100', 'backgroundColor') : getAccentColorStyle(currentAccentColor, 100, 'backgroundColor')}
+            style={
+              accentHex
+                ? getStyleFromHexShade(accentHex, "100", "backgroundColor")
+                : getAccentColorStyle(
+                  currentAccentColor,
+                  100,
+                  "backgroundColor",
+                )
+            }
             onClick={() => {
-              const input = document.createElement('input');
-              input.type = 'file';
-              input.accept = 'image/*';
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = "image/*";
               input.onchange = async () => {
                 const f = input.files?.[0] || null;
                 if (!f) return;
-                const nameExt = (f.name.split('.').pop() || '').toLowerCase();
-                const isGif = (f.type || '').toLowerCase() === 'image/gif' || nameExt === 'gif';
+                const nameExt = (f.name.split(".").pop() || "").toLowerCase();
+                const isGif =
+                  (f.type || "").toLowerCase() === "image/gif" ||
+                  nameExt === "gif";
                 if (isGif) {
                   if (!profile?.is_premium) {
-                    toast.error('GIF cover is available only for Golden Carrot', {});
+                    toast.error(
+                      "GIF cover is available only for Golden Carrot",
+                      {},
+                    );
                     return;
                   }
-                  await prepareGifCrop(f, 'cover');
+                  await prepareGifCrop(f, "cover");
                   return;
                 }
                 setCropCoverFile(f);
-                setCropping('cover');
+                setCropping("cover");
               };
               input.click();
             }}
@@ -261,7 +381,15 @@ export function Profile({ user }: ProfileProps) {
             {profile?.cover_url ? (
               <>
                 {/\.webm(\?|#|$)/i.test(profile.cover_url) ? (
-                  <video key={profile.cover_url} src={profile.cover_url} className="w-full h-full object-cover" muted playsInline autoPlay loop />
+                  <video
+                    key={profile.cover_url}
+                    src={profile.cover_url}
+                    className="w-full h-full object-cover"
+                    muted
+                    playsInline
+                    autoPlay
+                    loop
+                  />
                 ) : (
                   <Image
                     key={profile.cover_url}
@@ -270,7 +398,9 @@ export function Profile({ user }: ProfileProps) {
                     className="w-full h-full object-cover"
                     width={600}
                     height={192}
-                    unoptimized={profile.cover_url.toLowerCase().endsWith('.gif')}
+                    unoptimized={profile.cover_url
+                      .toLowerCase()
+                      .endsWith(".gif")}
                   />
                 )}
                 {/* Remove cover button with tooltip (visible on hover/focus) */}
@@ -282,21 +412,35 @@ export function Profile({ user }: ProfileProps) {
                         size="icon"
                         variant="destructive"
                         className="absolute size-8 top-2 right-2 z-10 opacity-0 group-hover/cover:opacity-100 focus:opacity-100 transition-opacity"
-                        onClick={async (e) => { e.stopPropagation(); await removeCoverSafely(); }}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await removeCoverSafely();
+                        }}
                       >
                         <OutlineClose />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="left" align="center">Remove cover</TooltipContent>
+                    <TooltipContent side="left" align="center">
+                      Remove cover
+                    </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full space-y-3" style={accentHex ? getStyleFromHexShade(accentHex, '950', 'color') : getAccentColorStyle(currentAccentColor, 950, 'color')} >
+              <div
+                className="flex flex-col items-center justify-center h-full space-y-3"
+                style={
+                  accentHex
+                    ? getStyleFromHexShade(accentHex, "950", "color")
+                    : getAccentColorStyle(currentAccentColor, 950, "color")
+                }
+              >
                 <OutlineImage size={42} />
                 <div className="text-center mb-10">
                   <p className="text-sm mb-1 font-semibold">Cover Image</p>
-                  <p className="text-xs opacity-80">Click here to add or change your cover image</p>
+                  <p className="text-xs opacity-80">
+                    Click here to add or change your cover image
+                  </p>
                 </div>
               </div>
             )}
@@ -307,48 +451,77 @@ export function Profile({ user }: ProfileProps) {
             <div className="relative group/avatar">
               {/* Avatar with same design as edit-profile-dialog - Clickable for adding image */}
               <div
-                className="size-28 rounded-full border-2 border-white overflow-hidden bg-white ring-3 ring-white shadow-lg cursor-pointer transition-all relative"
+                className="size-28 rounded-full overflow-hidden bg-white ring-4 ring-white dark:ring-black shadow-lg cursor-pointer transition-all relative"
                 onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'image/*';
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/*";
                   input.onchange = async () => {
                     const f = input.files?.[0] || null;
                     if (!f) return;
-                    const nameExt = (f.name.split('.').pop() || '').toLowerCase();
-                    const isGif = (f.type || '').toLowerCase() === 'image/gif' || nameExt === 'gif';
+                    const nameExt = (
+                      f.name.split(".").pop() || ""
+                    ).toLowerCase();
+                    const isGif =
+                      (f.type || "").toLowerCase() === "image/gif" ||
+                      nameExt === "gif";
                     if (isGif) {
                       if (!profile?.is_premium) {
-                        toast.error('GIF avatar is available only for Golden Carrot', {});
+                        toast.error(
+                          "GIF avatar is available only for Golden Carrot",
+                          {},
+                        );
                         return;
                       }
-                      await prepareGifCrop(f, 'avatar');
+                      await prepareGifCrop(f, "avatar");
                       return;
                     }
                     setCropAvatarFile(f);
-                    setCropping('avatar');
+                    setCropping("avatar");
                   };
                   input.click();
                 }}
               >
                 {profile?.avatar_url ? (
-                  (/\.webm(\?|#|$)/i.test(profile.avatar_url)) ? (
-                    <video key={profile.avatar_url} src={profile.avatar_url} className="w-full h-full object-cover" muted playsInline autoPlay loop />
+                  /\.webm(\?|#|$)/i.test(profile.avatar_url) ? (
+                    <video
+                      key={profile.avatar_url}
+                      src={profile.avatar_url}
+                      className="w-full h-full object-cover"
+                      muted
+                      playsInline
+                      autoPlay
+                      loop
+                    />
                   ) : (
                     <Image
                       key={profile.avatar_url}
                       src={profile.avatar_url}
-                      alt={profile.username || 'User'}
+                      alt={profile.username || "User"}
                       className="w-full h-full object-cover"
                       width={112}
                       height={112}
-                      unoptimized={profile.avatar_url.toLowerCase().endsWith('.gif')}
+                      unoptimized={profile.avatar_url
+                        .toLowerCase()
+                        .endsWith(".gif")}
                     />
                   )
                 ) : (
                   <div
                     className="w-full h-full overflow-hidden flex items-center justify-center text-2xl font-bold"
-                    style={accentHex ? getStyleFromHexShade(accentHex, '200', 'backgroundColor') : getAccentColorStyle(currentAccentColor, 200, 'backgroundColor')}
+                    style={
+                      accentHex
+                        ? getStyleFromHexShade(
+                          accentHex,
+                          "200",
+                          "backgroundColor",
+                        )
+                        : getAccentColorStyle(
+                          currentAccentColor,
+                          200,
+                          "backgroundColor",
+                        )
+                    }
                   >
                     <OutlineUser size={48} />
                     {/* hover overlay sliding from bottom */}
@@ -361,7 +534,6 @@ export function Profile({ user }: ProfileProps) {
                   </div>
                 )}
               </div>
-
               {/* Floating remove button as sibling over avatar (better z-index/overflow) */}
               {profile?.avatar_url && (
                 <TooltipProvider>
@@ -372,12 +544,18 @@ export function Profile({ user }: ProfileProps) {
                         size="icon"
                         variant="destructive"
                         className="absolute size-8 -bottom-1.5 -right-1.5 z-50 opacity-0 group-hover/avatar:opacity-100 focus:opacity-100 transition-opacity"
-                        onClick={async (e) => { e.preventDefault(); e.stopPropagation(); await removeAvatarSafely(); }}
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          await removeAvatarSafely();
+                        }}
                       >
                         <OutlineClose />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" align="center">Remove avatar</TooltipContent>
+                    <TooltipContent side="top" align="center">
+                      Remove avatar
+                    </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
@@ -390,134 +568,220 @@ export function Profile({ user }: ProfileProps) {
       </div>
 
       <Separator />
+
       {/* Crop Modal rendered via portal to avoid nesting dialog-in-dialog */}
-      <Dialog open={!!cropping} onOpenChange={(open) => { if (!open) { setCropping(null); setCropAvatarFile(null); setCropCoverFile(null); } }}>
+      <Dialog
+        open={!!cropping}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCropping(null);
+            setCropAvatarFile(null);
+            setCropCoverFile(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader className="flex flex-row w-full items-center justify-between">
-            <DialogTitle>{cropping === 'avatar' ? 'Crop avatar' : 'Crop cover'}</DialogTitle>
+            <DialogTitle>
+              {cropping === "avatar" ? "Crop avatar" : "Crop cover"}
+            </DialogTitle>
             <DialogClose asChild>
               <Button variant="ghost" size="icon">
                 <OutlineClose />
               </Button>
             </DialogClose>
           </DialogHeader>
-          {(cropping === 'avatar' || cropping === 'avatar-gif') && cropAvatarFile && (
-            <ImageCrop
-              aspect={1}
-              circularCrop
-              file={cropAvatarFile}
-              maxImageSize={1024 * 1024}
-              onComplete={(px) => { try { setGifPixelCrop(px) } catch { } }}
-              onCrop={async (dataUrl) => {
-                if (cropping === 'avatar') {
-                  await uploadAvatarFromCropped(dataUrl)
-                }
-              }}
-            >
-              <ImageCropContent className="max-w-full" />
-              <div className="flex items-center justify-between gap-2 w-full">
-                <div className="mt-3 flex items-center gap-2 w-full">
-                  <Button variant="ghost" onClick={() => { setCropping(null); setCropAvatarFile(null); }}>Cancel</Button>
+          {(cropping === "avatar" || cropping === "avatar-gif") &&
+            cropAvatarFile && (
+              <ImageCrop
+                aspect={1}
+                circularCrop
+                file={cropAvatarFile}
+                maxImageSize={1024 * 1024 * 5}
+                onComplete={(px) => {
+                  try {
+                    setGifPixelCrop(px);
+                  } catch { }
+                }}
+                onError={(error) => {
+                  toast.error(error);
+                  setCropping(null);
+                  setCropAvatarFile(null);
+                }}
+                onCrop={async (blob) => {
+                  if (cropping === "avatar") {
+                    await uploadAvatarFromCropped(blob);
+                    setCropping(null);
+                    setCropAvatarFile(null);
+                  }
+                }}
+              >
+                <ImageCropContent className="max-w-full" />
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <div className="mt-3 flex items-center gap-2 w-full">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setCropping(null);
+                        setCropAvatarFile(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <ImageCropReset>
+                    <OutlineRefreshCw />
+                    Restart
+                  </ImageCropReset>
+                  {cropping === "avatar" ? (
+                    <ImageCropApply>
+                      <OutlineCrop />
+                      Crop
+                    </ImageCropApply>
+                  ) : (
+                    <ImageCropApply
+                      onClick={async () => {
+                        try {
+                          if (!gifPixelCrop || !gifNatDims || !cropAvatarFile)
+                            return;
+                          const el = document.querySelector(
+                            'img[alt="crop"]',
+                          ) as HTMLImageElement | null;
+                          const renderW = el?.width || gifNatDims.w;
+                          const renderH = el?.height || gifNatDims.h;
+                          const natW = el?.naturalWidth || gifNatDims.w;
+                          const natH = el?.naturalHeight || gifNatDims.h;
+                          const scaleX = Math.max(
+                            1e-6,
+                            natW / Math.max(1, renderW),
+                          );
+                          const scaleY = Math.max(
+                            1e-6,
+                            natH / Math.max(1, renderH),
+                          );
+                          let x = Math.floor(gifPixelCrop.x * scaleX);
+                          let y = Math.floor(gifPixelCrop.y * scaleY);
+                          let w = Math.floor(gifPixelCrop.width * scaleX);
+                          let h = Math.floor(gifPixelCrop.height * scaleY);
+                          x = Math.max(0, Math.min(natW - 2, x));
+                          y = Math.max(0, Math.min(natH - 2, y));
+                          w = Math.max(2, Math.min(natW - x, w));
+                          h = Math.max(2, Math.min(natH - y, h));
+                          if (w % 2) w -= 1;
+                          if (h % 2) h -= 1;
+                          await uploadGifAvatarWithCrop(cropAvatarFile, {
+                            x,
+                            y,
+                            w,
+                            h,
+                          });
+                          setCropping(null);
+                          setCropAvatarFile(null);
+                        } catch { }
+                      }}
+                    >
+                      <OutlineCrop />
+                      Crop
+                    </ImageCropApply>
+                  )}
                 </div>
-                <ImageCropReset>
-                  <OutlineRefreshCw />
-                  Restart
-                </ImageCropReset>
-                {cropping === 'avatar' ? (
-                  <ImageCropApply>
-                    <OutlineCrop />
-                    Crop
-                  </ImageCropApply>
-                ) : (
-                  <ImageCropApply onClick={async () => {
-                    try {
-                      if (!gifPixelCrop || !gifNatDims || !cropAvatarFile) return
-                      const el = document.querySelector('img[alt="crop"]') as HTMLImageElement | null
-                      const renderW = el?.width || gifNatDims.w
-                      const renderH = el?.height || gifNatDims.h
-                      const natW = el?.naturalWidth || gifNatDims.w
-                      const natH = el?.naturalHeight || gifNatDims.h
-                      const scaleX = Math.max(1e-6, natW / Math.max(1, renderW))
-                      const scaleY = Math.max(1e-6, natH / Math.max(1, renderH))
-                      let x = Math.floor(gifPixelCrop.x * scaleX)
-                      let y = Math.floor(gifPixelCrop.y * scaleY)
-                      let w = Math.floor(gifPixelCrop.width * scaleX)
-                      let h = Math.floor(gifPixelCrop.height * scaleY)
-                      x = Math.max(0, Math.min(natW - 2, x))
-                      y = Math.max(0, Math.min(natH - 2, y))
-                      w = Math.max(2, Math.min(natW - x, w))
-                      h = Math.max(2, Math.min(natH - y, h))
-                      if (w % 2) w -= 1
-                      if (h % 2) h -= 1
-                      await uploadGifAvatarWithCrop(cropAvatarFile, { x, y, w, h })
-                      setCropping(null); setCropAvatarFile(null);
-                    } catch { }
-                  }}>
-                    <OutlineCrop />
-                    Crop
-                  </ImageCropApply>
-                )}
-              </div>
-            </ImageCrop>
-          )}
-          {(cropping === 'cover' || cropping === 'cover-gif') && cropCoverFile && (
-            <ImageCrop
-              aspect={3 / 1}
-              file={cropCoverFile}
-              maxImageSize={1024 * 1024 * 2}
-              onComplete={(px) => { try { setGifPixelCrop(px) } catch { } }}
-              onCrop={async (dataUrl) => {
-                if (cropping === 'cover') {
-                  await uploadCoverFromCropped(dataUrl)
-                }
-              }}
-            >
-              <ImageCropContent className="max-w-full" />
-              <div className="flex items-center justify-between gap-2 w-full">
-                <div className="mt-3 flex items-center gap-2 w-full">
-                  <Button variant="ghost" onClick={() => { setCropping(null); setCropCoverFile(null); }}>Cancel</Button>
+              </ImageCrop>
+            )}
+          {(cropping === "cover" || cropping === "cover-gif") &&
+            cropCoverFile && (
+              <ImageCrop
+                aspect={3 / 1}
+                file={cropCoverFile}
+                maxImageSize={1024 * 1024 * 5}
+                onComplete={(px) => {
+                  try {
+                    setGifPixelCrop(px);
+                  } catch { }
+                }}
+                onError={(error) => {
+                  toast.error(error);
+                  setCropping(null);
+                  setCropCoverFile(null);
+                }}
+                onCrop={async (blob) => {
+                  if (cropping === "cover") {
+                    await uploadCoverFromCropped(blob);
+                    setCropping(null);
+                    setCropCoverFile(null);
+                  }
+                }}
+              >
+                <ImageCropContent className="max-w-full" />
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <div className="mt-3 flex items-center gap-2 w-full">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setCropping(null);
+                        setCropCoverFile(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <ImageCropReset>
+                    <OutlineRefreshCw />
+                    Restart
+                  </ImageCropReset>
+                  {cropping === "cover" ? (
+                    <ImageCropApply>
+                      <OutlineCrop />
+                      Crop
+                    </ImageCropApply>
+                  ) : (
+                    <ImageCropApply
+                      onClick={async () => {
+                        try {
+                          if (!gifPixelCrop || !gifNatDims || !cropCoverFile)
+                            return;
+                          const el = document.querySelector(
+                            'img[alt="crop"]',
+                          ) as HTMLImageElement | null;
+                          const renderW = el?.width || gifNatDims.w;
+                          const renderH = el?.height || gifNatDims.h;
+                          const natW = el?.naturalWidth || gifNatDims.w;
+                          const natH = el?.naturalHeight || gifNatDims.h;
+                          const scaleX = Math.max(
+                            1e-6,
+                            natW / Math.max(1, renderW),
+                          );
+                          const scaleY = Math.max(
+                            1e-6,
+                            natH / Math.max(1, renderH),
+                          );
+                          let x = Math.floor(gifPixelCrop.x * scaleX);
+                          let y = Math.floor(gifPixelCrop.y * scaleY);
+                          let w = Math.floor(gifPixelCrop.width * scaleX);
+                          let h = Math.floor(gifPixelCrop.height * scaleY);
+                          x = Math.max(0, Math.min(natW - 2, x));
+                          y = Math.max(0, Math.min(natH - 2, y));
+                          w = Math.max(2, Math.min(natW - x, w));
+                          h = Math.max(2, Math.min(natH - y, h));
+                          if (w % 2) w -= 1;
+                          if (h % 2) h -= 1;
+                          await uploadGifCoverWithCrop(cropCoverFile, {
+                            x,
+                            y,
+                            w,
+                            h,
+                          });
+                          setCropping(null);
+                          setCropCoverFile(null);
+                        } catch { }
+                      }}
+                    >
+                      <OutlineCrop />
+                      Crop
+                    </ImageCropApply>
+                  )}
                 </div>
-                <ImageCropReset>
-                  <OutlineRefreshCw />
-                  Restart
-                </ImageCropReset>
-                {cropping === 'cover' ? (
-                  <ImageCropApply>
-                    <OutlineCrop />
-                    Crop
-                  </ImageCropApply>
-                ) : (
-                  <ImageCropApply onClick={async () => {
-                    try {
-                      if (!gifPixelCrop || !gifNatDims || !cropCoverFile) return
-                      const el = document.querySelector('img[alt="crop"]') as HTMLImageElement | null
-                      const renderW = el?.width || gifNatDims.w
-                      const renderH = el?.height || gifNatDims.h
-                      const natW = el?.naturalWidth || gifNatDims.w
-                      const natH = el?.naturalHeight || gifNatDims.h
-                      const scaleX = Math.max(1e-6, natW / Math.max(1, renderW))
-                      const scaleY = Math.max(1e-6, natH / Math.max(1, renderH))
-                      let x = Math.floor(gifPixelCrop.x * scaleX)
-                      let y = Math.floor(gifPixelCrop.y * scaleY)
-                      let w = Math.floor(gifPixelCrop.width * scaleX)
-                      let h = Math.floor(gifPixelCrop.height * scaleY)
-                      x = Math.max(0, Math.min(natW - 2, x))
-                      y = Math.max(0, Math.min(natH - 2, y))
-                      w = Math.max(2, Math.min(natW - x, w))
-                      h = Math.max(2, Math.min(natH - y, h))
-                      if (w % 2) w -= 1
-                      if (h % 2) h -= 1
-                      await uploadGifCoverWithCrop(cropCoverFile, { x, y, w, h })
-                      setCropping(null); setCropCoverFile(null);
-                    } catch { }
-                  }}>
-                    <OutlineCrop />
-                    Crop
-                  </ImageCropApply>
-                )}
-              </div>
-            </ImageCrop>
-          )}
+              </ImageCrop>
+            )}
         </DialogContent>
       </Dialog>
 
@@ -527,30 +791,38 @@ export function Profile({ user }: ProfileProps) {
           <div className="space-y-2">
             <Label htmlFor="displayName">Display Name</Label>
             <Input
+              key={`displayName-${formKey}`}
               id="displayName"
               placeholder="Enter your full name or nickname"
-              value={formData.displayName}
-              onChange={(e) => handleInputChange('displayName', e.target.value)}
-              className={validationErrors.displayName ? 'border-red-500' : ''}
+              value={formData.display_name}
+              onChange={(e) =>
+                handleInputChange("display_name", e.target.value)
+              }
+              className={validationErrors.display_name ? "border-red-500" : ""}
             />
-            {validationErrors.displayName && (
-              <p className="text-sm text-red-500">{validationErrors.displayName}</p>
+            {validationErrors.display_name && (
+              <p className="text-sm text-red-500">
+                {validationErrors.display_name}
+              </p>
             )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
-            <InputWrapper variant={'md'}>
+            <InputWrapper variant={"md"}>
               <OutlineAt />
               <Input
+                key={`username-${formKey}`}
                 id="username"
                 placeholder="username"
                 value={formData.username}
-                onChange={(e) => handleInputChange('username', e.target.value)}
-                className={`rounded-none ${validationErrors.username ? 'border-red-500' : ''}`}
+                onChange={(e) => handleInputChange("username", e.target.value)}
+                className={`rounded-none ${validationErrors.username ? "border-red-500" : ""}`}
               />
             </InputWrapper>
             {validationErrors.username && (
-              <p className="text-sm text-red-500">{validationErrors.username}</p>
+              <p className="text-sm text-red-500">
+                {validationErrors.username}
+              </p>
             )}
           </div>
         </div>
@@ -566,12 +838,34 @@ export function Profile({ user }: ProfileProps) {
                 </TooltipTrigger>
                 <TooltipContent className="">
                   <div className="space-y-2">
-                    <p className="text-sm">You can use these tags to format your bio:</p>
+                    <p className="text-sm">
+                      You can use these tags to format your bio:
+                    </p>
                     <div className="space-y-1 text-xs">
-                      <p><code className="bg-primary-foreground/12 px-1 rounded">[B]bold text[/B]</code> - makes text bold</p>
-                      <p><code className="bg-primary-foreground/12 px-1 rounded">[I]italic text[/I]</code> - makes text italic</p>
-                      <p><code className="bg-primary-foreground/12 px-1 rounded">[U]underlined text[/U]</code> - underlines text</p>
-                      <p><code className="bg-primary-foreground/12 px-1 rounded">[SPOT]highlighted text[/SPOT]</code> - highlights text with darker color</p>
+                      <p>
+                        <code className="bg-primary-foreground/12 px-1 rounded">
+                          [B]bold text[/B]
+                        </code>{" "}
+                        - makes text bold
+                      </p>
+                      <p>
+                        <code className="bg-primary-foreground/12 px-1 rounded">
+                          [I]italic text[/I]
+                        </code>{" "}
+                        - makes text italic
+                      </p>
+                      <p>
+                        <code className="bg-primary-foreground/12 px-1 rounded">
+                          [U]underlined text[/U]
+                        </code>{" "}
+                        - underlines text
+                      </p>
+                      <p>
+                        <code className="bg-primary-foreground/12 px-1 rounded">
+                          [SPOT]highlighted text[/SPOT]
+                        </code>{" "}
+                        - highlights text with darker color
+                      </p>
                     </div>
                   </div>
                 </TooltipContent>
@@ -579,12 +873,13 @@ export function Profile({ user }: ProfileProps) {
             </TooltipProvider>
           </div>
           <Textarea
+            key={`bio-${formKey}`}
             id="bio"
             placeholder="Tell us about yourself..."
             rows={3}
             value={formData.bio}
-            onChange={(e) => handleInputChange('bio', e.target.value)}
-            className={validationErrors.bio ? 'border-red-500' : ''}
+            onChange={(e) => handleInputChange("bio", e.target.value)}
+            className={validationErrors.bio ? "border-red-500" : ""}
           />
           {validationErrors.bio && (
             <p className="text-sm text-red-500">{validationErrors.bio}</p>
@@ -600,35 +895,55 @@ export function Profile({ user }: ProfileProps) {
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
+              key={`email-${formKey}`}
               id="email"
               type="email"
               value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
+              onChange={(e) => handleInputChange("email", e.target.value)}
               placeholder="Enter your email"
             />
             <div className="flex items-center gap-2">
-              <p className="text-xs text-gray-500">We will send a verification if changed.</p>
+              <p className="text-xs text-gray-500">
+                We will send a verification if changed.
+              </p>
               <Button
                 size="sm"
                 variant="secondary"
-                disabled={!formData.email || formData.email.trim() === (user?.email || '')}
+                disabled={
+                  !formData.email ||
+                  formData.email.trim() === (user?.email || "")
+                }
                 onClick={async () => {
-                  const next = (formData.email || '').trim();
-                  if (!next) { toast.error('Email is required'); return; }
+                  const next = (formData.email || "").trim();
+                  if (!next) {
+                    toast.error("Email is required");
+                    return;
+                  }
                   // very light email check (HTML type=email already helps)
                   const ok = /.+@.+\..+/.test(next);
-                  if (!ok) { toast.error('Invalid email'); return; }
-                  if (user?.email && next === user.email) { toast.message('Email unchanged'); return; }
+                  if (!ok) {
+                    toast.error("Invalid email");
+                    return;
+                  }
+                  if (user?.email && next === user.email) {
+                    toast.message("Email unchanged");
+                    return;
+                  }
                   const p = supabase.auth.updateUser({ email: next });
                   toast.promise(p, {
-                    loading: 'Updating email…',
-                    success: () => 'Verification sent to new email',
-                    error: (err) => (err instanceof Error ? err.message : 'Failed to update email'),
+                    loading: "Updating email…",
+                    success: () => "Verification sent to new email",
+                    error: (err) =>
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to update email",
                   });
                   try {
                     const { error } = await p;
                     if (error) return;
-                    try { await supabase.auth.refreshSession() } catch { }
+                    try {
+                      await supabase.auth.refreshSession();
+                    } catch { }
                   } catch { }
                 }}
               >
@@ -638,54 +953,102 @@ export function Profile({ user }: ProfileProps) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="current-password">Current Password</Label>
-            <Input id="current-password" type="password" placeholder="Enter current password" value={pwdCurrent} onChange={(e) => setPwdCurrent(e.target.value)} />
+            <Input
+              id="current-password"
+              type="password"
+              placeholder="Enter current password"
+              value={pwdCurrent}
+              onChange={(e) => setPwdCurrent(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="new-password">New Password</Label>
-            <Input id="new-password" type="password" placeholder="Enter new password" value={pwdNew} onChange={(e) => setPwdNew(e.target.value)} />
+            <Input
+              id="new-password"
+              type="password"
+              placeholder="Enter new password"
+              value={pwdNew}
+              onChange={(e) => setPwdNew(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirm-password">Confirm New Password</Label>
-            <Input id="confirm-password" type="password" placeholder="Re-enter new password" value={pwdConfirm} onChange={(e) => setPwdConfirm(e.target.value)} />
+            <Input
+              id="confirm-password"
+              type="password"
+              placeholder="Re-enter new password"
+              value={pwdConfirm}
+              onChange={(e) => setPwdConfirm(e.target.value)}
+            />
           </div>
           <div>
             <Button
               size="sm"
               disabled={pwdLoading}
               onClick={async () => {
-                if (!user?.email) { toast.error("Missing user email"); return }
+                if (!user?.email) {
+                  toast.error("Missing user email");
+                  return;
+                }
                 // basic validations
-                if (!pwdCurrent) { toast.error("Enter current password"); return }
-                if (pwdNew.length < 8) { toast.error("New password must be at least 8 characters"); return }
-                if (pwdNew !== pwdConfirm) { toast.error("Passwords do not match"); return }
-                if (pwdNew === pwdCurrent) { toast.error("New password cannot be the same as current"); return }
+                if (!pwdCurrent) {
+                  toast.error("Enter current password");
+                  return;
+                }
+                if (pwdNew.length < 8) {
+                  toast.error("New password must be at least 8 characters");
+                  return;
+                }
+                if (pwdNew !== pwdConfirm) {
+                  toast.error("Passwords do not match");
+                  return;
+                }
+                if (pwdNew === pwdCurrent) {
+                  toast.error("New password cannot be the same as current");
+                  return;
+                }
 
-                setPwdLoading(true)
+                setPwdLoading(true);
                 try {
                   // Temporarily suppress unsaved-changes state
-                  try { resetChanges?.() } catch { }
+                  try {
+                    resetChanges?.();
+                  } catch { }
                   // verify current password
-                  const { error: verifyErr } = await supabase.auth.signInWithPassword({ email: user.email, password: pwdCurrent })
-                  if (verifyErr) { toast.error("Current password is incorrect"); return }
-
+                  const { error: verifyErr } =
+                    await supabase.auth.signInWithPassword({
+                      email: user.email,
+                      password: pwdCurrent,
+                    });
+                  if (verifyErr) {
+                    toast.error("Current password is incorrect");
+                    return;
+                  }
                   // update to new password
-                  const { error: updErr } = await supabase.auth.updateUser({ password: pwdNew })
-                  if (updErr) { toast.error(updErr.message); return }
+                  const { error: updErr } = await supabase.auth.updateUser({
+                    password: pwdNew,
+                  });
+                  if (updErr) {
+                    toast.error(updErr.message);
+                    return;
+                  }
 
-                  try { await supabase.auth.refreshSession() } catch { }
-                  setPwdCurrent("")
-                  setPwdNew("")
-                  setPwdConfirm("")
-                  toast.success("Password updated")
+                  try {
+                    await supabase.auth.refreshSession();
+                  } catch { }
+                  setPwdCurrent("");
+                  setPwdNew("");
+                  setPwdConfirm("");
+                  toast.success("Password updated");
                 } finally {
-                  setPwdLoading(false)
+                  setPwdLoading(false);
                   // Recompute unsaved status for profile fields only
                   try {
                     checkForChanges?.({
-                      displayName: formData.displayName,
+                      display_name: formData.display_name,
                       username: formData.username,
-                      bio: formData.bio || ''
-                    })
+                      bio: formData.bio || "",
+                    });
                   } catch { }
                 }
               }}
@@ -704,9 +1067,16 @@ export function Profile({ user }: ProfileProps) {
           <div className="p-4 border border-red-200 rounded-lg bg-red-50">
             <h4 className="font-medium text-red-800 mb-2">Delete Account</h4>
             <p className="text-sm text-red-600 mb-3">
-              This action cannot be undone. All your data will be permanently deleted.
+              This action cannot be undone. All your data will be permanently
+              deleted.
             </p>
-            <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>Delete Account</Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setDeleteOpen(true)}
+            >
+              Delete Account
+            </Button>
           </div>
         </div>
       </div>
@@ -720,20 +1090,37 @@ export function Profile({ user }: ProfileProps) {
           if (!user?.id) return;
           setDeleting(true);
           try {
-            // 1) sign out first to clear local storage and sessions
-            await supabase.auth.signOut();
-            // 2) delete account on server
-            const res = await deleteAccount(user.id);
+            // Get JWT token for authentication
+            const token = await getToken();
+            // 1) delete account on server first (while user is still authenticated)
+            const res = await deleteAccount(user.id, token || undefined);
+
             if ((res as { error?: string }).error) {
-              toast.error(String((res as { error?: string }).error));
-            } else {
-              toast.success("Account deleted");
+              const error = (res as { error?: string }).error;
+              // Handle specific error types
+              if (error === "Unauthorized") {
+                toast.error(
+                  "You are not authorized to delete this account. Please log in again.",
+                );
+              } else if (error === "Forbidden") {
+                toast.error("You can only delete your own account.");
+              } else {
+                toast.error(`Failed to delete account: ${error}`);
+              }
+              return;
             }
+
+            // 2) sign out after successful deletion
+            await supabase.auth.signOut();
+            toast.success("Account deleted successfully");
+          } catch (error) {
+            console.error("Unexpected error deleting account:", error);
+            toast.error("An unexpected error occurred while deleting account.");
           } finally {
             setDeleting(false);
           }
         }}
       />
     </div>
-  )
+  );
 }

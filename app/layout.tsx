@@ -2,12 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Container } from "@/components/container";
 import "./globals.css";
-import Header from "@/components/header";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import Footer from "@/components/footer";
-import AuthProvider from "@/providers/AuthProvider";
+import Header from "@/components/header";
 import { Toaster } from "@/components/ui/sonner";
-import { Analytics } from "@vercel/analytics/next"
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import AuthProvider from "@/providers/AuthProvider";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,7 +21,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL) : undefined,
+  metadataBase:
+    typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL
+      ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
+      : undefined,
   title: {
     default: "RabbitHole",
     template: "RabbitHole | %s",
@@ -41,9 +45,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "RabbitHole",
     description: "Discover and share creative posts.",
-    images: [
-      { url: "/assets/og.webp" },
-    ],
+    images: [{ url: "/assets/og.webp" }],
   },
   other: {
     "theme-color": "#000000",
@@ -69,26 +71,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SpeedInsights />
         <Analytics />
-        <div className="flex flex-col min-h-screen">
-          <Container>
-            <AuthProvider>
-              <Header />
-              {/* TODO: for profile page mx-auto max-w-xl */}
-              <div className="flex-1 min-h-dvh sm:pb-5">
-                {children}
-              </div>
-              <Footer />
-              <Toaster />
-            </AuthProvider>
-          </Container>
-        </div>
-      </body>
-    </html>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme={"light"}
+          enableSystem
+          disableTransitionOnChange
+        >
+          <div className="flex flex-col min-h-screen">
+            <Container>
+              <AuthProvider>
+                <Header />
+                <div className="flex-1 min-h-dvh sm:pb-5">{children}</div>
+                <Footer />
+                <Toaster richColors />
+              </AuthProvider>
+            </Container>
+          </div>
+        </ThemeProvider>
+      </body >
+    </html >
   );
 }

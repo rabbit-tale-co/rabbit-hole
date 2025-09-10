@@ -1,9 +1,10 @@
-'use client'
+"use client";
 
-import * as React from 'react'
-import { useAuth } from '@/providers/AuthProvider'
-import { Button } from '@/components/ui/button'
-import { UserAvatar } from '@/components/ui/user-avatar'
+import Link from "next/link";
+import * as React from "react";
+import { SettingsDialog } from "@/components/settings/Dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,47 +12,69 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import Link from 'next/link'
-import { SettingsDialog } from '@/components/settings/Dialog'
-import { OutlineCarrot, OutlineCrown, OutlineLogout, OutlineSettings, OutlineUser } from '../icons/Icons'
-import { Badge } from '@/components/ui/badge'
-import { PremiumBadge } from './PremiumBadge'
+} from "@/components/ui/dropdown-menu";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { SAVINGS_PCT } from "@/lib/pricing";
+import { useAuth } from "@/providers/AuthProvider";
+import {
+  OutlineCarrot,
+  OutlineCrown,
+  OutlineLogout,
+  OutlineSettings,
+  OutlineUser,
+} from "../icons/Icons";
+import { PremiumBadge } from "./PremiumBadge";
 
-export function UserProfileMenu() {
-  const { user: auth_user, profile: user, signOut } = useAuth()
-  const [settingsOpen, setSettingsOpen] = React.useState(false)
+export function UserProfileMenu({ className }: { className?: string }) {
+  const { user: auth_user, profile: user, signOut } = useAuth();
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
 
   if (!auth_user || !user) {
-    return null
+    return null;
   }
 
   const items: Array<
-    | { href: string; label: string; icon?: React.ElementType; onClick?: undefined }
-    | { href?: undefined; label: string; icon?: React.ElementType; onClick: () => void }
+    | {
+      href: string;
+      label: string;
+      icon?: React.ElementType;
+      onClick?: undefined;
+    }
+    | {
+      href?: undefined;
+      label: string;
+      icon?: React.ElementType;
+      onClick: () => void;
+    }
   > = [
-      { href: `/user/${user.username}`, label: 'Profile', icon: OutlineUser },
-      { href: '/golden-carrot', label: 'Upgrade', icon: OutlineCarrot },
-      { href: '/support', label: 'Support us', icon: OutlineCrown },
-      { label: 'Settings', icon: OutlineSettings, onClick: () => setSettingsOpen(true) },
-    ]
-
-
+      { href: `/user/${user.username}`, label: "Profile", icon: OutlineUser },
+      { href: "/golden-carrot", label: "Upgrade", icon: OutlineCarrot },
+      { href: "/support", label: "Support us", icon: OutlineCrown },
+      {
+        label: "Settings",
+        icon: OutlineSettings,
+        onClick: () => setSettingsOpen(true),
+      },
+    ];
 
   const handleSignOut = async () => {
-    await signOut()
-  }
+    await signOut();
+  };
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Button
+            size={"icon"}
+            variant="ghost"
+            className="relative rounded-full"
+          >
             <UserAvatar
               username={user.username}
               avatarUrl={user.avatar_url || undefined}
-              size="sm"
               accentHex={user.accent_color || undefined}
+              className={className}
             />
           </Button>
         </DropdownMenuTrigger>
@@ -63,35 +86,43 @@ export function UserProfileMenu() {
                   {user.display_name || user.username}
                   <PremiumBadge show={user.is_premium} />
                 </p>
-                <p className="text-xs leading-none text-muted-foreground">@{user.username}</p>
+                <p className="text-xs leading-none text-muted-foreground">
+                  @{user.username}
+                </p>
               </div>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {items.map((item, idx) => (
+          {items.map((item) =>
             item.href ? (
-              <Link href={item.href} key={item.href}>
-                <DropdownMenuItem>
+              <DropdownMenuItem asChild key={item.href}>
+                <Link href={item.href}>
                   {item.icon && <item.icon />}
                   <span>{item.label}</span>
-                  {item.label === 'Upgrade' && (
-                    <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200 text-[10px]">-42%</Badge>
+                  {item.label === "Upgrade" && (
+                    <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200 text-[10px]">
+                      -{SAVINGS_PCT}%
+                    </Badge>
                   )}
-                </DropdownMenuItem>
-              </Link>
+                </Link>
+              </DropdownMenuItem>
             ) : (
-              <DropdownMenuItem key={`action-${idx}`} onClick={item.onClick}>
+              <DropdownMenuItem key={item.label} onClick={item.onClick}>
                 {item.icon && <item.icon />}
                 <span>{item.label}</span>
-                {item.label === 'Upgrade' && (
-                  <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200 px-2 py-0.5 text-[10px] font-semibold">-42%</Badge>
+                {item.label === "Upgrade" && (
+                  <Badge className="ml-auto bg-amber-100 text-amber-700 border-amber-200 px-2 py-0.5 text-[10px] font-semibold">
+                    -{SAVINGS_PCT}%
+                  </Badge>
                 )}
               </DropdownMenuItem>
-            )
-          ))}
-          {/* Settings entry is provided in links */}
+            ),
+          )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => handleSignOut()}>
+          <DropdownMenuItem
+            onClick={() => handleSignOut()}
+            variant="destructive"
+          >
             <OutlineLogout />
             <span>Log out</span>
           </DropdownMenuItem>
@@ -100,5 +131,5 @@ export function UserProfileMenu() {
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
-  )
+  );
 }

@@ -1,8 +1,13 @@
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
+
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
   const { id } = await params;
   let authorId: string | null = null;
   let text: string | null = null;
@@ -12,7 +17,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       .select("author_id,text")
       .eq("id", id)
       .maybeSingle();
-    authorId = (data as { author_id?: string | null } | null)?.author_id ?? null;
+    authorId =
+      (data as { author_id?: string | null } | null)?.author_id ?? null;
     text = (data as { text?: string | null } | null)?.text ?? null;
   } catch { }
 
@@ -24,7 +30,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         .select("display_name,username")
         .eq("user_id", authorId)
         .maybeSingle();
-      const d = prof as { display_name?: string | null; username?: string | null } | null;
+      const d = prof as {
+        display_name?: string | null;
+        username?: string | null;
+      } | null;
       displayLabel = (d?.display_name?.trim() || d?.username || null) ?? null;
     } catch { }
   }
@@ -40,11 +49,22 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title,
     description,
-    openGraph: { title, description, url, images: [{ url: "/assets/og.webp" }] },
+    openGraph: {
+      title,
+      description,
+      url,
+      images: [{ url: "/assets/og.webp" }],
+    },
     twitter: { title, description, images: [{ url: "/assets/og.webp" }] },
   };
 }
 
-export default function PostLayout({ children }: { children: React.ReactNode }) {
-  return children;
+import { Container } from "@/components/container";
+
+export default function PostLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <Container maxWidth="4xl">{children}</Container>;
 }
