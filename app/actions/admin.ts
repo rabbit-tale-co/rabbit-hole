@@ -1,22 +1,16 @@
 "use server";
 
-import { getUserFromToken } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireActiveUser } from "@/app/actions/auth";
 
-async function requireAdmin(token?: string) {
-	let userId: string | null = null;
-
-	if (token) {
-		const me = await getUserFromToken(token);
-		if (!me) return { error: "Unauthorized" } as const;
-		userId = me.id;
-	} else {
-		const { data: auth } = await supabaseAdmin.auth.getUser();
-		if (!auth.user?.id) return { error: "Unauthorized" } as const;
-		userId = auth.user.id;
+async function requireAdmin() {
+	// Use requireActiveUser for consistent auth handling
+	const auth = await requireActiveUser();
+	if (auth.error || !auth.me) {
+		return { error: auth.error || "Unauthorized" } as const;
 	}
 
-	if (!userId) return { error: "Unauthorized" } as const;
+	const userId = auth.me.id;
 
 	// Log JWT usage for admin operations
 	console.log(`[JWT] Admin operation requested by user: ${userId}`);
@@ -39,14 +33,14 @@ async function requireAdmin(token?: string) {
 }
 
 export async function isCurrentUserAdmin() {
-	const { data: auth } = await supabaseAdmin.auth.getUser();
-	if (!auth.user?.id) return { admin: false };
+	const auth = await requireActiveUser();
+	if (auth.error || !auth.me) return { admin: false };
 	try {
 		const { data: prof } = await supabaseAdmin
 			.schema("social_art")
 			.from("profiles")
 			.select("is_admin")
-			.eq("user_id", auth.user.id)
+			.eq("user_id", auth.me.id)
 			.maybeSingle();
 		const isAdmin = Boolean((prof as { is_admin?: boolean } | null)?.is_admin);
 		return { admin: isAdmin };
@@ -96,7 +90,7 @@ export async function adminBanUser(
 	note?: string,
 	token?: string,
 ) {
-	const auth = await requireAdmin(token);
+	const auth = await requireAdmin();
 	if ("error" in auth) return auth;
 	const { error } = await supabaseAdmin
 		.schema("social_art")
@@ -115,7 +109,7 @@ export async function adminBanUser(
 }
 
 export async function adminUnbanUser(targetUserId: string, token?: string) {
-	const auth = await requireAdmin(token);
+	const auth = await requireAdmin();
 	if ("error" in auth) return auth;
 	// Remove suspension entry entirely
 	const { error } = await supabaseAdmin

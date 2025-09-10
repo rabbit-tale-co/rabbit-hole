@@ -18,6 +18,8 @@ export function useFeed(
 	isOwnProfile?: boolean,
 	onCountChange?: (n: number) => void,
 	forceUpdate?: number,
+	following?: boolean,
+	rabbitHole?: string,
 ) {
 	const router = useRouter();
 	const { recordImpression } = useManualImpression({ enabled: false });
@@ -26,7 +28,7 @@ export function useFeed(
 	const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(
 		initial,
 		24,
-		{ username },
+		{ username, following, rabbitHole },
 	);
 
 	// Map posts to tiles (first image per post as cover)

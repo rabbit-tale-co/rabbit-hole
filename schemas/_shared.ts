@@ -26,4 +26,5 @@ export const MimeImage = z.enum([
 export const Cursor = z.object({
 	cursor: z.string().optional(), // base64(created_at|id)
 	limit: z.number().int().min(1).max(50).default(24),
+	user_id: z.string().optional(), // for checking is_liked, is_bookmarked, etc.
 });

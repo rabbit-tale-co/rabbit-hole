@@ -1,121 +1,161 @@
-// app/api/posts/route.ts
-import type { NextRequest } from "next/server";
-import { getFeedPage, getUserFeedPage, createPost } from "@/app/actions/posts";
-import { getUser } from "@/lib/auth";
-import { supabaseAdmin } from "@/lib/supabase-admin";
-import { CreatePost, Cursor } from "@/lib/validation";
+import { NextRequest, NextResponse } from "next/server";
+import { getFeedPage, getUserFeedPage, getFollowingFeedPage, createPost } from "@/app/actions/posts";
+import { getRabbitHoleFeedPage } from "@/app/actions/rabbit-holes";
+import { CreatePost } from "@/schemas/post";
+import { verifySupabaseJWT } from "@/lib/jwt-utils";
 
 export async function GET(req: NextRequest) {
-	const { searchParams } = new URL(req.url);
-	const parsed = Cursor.safeParse({
-		cursor: searchParams.get("cursor") ?? undefined,
-		limit: Number(searchParams.get("limit") ?? "24"),
-	});
-	if (!parsed.success)
-		return Response.json({ error: "bad cursor" }, { status: 400 });
+	try {
+		const { searchParams } = new URL(req.url);
+		const limit = parseInt(searchParams.get("limit") || "24");
+		const offset = parseInt(searchParams.get("offset") || "0");
+		const userId = searchParams.get("userId");
+		const username = searchParams.get("username");
+		const following = searchParams.get("following");
+		const rabbitHole = searchParams.get("rabbitHole");
 
-	// Try to get user from Authorization header first, then fallback to cookies
-	const authHeader = req.headers.get("authorization");
-	const token = authHeader?.replace("Bearer ", "");
+		console.log("[API] Fetching posts:", { limit, offset, userId, username, following, rabbitHole });
 
-	let user = null;
-	if (token) {
-		const { getUserFromToken } = await import("@/lib/auth");
-		user = await getUserFromToken(token);
-	}
-
-	if (!user) {
-		user = await getUser();
-	}
-
-	const { cursor, limit } = parsed.data;
-	const username = searchParams.get("username");
-
-	let result;
-	if (username) {
-		// Get user_id from username for user-specific feed
-		const { data: profile, error: profileError } = await supabaseAdmin
-			.from("profiles")
-			.select("user_id")
-			.eq("username", username)
-			.maybeSingle();
-
-		if (profileError) {
-			console.error("/api/posts profile error:", profileError.message);
-			return Response.json({ error: profileError.message }, { status: 500 });
-		}
-		if (!profile) {
-			return Response.json({ error: "User not found" }, { status: 404 });
+		// Get user_id from token for is_liked checking
+		let currentUserId: string | null = null;
+		const authHeader = req.headers.get("authorization");
+		if (authHeader?.startsWith("Bearer ")) {
+			const token = authHeader.substring(7);
+			const user = await verifySupabaseJWT(token);
+			if (user) {
+				currentUserId = user.userId;
+			}
 		}
 
-		result = await getUserFeedPage({
-			cursor,
-			limit,
-			author_id: profile.user_id,
+
+		let result;
+		if (following === "true") {
+			// Get authorization header for following feed
+			const authHeader = req.headers.get("authorization");
+			if (!authHeader?.startsWith("Bearer ")) {
+				return NextResponse.json({ error: "Authentication required for following feed" }, { status: 401 });
+			}
+
+			const token = authHeader.substring(7);
+			const user = await verifySupabaseJWT(token);
+			if (!user) {
+				return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+			}
+
+			result = await getFollowingFeedPage({ user_id: user.userId, limit, offset });
+		} else if (rabbitHole) {
+			// Handle rabbit hole feed
+			const { supabaseAdmin } = await import("@/lib/supabase-admin");
+			const { data: rabbitHoleData } = await supabaseAdmin
+				.from("rabbit_holes")
+				.select("id")
+				.eq("name", rabbitHole)
+				.eq("is_public", true)
+				.single();
+
+			if (!rabbitHoleData) {
+				return NextResponse.json({ error: "Rabbit hole not found" }, { status: 404 });
+			}
+			result = await getRabbitHoleFeedPage({
+				rabbit_hole_id: rabbitHoleData.id,
+				limit,
+				cursor: offset ? new Date(offset).toISOString() : undefined,
+				user_id: currentUserId || undefined
+			});
+		} else if (userId) {
+			result = await getUserFeedPage({ author_id: userId, limit, offset, user_id: currentUserId || undefined });
+		} else if (username) {
+			// Convert username to userId
+			const { supabaseAdmin } = await import("@/lib/supabase-admin");
+			const { data: profile } = await supabaseAdmin
+				.from("profiles")
+				.select("user_id")
+				.eq("username", username)
+				.single();
+
+			if (!profile) {
+				return NextResponse.json({ error: "User not found" }, { status: 404 });
+			}
+
+			result = await getUserFeedPage({ author_id: profile.user_id, limit, offset, user_id: currentUserId || undefined });
+		} else {
+			result = await getFeedPage({ limit, offset, user_id: currentUserId || undefined });
+		}
+
+		if (result.error) {
+			console.error("[API] Error fetching posts:", result.error);
+			return NextResponse.json({ error: result.error }, { status: 500 });
+		}
+
+		console.log("[API] Posts fetched successfully:", {
+			postCount: result.items?.length || 0,
+			hasMore: result.nextCursor !== null
 		});
-	} else {
-		// Use getFeedPage for main feed (includes stats)
-		result = await getFeedPage({ cursor, limit });
+
+		return NextResponse.json({
+			items: result.items || [],
+			nextCursor: result.nextCursor,
+		});
+	} catch (error) {
+		console.error("[API] Unexpected error:", error);
+		return NextResponse.json(
+			{ error: "Internal server error" },
+			{ status: 500 }
+		);
 	}
-
-	if (result.error)
-		return Response.json({ error: result.error }, { status: 400 });
-
-	// Attach current-user like flags for returned page only
-	if (user && result.items && result.items.length > 0) {
-		try {
-			const postIds = result.items.map((p) => p.id);
-			const { data: likes } = await supabaseAdmin
-				.from("likes")
-				.select("post_id")
-				.eq("user_id", user.id)
-				.in("post_id", postIds);
-			const liked = new Set((likes || []).map((l) => l.post_id));
-			result.items = result.items.map((p) => ({
-				...p,
-				is_liked: liked.has(p.id),
-			}));
-		} catch {
-			// Error loading likes - continue without is_liked flags
-		}
-	}
-
-	return Response.json(result);
 }
 
 export async function POST(req: NextRequest) {
-	// Try Authorization header first, then fallback to cookies
-	const authHeader = req.headers.get("authorization");
-	const token = authHeader?.replace("Bearer ", "");
+	try {
+		// Get authorization header
+		const authHeader = req.headers.get("authorization");
+		if (!authHeader?.startsWith("Bearer ")) {
+			return NextResponse.json({ error: "Missing or invalid authorization" }, { status: 401 });
+		}
 
-	let user = null;
-	if (token) {
-		const { getUserFromToken } = await import("@/lib/auth");
-		user = await getUserFromToken(token);
+		const token = authHeader.substring(7);
+		const user = await verifySupabaseJWT(token);
+		if (!user) {
+			return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+		}
+
+		const body = await req.json();
+		console.log("[API] Creating post with data:", {
+			postId: body.id,
+			authorId: user.userId,
+			imageCount: body.images?.length || 0,
+			imageIds: body.images?.map((img: any) => img.id) || [],
+			rawBody: body
+		});
+
+		const parsed = await CreatePost.safeParseAsync(body);
+		if (!parsed.success) {
+			console.error("[API] Validation failed:", parsed.error.issues);
+			return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
+		}
+
+		const result = await createPost({
+			...parsed.data,
+			author_id: user.userId,
+			id: body.id, // Ensure the ID is passed correctly
+		}, true); // Skip auth since we already authenticated in the API route
+
+		if (result.error) {
+			console.error("[API] createPost failed:", result.error);
+			return NextResponse.json({ error: result.error }, { status: 500 });
+		}
+
+		console.log("[API] Post created successfully:", {
+			postId: result.post?.id,
+			imageCount: result.post?.images?.length || 0
+		});
+
+		return NextResponse.json({ post: result.post }, { status: 201 });
+	} catch (error) {
+		console.error("[API] Unexpected error:", error);
+		return NextResponse.json(
+			{ error: "Internal server error" },
+			{ status: 500 }
+		);
 	}
-
-	if (!user) {
-		user = await getUser(); // Fallback to cookie auth
-	}
-
-	if (!user) {
-		return new Response("Unauthorized", { status: 401 });
-	}
-
-	const body = await req.json();
-	const parsed = await CreatePost.safeParseAsync(body);
-	if (!parsed.success)
-		return Response.json({ error: parsed.error.issues }, { status: 400 });
-
-	// Use createPost action which handles ID properly
-	const result = await createPost({
-		...parsed.data,
-		author_id: user.id,
-	});
-
-	if (result.error) {
-		return Response.json({ error: result.error }, { status: 500 });
-	}
-
-	return Response.json({ post: result.post }, { status: 201 });
 }

@@ -12,7 +12,7 @@ let globalInFlight = false;
 export function useInfiniteFeed(
 	initial?: Page,
 	pageSize = 24,
-	opts?: { username?: string },
+	opts?: { username?: string; following?: boolean; rabbitHole?: string },
 ) {
 	const [pages, setPages] = useState<Page[]>(initial ? [initial] : []);
 	const [cursor, setCursor] = useState<string | null | "">(
@@ -77,6 +77,8 @@ export function useInfiniteFeed(
 		if (cursorParam) qs.set("cursor", cursorParam);
 		qs.set("limit", String(pageSize));
 		if (opts?.username) qs.set("username", opts.username);
+		if (opts?.following) qs.set("following", "true");
+		if (opts?.rabbitHole) qs.set("rabbitHole", opts.rabbitHole);
 		const url = `/api/posts${qs.toString() ? `?${qs.toString()}` : ""}`;
 
 		if (abortRef.current) {

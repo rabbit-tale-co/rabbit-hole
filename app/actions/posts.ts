@@ -30,46 +30,33 @@ function encodeCursor(ts: string, id: string) {
 }
 
 // Require logged-in and not-banned user. Optionally assert the userId matches the current user.
-async function requireActiveUser(
-	expectedUserId?: string,
-): Promise<{ error?: string; me?: { id: string } }> {
-	// Try to get user from Supabase session first
-	const { data: auth } = await supabaseAdmin.auth.getUser();
-
-	if (!auth.user?.id) {
-		// If no session, try to get user from client-side context
-		try {
-			const { supabase } = await import("@/lib/supabase");
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-			if (!user?.id) return { error: "Unauthorized" };
-
-			if (expectedUserId && user.id !== expectedUserId)
-				return { error: "Forbidden" };
-			return { me: { id: user.id } };
-		} catch (error) {
-			console.error("[JWT] Auth error:", error);
-			return { error: "Unauthorized" };
-		}
-	}
-
-	// Note: bannedUntil check moved to admin functions in admin.ts
-	if (expectedUserId && auth.user.id !== expectedUserId)
-		return { error: "Forbidden" };
-	return { me: { id: auth.user.id } };
-}
+import { requireActiveUser } from "./auth";
 
 // --- create post (images must be already uploaded to Storage with those paths) ---
-export async function createPost(input: unknown) {
+export async function createPost(input: unknown, skipAuth = false) {
+	console.log("[createPost] Input data:", {
+		id: (input as any)?.id,
+		author_id: (input as any)?.author_id,
+		imageCount: (input as any)?.images?.length || 0,
+		imageIds: (input as any)?.images?.map((img: any) => img.id) || []
+	});
+
 	const parsed = await CreatePost.safeParseAsync(input);
 	if (!parsed.success) {
+		console.error("[createPost] Validation failed:", parsed.error.issues);
 		return { error: "Invalid payload" };
 	}
 
-	{
+	if (!skipAuth) {
+		console.log("[createPost] Checking auth for user:", parsed.data.author_id);
 		const auth = await requireActiveUser(parsed.data.author_id);
-		if (auth.error) return { error: auth.error };
+		if (auth.error) {
+			console.error("[createPost] Auth failed:", auth.error);
+			return { error: auth.error };
+		}
+		console.log("[createPost] Auth successful for user:", parsed.data.author_id);
+	} else {
+		console.log("[createPost] Skipping auth check (called from API route)");
 	}
 
 	const sb = supabaseAdmin;
@@ -82,7 +69,12 @@ export async function createPost(input: unknown) {
 	// Use provided ID if available, otherwise let database generate one
 	if (parsed.data.id) {
 		insertData.id = parsed.data.id;
+		console.log("[createPost] Using provided ID:", parsed.data.id);
+	} else {
+		console.log("[createPost] No ID provided, database will generate one");
 	}
+
+	console.log("[createPost] Inserting data:", insertData);
 
 	const { data, error } = await sb
 		.from("posts")
@@ -90,7 +82,15 @@ export async function createPost(input: unknown) {
 		.select()
 		.single();
 
-	if (error) return { error: error.message };
+	if (error) {
+		console.error("[createPost] Database error:", error);
+		return { error: error.message };
+	}
+
+	console.log("[createPost] Post created successfully:", {
+		id: data.id,
+		imageCount: data.images?.length || 0
+	});
 
 	// Revalidate the feed pages to show the new post
 	// Don't revalidate main page to avoid infinite loops
@@ -296,52 +296,64 @@ export async function getFeedPage(input: unknown) {
 	const parsed = FeedCursor.safeParse(input);
 	if (!parsed.success) return { error: "Invalid cursor" };
 
-	const sb = supabaseAdmin;
-	const decoded = decodeCursor(parsed.data.cursor);
-	const query = sb
-		.from("posts")
-		.select("*")
-		.order("created_at", { ascending: false })
-		.order("id", { ascending: false })
-		.limit(parsed.data.limit);
 
-	if (decoded) {
-		// simple keyset without tie-break OR to avoid overriding previous OR filters
-		query.lt("created_at", decoded.ts);
-	}
+		const sb = supabaseAdmin;
+		const decoded = decodeCursor(parsed.data.cursor);
+		const query = sb
+			.from("posts")
+			.select("*")
+			.order("created_at", { ascending: false })
+			.order("id", { ascending: false })
+			.limit(parsed.data.limit);
 
-	const { data, error } = await query;
-	if (error) return { error: error.message };
+		if (decoded) {
+			// simple keyset without tie-break OR to avoid overriding previous OR filters
+			query.lt("created_at", decoded.ts);
+		}
 
-	// Calculate reaction counts for all posts
-	let itemsWithReactionStats = data ?? [];
-	if (data && data.length > 0) {
-		try {
-			const postIds = data.map((post) => post.id);
+		const { data, error } = await query;
+		if (error) return { error: error.message };
 
-			// Get like counts
-			const { data: likeCounts } = await sb
-				.from("likes")
-				.select("post_id")
-				.in("post_id", postIds);
+		// Calculate reaction counts for all posts
+		let itemsWithReactionStats = data ?? [];
+		if (data && data.length > 0) {
+			try {
+				const postIds = data.map((post) => post.id);
 
-			// Get comment counts
-			const { data: commentCounts } = await sb
-				.from("comments")
-				.select("post_id")
-				.in("post_id", postIds);
+				// Get like counts
+				const { data: likeCounts } = await sb
+					.from("likes")
+					.select("post_id")
+					.in("post_id", postIds);
 
-			// Get repost counts
-			const { data: repostCounts } = await sb
-				.from("reposts")
-				.select("post_id")
-				.in("post_id", postIds);
+				// Get comment counts
+				const { data: commentCounts } = await sb
+					.from("comments")
+					.select("post_id")
+					.in("post_id", postIds);
 
-			// Get bookmark counts
-			const { data: bookmarkCounts } = await sb
-				.from("bookmarks")
-				.select("post_id")
-				.in("post_id", postIds);
+				// Get repost counts
+				const { data: repostCounts } = await sb
+					.from("reposts")
+					.select("post_id")
+					.in("post_id", postIds);
+
+				// Get bookmark counts
+				const { data: bookmarkCounts } = await sb
+					.from("bookmarks")
+					.select("post_id")
+					.in("post_id", postIds);
+
+				// Get user's likes if user_id is provided
+				let userLikes: string[] = [];
+				if (parsed.data.user_id) {
+					const { data: userLikesData } = await sb
+						.from("likes")
+						.select("post_id")
+						.eq("user_id", parsed.data.user_id)
+						.in("post_id", postIds);
+					userLikes = (userLikesData || []).map(like => like.post_id);
+				}
 
 			// Count occurrences
 			const likeCountMap = new Map();
@@ -384,6 +396,7 @@ export async function getFeedPage(input: unknown) {
 				comment_count: commentCountMap.get(post.id) || 0,
 				repost_count: repostCountMap.get(post.id) || 0,
 				bookmark_count: bookmarkCountMap.get(post.id) || 0,
+				is_liked: userLikes.includes(post.id),
 			}));
 		} catch (err) {
 			console.error("Error fetching reaction stats:", err);
@@ -394,6 +407,7 @@ export async function getFeedPage(input: unknown) {
 				comment_count: 0,
 				repost_count: 0,
 				bookmark_count: 0,
+				is_liked: false,
 			}));
 		}
 	}
@@ -401,7 +415,7 @@ export async function getFeedPage(input: unknown) {
 	// Fetch real post stats for all posts in batch
 	let itemsWithStats = itemsWithReactionStats;
 
-	if (data && data.length > 0) {
+		if (data && data.length > 0) {
 		try {
 			const postIds = data.map((post) => post.id);
 
@@ -412,14 +426,19 @@ export async function getFeedPage(input: unknown) {
 
 			if (statsError) {
 				// If stats table doesn't exist, return posts without stats
-				itemsWithStats = data.map((post) => ({
-					...post,
-					stats: {
-						views_total: 0,
-						unique_viewers: 0,
-						last_view_at: null,
-					},
-				}));
+				itemsWithStats = data.map((post) => {
+					// Find the original post with is_liked from itemsWithReactionStats
+					const originalPost = itemsWithReactionStats.find(p => p.id === post.id);
+					return {
+						...post,
+						stats: {
+							views_total: 0,
+							unique_viewers: 0,
+							last_view_at: null,
+						},
+						is_liked: originalPost?.is_liked ?? false,
+					};
+				});
 			} else {
 				// Create a map of post_id to stats for efficient lookup
 				const statsMap = new Map();
@@ -438,23 +457,31 @@ export async function getFeedPage(input: unknown) {
 						unique_viewers: 0,
 						last_view_at: null,
 					};
+					// Find the original post with is_liked from itemsWithReactionStats
+					const originalPost = itemsWithReactionStats.find(p => p.id === post.id);
 					return {
 						...post,
 						stats,
+						is_liked: originalPost?.is_liked ?? false,
 					};
 				});
 			}
 		} catch (err) {
 			console.error("Error fetching post stats:", err);
 			// Return posts without stats if there's an error
-			itemsWithStats = data.map((post) => ({
-				...post,
-				stats: {
-					views_total: 0,
-					unique_viewers: 0,
-					last_view_at: null,
-				},
-			}));
+			itemsWithStats = data.map((post) => {
+				// Find the original post with is_liked from itemsWithReactionStats
+				const originalPost = itemsWithReactionStats.find(p => p.id === post.id);
+				return {
+					...post,
+					stats: {
+						views_total: 0,
+						unique_viewers: 0,
+						last_view_at: null,
+					},
+					is_liked: originalPost?.is_liked ?? false,
+				};
+			});
 		}
 	}
 
@@ -474,6 +501,7 @@ const FeedByAuthor = z.object({
 	cursor: z.string().optional(),
 	limit: z.number().int().min(1).max(50).default(24),
 	author_id: UUID,
+	user_id: z.string().optional(), // for checking is_liked, is_bookmarked, etc.
 });
 
 export async function getUserFeedPage(input: unknown) {
@@ -529,6 +557,17 @@ export async function getUserFeedPage(input: unknown) {
 				.select("post_id")
 				.in("post_id", postIds);
 
+			// Get user's likes if user_id is provided
+			let userLikes: string[] = [];
+			if (parsed.data.user_id) {
+				const { data: userLikesData } = await sb
+					.from("likes")
+					.select("post_id")
+					.eq("user_id", parsed.data.user_id)
+					.in("post_id", postIds);
+				userLikes = (userLikesData || []).map(like => like.post_id);
+			}
+
 			// Count occurrences
 			const likeCountMap = new Map();
 			const commentCountMap = new Map();
@@ -570,6 +609,7 @@ export async function getUserFeedPage(input: unknown) {
 				comment_count: commentCountMap.get(post.id) || 0,
 				repost_count: repostCountMap.get(post.id) || 0,
 				bookmark_count: bookmarkCountMap.get(post.id) || 0,
+				is_liked: userLikes.includes(post.id),
 			}));
 		} catch (err) {
 			console.error("Error fetching reaction stats:", err);
@@ -580,6 +620,7 @@ export async function getUserFeedPage(input: unknown) {
 				comment_count: 0,
 				repost_count: 0,
 				bookmark_count: 0,
+				is_liked: false,
 			}));
 		}
 	}
@@ -651,6 +692,195 @@ export async function getUserFeedPage(input: unknown) {
 					itemsWithStats[itemsWithStats.length - 1].id as string,
 				)
 			: null;
+
+	return { items: itemsWithStats, nextCursor };
+}
+
+// --- following feed page ---
+const FeedFollowing = z.object({
+	cursor: z.string().optional(),
+	limit: z.number().int().min(1).max(50).default(24),
+	user_id: UUID,
+});
+
+export async function getFollowingFeedPage(input: unknown) {
+	const parsed = FeedFollowing.safeParse(input);
+	if (!parsed.success) return { error: "Invalid cursor or user_id" };
+
+	const sb = supabaseAdmin;
+	const decoded = decodeCursor(parsed.data.cursor);
+
+	// First get list of users that the current user follows
+	const { data: followingData, error: followingError } = await sb
+		.from("follows")
+		.select("following_id")
+		.eq("follower_id", parsed.data.user_id);
+
+	if (followingError) return { error: followingError.message };
+
+	// If user follows no one, return empty feed
+	if (!followingData || followingData.length === 0) {
+		return { items: [], nextCursor: null };
+	}
+
+	const followingIds = followingData.map(f => f.following_id);
+
+	const query = sb
+		.from("posts")
+		.select("*")
+		.in("author_id", followingIds)
+		.order("created_at", { ascending: false })
+		.order("id", { ascending: false })
+		.limit(parsed.data.limit);
+
+	if (decoded) {
+		query.lt("created_at", decoded.ts);
+	}
+
+	const { data, error } = await query;
+	if (error) return { error: error.message };
+
+	// Calculate reaction counts for all posts
+	let itemsWithReactionStats = data ?? [];
+	if (data && data.length > 0) {
+		try {
+			const postIds = data.map((post) => post.id);
+
+			// Get like counts
+			const { data: likeCounts } = await sb
+				.from("likes")
+				.select("post_id")
+				.in("post_id", postIds);
+
+			// Get bookmark counts
+			const { data: bookmarkCounts } = await sb
+				.from("bookmarks")
+				.select("post_id")
+				.in("post_id", postIds);
+
+			// Get repost counts
+			const { data: repostCounts } = await sb
+				.from("reposts")
+				.select("post_id")
+				.in("post_id", postIds);
+
+			// Get comment counts
+			const { data: commentCounts } = await sb
+				.from("comments")
+				.select("post_id")
+				.in("post_id", postIds);
+
+			// Get user's likes if user_id is provided
+			let userLikes: string[] = [];
+			if (parsed.data.user_id) {
+				const { data: userLikesData } = await sb
+					.from("likes")
+					.select("post_id")
+					.eq("user_id", parsed.data.user_id)
+					.in("post_id", postIds);
+				userLikes = (userLikesData || []).map(like => like.post_id);
+			}
+
+			// Count reactions for each post
+			const likeCountMap = new Map<string, number>();
+			const bookmarkCountMap = new Map<string, number>();
+			const repostCountMap = new Map<string, number>();
+			const commentCountMap = new Map<string, number>();
+
+			likeCounts?.forEach((like) => {
+				likeCountMap.set(like.post_id, (likeCountMap.get(like.post_id) || 0) + 1);
+			});
+
+			bookmarkCounts?.forEach((bookmark) => {
+				bookmarkCountMap.set(bookmark.post_id, (bookmarkCountMap.get(bookmark.post_id) || 0) + 1);
+			});
+
+			repostCounts?.forEach((repost) => {
+				repostCountMap.set(repost.post_id, (repostCountMap.get(repost.post_id) || 0) + 1);
+			});
+
+			commentCounts?.forEach((comment) => {
+				commentCountMap.set(comment.post_id, (commentCountMap.get(comment.post_id) || 0) + 1);
+			});
+
+			// Add reaction counts to posts
+			itemsWithReactionStats = data.map((post) => ({
+				...post,
+				stats: {
+					likes: likeCountMap.get(post.id) || 0,
+					bookmarks: bookmarkCountMap.get(post.id) || 0,
+					reposts: repostCountMap.get(post.id) || 0,
+					comments: commentCountMap.get(post.id) || 0,
+				},
+				is_liked: userLikes.includes(post.id),
+			}));
+		} catch (error) {
+			console.error("Error fetching reaction stats:", error);
+			// Continue without stats if there's an error
+		}
+	}
+
+	// Fetch real post stats for all posts in batch
+	let itemsWithStats = itemsWithReactionStats;
+
+	if (data && data.length > 0) {
+		try {
+			const postIds = data.map((post) => post.id);
+			const { data: statsData, error: statsError } = await sb
+				.from("posts_stats")
+				.select("post_id, views_total, unique_viewers, last_view_at")
+				.in("post_id", postIds);
+
+			if (statsError) {
+				// If stats table doesn't exist, return posts without stats
+				itemsWithStats = data.map((post) => ({
+					...post,
+					stats: {
+						views_total: 0,
+						unique_viewers: 0,
+						last_view_at: null,
+					},
+				}));
+			} else {
+				// Create a map of post stats
+				const statsMap = new Map();
+				statsData?.forEach((stat) => {
+					statsMap.set(stat.post_id, stat);
+				});
+
+				// Merge stats with posts
+				itemsWithStats = itemsWithReactionStats.map((post) => {
+					const postStats = statsMap.get(post.id);
+					return {
+						...post,
+						stats: {
+							views_total: postStats?.views_total || 0,
+							unique_viewers: postStats?.unique_viewers || 0,
+							last_view_at: postStats?.last_view_at || null,
+						},
+					};
+				});
+			}
+		} catch (error) {
+			console.error("Error fetching post stats:", error);
+			// Return posts without stats if there's an error
+			itemsWithStats = data.map((post) => ({
+				...post,
+				stats: {
+					views_total: 0,
+					unique_viewers: 0,
+					last_view_at: null,
+				},
+			}));
+		}
+	}
+
+	const nextCursor = data && data.length === parsed.data.limit
+		? encodeCursor(
+				data[data.length - 1].created_at as string,
+				data[data.length - 1].id as string,
+			)
+		: null;
 
 	return { items: itemsWithStats, nextCursor };
 }

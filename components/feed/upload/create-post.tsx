@@ -542,6 +542,7 @@ export function CreateMediaPost({
       }
 
       console.debug("[uploadOne] prepared for upload", { postId, mime, size: blob.size });
+      console.log("[POST CREATE] Starting upload with postId:", postId);
 
       const MEDIA_API =
         process.env.NEXT_PUBLIC_BACKEND ||
@@ -576,8 +577,15 @@ export function CreateMediaPost({
               return;
             }
             const json: UploadResp = await res.json();
+            console.log("[POST CREATE] API response:", {
+              requestedPostId: postId,
+              returnedPostId: json.postId,
+              imageId: json.imageId,
+              path: json.path
+            });
             // Update postId if returned from API
             if (json.postId && json.postId !== postId) {
+              console.log("[POST CREATE] Updating postId from", postId, "to", json.postId);
               setPostId(json.postId);
             }
             serverMeta = {
@@ -642,8 +650,15 @@ export function CreateMediaPost({
             return;
           }
           const json: UploadResp = await res.json();
+          console.log("[POST CREATE] API response (second path):", {
+            requestedPostId: postId,
+            returnedPostId: json.postId,
+            imageId: json.imageId,
+            path: json.path
+          });
           // Update postId if returned from API
           if (json.postId && json.postId !== postId) {
+            console.log("[POST CREATE] Updating postId from", postId, "to", json.postId);
             setPostId(json.postId);
           }
           const built = {
@@ -688,7 +703,7 @@ export function CreateMediaPost({
   const uploadAll = useCallback(
     async (
       _items: Item[],
-      postId: string,
+      initialPostId: string,
       setOne: (id: string, patch: Partial<Item>) => void,
     ) => {
       const metas: Meta[] = [];
@@ -705,7 +720,8 @@ export function CreateMediaPost({
           });
 
           try {
-            const meta = await uploadOne(it, postId, (p) =>
+            // Use current postId from state, not the initial one
+            const meta = await uploadOne(it, postId || initialPostId, (p) =>
               setOne(it.id, { status: "uploading", progress: p }),
             );
             metas.push(meta);
@@ -734,7 +750,7 @@ export function CreateMediaPost({
       await Promise.all(runners);
       return metas;
     },
-    [uploadOne],
+    [uploadOne, postId],
   );
 
   // auto-upload newly added items in background and collect metas
@@ -787,6 +803,8 @@ export function CreateMediaPost({
       if (!postId) {
         throw new Error("No postId available - uploads must complete first");
       }
+      console.log("[POST CREATE] Creating post with final postId:", postId);
+      console.log("[POST CREATE] Uploaded metas:", uploadedMetas.map(m => ({ id: m.id, path: m.path })));
       // optimistic immediately
       onPostCreated(optimistic);
 
@@ -810,26 +828,29 @@ export function CreateMediaPost({
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
         "";
 
+      const postData = {
+        id: postId, // Use postId from API uploads
+        text: optimistic.content,
+        images: metas.map((m) => ({
+          id: m.id,
+          path: m.path,
+          alt: items.find((i) => i.serverId === m.id)?.alt || m.alt || "",
+          width: Math.max(1, m.width || 1),
+          height: Math.max(1, m.height || 1),
+          size_bytes: m.size_bytes,
+          mime: m.mime,
+          is_cover: m.is_cover,
+        })),
+      };
+      console.log("[POST CREATE] Sending to /api/posts:", postData);
+
       const res = await fetch("/api/posts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          id: postId, // Use postId from API uploads
-          text: optimistic.content,
-          images: metas.map((m) => ({
-            id: m.id,
-            path: m.path,
-            alt: items.find((i) => i.serverId === m.id)?.alt || m.alt || "",
-            width: Math.max(1, m.width || 1),
-            height: Math.max(1, m.height || 1),
-            size_bytes: m.size_bytes,
-            mime: m.mime,
-            is_cover: m.is_cover,
-          })),
-        }),
+        body: JSON.stringify(postData),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

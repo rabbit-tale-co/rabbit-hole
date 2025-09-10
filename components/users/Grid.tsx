@@ -8,6 +8,7 @@ import { useFollow } from "@/hooks/useFollow";
 import { useGlobalFollowStats } from "@/hooks/useGlobalFollowStats";
 import { type UserListItem, useInfiniteUsers } from "@/hooks/useInfiniteUsers";
 import { useIntersection } from "@/hooks/useIntersection";
+import { useUsersCount } from "@/hooks/useUsersCount";
 import {
   generateAccentColor,
   getAccentColorStyle,
@@ -60,8 +61,7 @@ function UserCard({
   };
 
   return (
-    <button
-      type="button"
+    <article
       className="group h-[280px] sm:h-[300px] lg:h-[320px] ring-1 ring-border flex flex-col rounded-2xl bg-white hover:bg-neutral-50 transition-colors duration-150 cursor-pointer text-left"
       data-username={u.username}
       onClick={handleCardClick}
@@ -176,7 +176,7 @@ function UserCard({
           </span>
         </div>
       </div>
-    </button>
+    </article>
   );
 }
 
@@ -189,6 +189,7 @@ export default function UsersGrid({
     initialData,
     20,
   );
+  const { count: totalUsersCount, loading: countLoading } = useUsersCount();
   const sentinelRef = useIntersection(
     () => {
       if (!loading && hasMore) loadMore();
@@ -208,7 +209,7 @@ export default function UsersGrid({
       <div className="flex items-end justify-between mt-6">
         <h2 className="text-sm font-semibold">Creators</h2>
         <span className="text-xs text-muted-foreground">
-          {items.length} found
+          {countLoading ? "..." : totalUsersCount !== null ? `${totalUsersCount} total` : `${items.length} found`}
         </span>
       </div>
 

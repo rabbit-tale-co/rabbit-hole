@@ -6,18 +6,12 @@ import { verifySupabaseJWT } from "@/lib/jwt-utils";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { createClient } from "@/lib/supabase-cookies";
 import { UpsertProfileClient } from "@/schemas/profile";
+import { requireActiveUser } from "@/app/actions/auth";
 import { sanitizeUsersListResponse } from "@/utils/userSanitizer";
-// import { getBatchFollowStats } from "./follow"; // No longer needed - follow stats loaded on hover
 
 export async function upsertProfile(input: unknown, token?: string) {
-	// const callId = Math.random().toString(36).substring(7);
-	// console.log(`[${callId}] upsertProfile called at ${new Date().toISOString()}`);
-
-	// Parse client input (without user_id)
 	const parsed = await UpsertProfileClient.safeParseAsync(input);
 	if (!parsed.success) {
-		// console.log(`[${callId}] Validation failed:`, parsed.error.issues);
-		// Extract bannable words errors specifically
 		const bannableWordsErrors = parsed.error.issues
 			.filter(
 				(issue) =>
@@ -35,43 +29,13 @@ export async function upsertProfile(input: unknown, token?: string) {
 		return { error: firstError.message || "Invalid input data" };
 	}
 
-	// Verify user authentication - try JWT token first, then cookies
-	// console.log(`[${callId}] Starting authentication verification...`);
-	let userId: string;
-
-	try {
-		// Try JWT token first if provided
-		if (token) {
-			// console.log(`[${callId}] [AUTH] Attempting JWT authentication with token:`, token.substring(0, 20) + '...');
-			const authResult = await verifySupabaseJWT(token);
-			if (authResult) {
-				userId = authResult.userId;
-				// console.log(`[${callId}] [AUTH] Profile update (JWT auth): ${userId}`);
-			} else {
-				// console.log(`[${callId}] [AUTH] JWT token verification failed`);
-				throw new Error("Invalid JWT token");
-			}
-		} else {
-			// console.log(`[${callId}] [AUTH] No JWT token provided, trying cookies...`);
-			// Fallback to cookies
-			const supabase = await createClient();
-			const {
-				data: { user },
-				error,
-			} = await supabase.auth.getUser();
-
-			if (error || !user) {
-				// console.log(`[${callId}] Authentication failed:`, error?.message || 'No user');
-				return { error: "Unauthorized" };
-			}
-
-			userId = user.id;
-			// console.log(`[${callId}] [AUTH] Profile update (cookie auth): ${userId}`);
-		}
-	} catch {
-		// console.error(`[${callId}] [AUTH] Authentication error:`, error);
-		return { error: "Unauthorized" };
+	// Verify user authentication using requireActiveUser
+	const auth = await requireActiveUser();
+	if (auth.error || !auth.me) {
+		return { error: auth.error || "Unauthorized" };
 	}
+
+	const userId = auth.me.id;
 
 	// find old username to revalidate old path if it changes
 	let oldUsername: string | null = null;
@@ -119,38 +83,13 @@ export async function upsertProfile(input: unknown, token?: string) {
 }
 
 export async function deleteAccount(userId: string, token?: string) {
-	// Verify user authentication
-	let authenticatedUserId: string;
-
-	if (token) {
-		// Use JWT token for authentication
-		try {
-			const authResult = await verifySupabaseJWT(token);
-			if (!authResult) {
-				// console.error('[JWT] Account deletion - JWT verification failed');
-				return { error: "Unauthorized" };
-			}
-			authenticatedUserId = authResult.userId;
-			// console.log(`[JWT] Account deletion (JWT auth): ${authenticatedUserId}`);
-		} catch {
-			// console.error('[JWT] Account deletion auth error:', error);
-			return { error: "Unauthorized" };
-		}
-	} else {
-		// Fallback to client-side authentication
-		try {
-			const { supabase } = await import("@/lib/supabase");
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-			if (!user?.id) return { error: "Unauthorized" };
-			authenticatedUserId = user.id;
-			// console.log(`[JWT] Account deletion (client auth): ${authenticatedUserId}`);
-		} catch {
-			// console.error('[JWT] Account deletion auth error:', error);
-			return { error: "Unauthorized" };
-		}
+	// Verify user authentication using requireActiveUser
+	const auth = await requireActiveUser();
+	if (auth.error || !auth.me) {
+		return { error: auth.error || "Unauthorized" };
 	}
+
+	const authenticatedUserId = auth.me.id;
 
 	// Verify user can only delete their own account
 	if (authenticatedUserId !== userId) return { error: "Forbidden" };

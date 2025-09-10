@@ -25,9 +25,6 @@ export async function verifySupabaseJWT(
 	token: string,
 ): Promise<{ userId: string; claims: SupabaseJWTPayload } | null> {
 	try {
-		// console.log('Verifying JWT token:', token.substring(0, 20) + '...');
-		// console.log('Token length:', token.length);
-
 		const {
 			data: { user },
 			error,
@@ -35,11 +32,8 @@ export async function verifySupabaseJWT(
 
 		if (error || !user) {
 			console.error("Supabase client verification failed:", error);
-			// console.error('User data:', user);
 			return null;
 		}
-
-		// console.log('JWT verification successful for user:', user.id);
 
 		// Decode token manually to get claims
 		const parts = token.split(".");

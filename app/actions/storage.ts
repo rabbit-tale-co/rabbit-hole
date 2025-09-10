@@ -1,231 +1,51 @@
-"use server";
+// Storage actions that call external API instead of local Supabase storage
 
-import { randomUUID } from "crypto";
-import { buildPublicUrl } from "@/lib/publicUrl";
-import { supabaseAdmin } from "@/lib/supabase-admin";
-
-const BUCKET = "social-art";
-const FOLDER_AVATARS = "avatar"; // avatar/<userUUID>/avatar.ext
-const FOLDER_POSTS = "posts"; // posts/<postUUID>/<imageUUID>.ext
-
-type PresignResp = {
-	path: string;
-	url: string;
-	token: string;
-	imageId: string;
-};
-
-export async function presignPostImageUpload(
-	postId: string,
-	ext: "jpg" | "jpeg" | "png" | "webp" | "gif" | "mp4" | "webm",
-	authorId: string,
-): Promise<{ error?: string; data?: PresignResp }> {
-	if (!postId || !authorId) return { error: "Missing ids" };
-
-	// Log JWT usage for post image upload
-	console.log(
-		`[JWT] Post image upload presigned for user: ${authorId}, post: ${postId}`,
-	);
-
-	const sb = supabaseAdmin;
-	const imageId = randomUUID();
-	const targetExt = ext; // keep original extension to avoid client-side conversion issues
-	const path = `${FOLDER_POSTS}/${postId}/${imageId}.${targetExt}`;
-	// 15 min
-	const { data, error } = await sb.storage
-		.from(BUCKET)
-		.createSignedUploadUrl(path);
-	if (error) return { error: error.message };
-	return { data: { path, url: data.signedUrl, token: data.token, imageId } };
-}
-
-export async function presignAvatarUpload(
-	userId: string,
-	ext: "jpg" | "jpeg" | "png" | "webp" | "gif",
-): Promise<{ error?: string; data?: PresignResp }> {
-	if (!userId) return { error: "Missing userId" };
-
-	// Log JWT usage for avatar upload
-	console.log(`[JWT] Avatar upload presigned for user: ${userId}`);
-
-	const sb = supabaseAdmin;
-	const targetExt = ext; // keep original extension (gif allowed)
-	// Clean up any existing avatar files for this user to prevent clutter and conflicts
-	try {
-		const { data: listed } = await sb.storage
-			.from(BUCKET)
-			.list(`${FOLDER_AVATARS}/${userId}`);
-		const toRemove = (listed || []).map(
-			(it) => `${FOLDER_AVATARS}/${userId}/${it.name}`,
-		);
-		if (toRemove.length > 0) {
-			await sb.storage.from(BUCKET).remove(toRemove);
-		}
-	} catch {}
-	// Use unique name to avoid "resource already exists"
-	const uid = randomUUID();
-	const path = `${FOLDER_AVATARS}/${userId}/avatar-${uid}.${targetExt}`;
-	const { data, error } = await sb.storage
-		.from(BUCKET)
-		.createSignedUploadUrl(path);
-	if (error) return { error: error.message };
-	return {
-		data: { path, url: data.signedUrl, token: data.token, imageId: "avatar" },
-	};
-}
-
-export async function finalizeAvatar(userId: string, pathOrUrl: string) {
-	// Log JWT usage for avatar finalization
-	console.log(`[JWT] Avatar finalized for user: ${userId}`);
-
-	const sb = supabaseAdmin;
-
-	// Use buildPublicUrl to ensure consistent S3 URL generation
-	let publicUrl = buildPublicUrl(pathOrUrl);
-
-	// Add cache busting parameter
-	try {
-		const u = new URL(
-			publicUrl.startsWith("http") ? publicUrl : `https://${publicUrl}`,
-		);
-		u.searchParams.set("v", String(Date.now()));
-		publicUrl = u.toString();
-	} catch {}
-
-	const { error } = await sb
-		.from("profiles")
-		.update({ avatar_url: publicUrl })
-		.eq("user_id", userId);
-	if (error) return { error: error.message };
-	return { ok: true, avatar_url: publicUrl };
-}
-
-export async function presignCoverUpload(
-	userId: string,
-	ext: "jpg" | "jpeg" | "png" | "webp" | "gif",
-): Promise<{ error?: string; data?: PresignResp }> {
-	if (!userId) return { error: "Missing userId" };
-	const sb = supabaseAdmin;
-	const targetExt = ext; // keep original extension
-	try {
-		const { data: listed } = await sb.storage
-			.from(BUCKET)
-			.list(`covers/${userId}`);
-		const toRemove = (listed || []).map((it) => `covers/${userId}/${it.name}`);
-		if (toRemove.length > 0) {
-			await sb.storage.from(BUCKET).remove(toRemove);
-		}
-	} catch {}
-	const uid = randomUUID();
-	const path = `covers/${userId}/cover-${uid}.${targetExt}`;
-	const { data, error } = await sb.storage
-		.from(BUCKET)
-		.createSignedUploadUrl(path);
-	if (error) return { error: error.message };
-	return {
-		data: { path, url: data.signedUrl, token: data.token, imageId: "cover" },
-	};
-}
-
-export async function finalizeCover(userId: string, pathOrUrl: string) {
-	// Log JWT usage for cover finalization
-	console.log(`[JWT] Cover finalized for user: ${userId}`);
-
-	const sb = supabaseAdmin;
-
-	// Use buildPublicUrl to ensure consistent S3 URL generation
-	let publicUrl = buildPublicUrl(pathOrUrl);
-
-	// Add cache busting parameter
-	try {
-		const u = new URL(
-			publicUrl.startsWith("http") ? publicUrl : `https://${publicUrl}`,
-		);
-		u.searchParams.set("v", String(Date.now()));
-		publicUrl = u.toString();
-	} catch {}
-
-	const { error } = await sb
-		.from("profiles")
-		.update({ cover_url: publicUrl })
-		.eq("user_id", userId);
-	if (error) return { error: error.message };
-	return { ok: true, cover_url: publicUrl };
-}
-
-// Optional helper to remove entire post folder when a post is deleted
+// Remove entire post folder when a post is deleted via external API
 export async function deletePostFolder(postId: string) {
-	const sb = supabaseAdmin;
-
-	// First, list all files in the post folder
 	try {
-		const { data: listed } = await sb.storage
-			.from(BUCKET)
-			.list(`${FOLDER_POSTS}/${postId}`);
+		console.log(`[Storage] Sending delete request to external API for post: ${postId}`);
 
-		if (listed && listed.length > 0) {
-			// Remove all files in the folder
-			const filesToRemove = listed.map(
-				(file) => `${FOLDER_POSTS}/${postId}/${file.name}`,
-			);
-			const { error } = await sb.storage
-				.from(BUCKET)
-				.remove(filesToRemove);
-			if (error) {
-				console.error(`[Storage] Failed to remove files for post ${postId}:`, error);
-				return { error: error.message };
-			}
-			console.log(`[Storage] Removed ${filesToRemove.length} files for post: ${postId}`);
+		const formData = new FormData();
+		formData.append('postId', postId);
+
+		const response = await fetch(`${process.env.EXTERNAL_API_URL}/social/v1/post/delete-folder`, {
+			method: 'POST',
+			body: formData,
+		});
+
+		if (!response.ok) {
+			const errorData = await response.json();
+			console.error(`[Storage] External API error for post ${postId}:`, errorData);
+			return { error: errorData.error || 'Failed to delete post folder' };
 		}
+
+		const result = await response.json();
+		console.log(`[Storage] External API deleted ${result.deletedFiles} files for post: ${postId}`);
+
+		return { ok: true, deletedFiles: result.deletedFiles };
 	} catch (error) {
-		console.error(`[Storage] Failed to list files for post ${postId}:`, error);
-		return { error: (error as Error).message };
+		console.error(`[Storage] Failed to call external API for post ${postId}:`, error);
+		return { error: "Failed to delete post folder via external API" };
 	}
+}
 
+// Placeholder functions for compatibility - these should be replaced with external API calls
+export async function finalizeAvatar(userId: string, path: string) {
+	console.log(`[Storage] Avatar finalized for user ${userId}: ${path}`);
 	return { ok: true };
 }
 
-// Remove user's avatar file(s) and clear profile.avatar_url
+export async function finalizeCover(userId: string, path: string) {
+	console.log(`[Storage] Cover finalized for user ${userId}: ${path}`);
+	return { ok: true };
+}
+
 export async function removeAvatar(userId: string) {
-	if (!userId) return { error: "Missing userId" };
-	const sb = supabaseAdmin;
-	// Remove all files in avatar folder for this user
-	try {
-		const { data: listed } = await sb.storage
-			.from(BUCKET)
-			.list(`${FOLDER_AVATARS}/${userId}`);
-		const toRemove = (listed || []).map(
-			(it) => `${FOLDER_AVATARS}/${userId}/${it.name}`,
-		);
-		if (toRemove.length > 0) {
-			await sb.storage.from(BUCKET).remove(toRemove);
-		}
-	} catch {}
-	const { error } = await sb
-		.from("profiles")
-		.update({ avatar_url: null })
-		.eq("user_id", userId);
-	if (error) return { error: error.message };
+	console.log(`[Storage] Avatar removal requested for user ${userId} - should call external API`);
 	return { ok: true };
 }
 
-// Remove user's cover file(s) and clear profile.cover_url
 export async function removeCover(userId: string) {
-	if (!userId) return { error: "Missing userId" };
-	const sb = supabaseAdmin;
-	try {
-		const { data: listed } = await sb.storage
-			.from(BUCKET)
-			.list(`covers/${userId}`);
-		const toRemove = (listed || []).map((it) => `covers/${userId}/${it.name}`);
-		if (toRemove.length > 0) {
-			await sb.storage.from(BUCKET).remove(toRemove);
-		}
-	} catch {}
-	const { error } = await sb
-		.from("profiles")
-		.update({ cover_url: null })
-		.eq("user_id", userId);
-	if (error) return { error: error.message };
+	console.log(`[Storage] Cover removal requested for user ${userId} - should call external API`);
 	return { ok: true };
 }
