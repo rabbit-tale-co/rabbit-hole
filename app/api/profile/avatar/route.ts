@@ -5,10 +5,12 @@ import { withAuth } from "@/middleware/auth";
 
 let ffmpegPath: string | null = null;
 try {
-  const mod = await import("ffmpeg-static");
-  ffmpegPath = (mod as unknown as { default?: string }).default || (mod as unknown as string);
+	const mod = await import("ffmpeg-static");
+	ffmpegPath =
+		(mod as unknown as { default?: string }).default ||
+		(mod as unknown as string);
 } catch {
-  ffmpegPath = null;
+	ffmpegPath = null;
 }
 
 export const runtime = "nodejs";

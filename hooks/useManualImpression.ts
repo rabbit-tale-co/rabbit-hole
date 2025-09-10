@@ -42,11 +42,11 @@ export function useManualImpression({
 							message: error.message,
 							code: error.code,
 							details: error.details,
-							hint: error.hint
+							hint: error.hint,
 						},
 						postId,
 						anonKey,
-						hasSession: !!session?.session
+						hasSession: !!session?.session,
 					});
 					if (
 						error.message?.includes("relation") ||

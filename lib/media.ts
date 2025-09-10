@@ -71,9 +71,9 @@ export async function convertVideoToWebM(file: File): Promise<ConvertedBlob> {
 		video.muted = true;
 		video.playsInline = true;
 		await video.play().catch(() => {});
-		await new Promise<void>(
-			(resolve) => { video.onloadeddata = () => resolve() },
-		);
+		await new Promise<void>((resolve) => {
+			video.onloadeddata = () => resolve();
+		});
 		const stream = (
 			video as unknown as { captureStream?: () => MediaStream }
 		).captureStream?.() as MediaStream | undefined;

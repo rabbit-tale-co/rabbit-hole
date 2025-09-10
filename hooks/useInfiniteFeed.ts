@@ -9,8 +9,6 @@ type Page = { items: PostRow[]; nextCursor: string | null };
 // Global state to prevent multiple simultaneous requests
 let globalInFlight = false;
 
-
-
 export function useInfiniteFeed(
 	initial?: Page,
 	pageSize = 24,

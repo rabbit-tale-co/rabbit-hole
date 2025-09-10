@@ -59,9 +59,9 @@ const UserListItem = memo(function UserListItem({
     isFollowing,
     toggleFollow,
   } = useFollow(user.user_id, batchStats);
-  const accent = useMemo(
-    () => generateAccentColor(user.username),
-    [user.username],
+  const accentColor = useMemo(
+    () => user.accent_color ? undefined : generateAccentColor(user.user_id),
+    [user.accent_color, user.user_id],
   );
 
   const canFollow =
@@ -77,7 +77,7 @@ const UserListItem = memo(function UserListItem({
             avatarUrl={
               user.avatar_url ? buildPublicUrl(user.avatar_url) : undefined
             }
-            accentColor={accent}
+            accentColor={accentColor}
             accentHex={user.accent_color || undefined}
             className="rounded-full ring-1 ring-black/5"
           />

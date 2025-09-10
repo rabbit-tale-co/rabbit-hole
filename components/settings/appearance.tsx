@@ -12,103 +12,103 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
-  ACCENT_COLORS,
-  type AccentColor,
-  findAccentBy500Hex,
-  generateAccentColor,
-  generateRandomAccentColor,
-  getAccentColorStyle,
-  getAccentColorValue,
+	ACCENT_COLORS,
+	type AccentColor,
+	findAccentBy500Hex,
+	generateAccentColor,
+	generateRandomAccentColor,
+	getAccentColorStyle,
+	getAccentColorValue,
 } from "@/lib/accent-colors";
 import { useAuth } from "@/providers/AuthProvider";
 
 export function Appearance() {
-  const { user: auth_user, profile, getToken } = useAuth();
-  // const { setTheme } = useTheme()
+	const { user: auth_user, profile, getToken } = useAuth();
+	// const { setTheme } = useTheme()
 
-  // Local state for accent color to handle updates
-  const [localAccentColor, setLocalAccentColor] = React.useState<AccentColor>(
-    () => generateAccentColor(auth_user?.id || ""),
-  );
+	// Local state for accent color to handle updates
+	const [localAccentColor, setLocalAccentColor] = React.useState<AccentColor>(
+		() => generateAccentColor(auth_user?.id || ""),
+	);
 
-  // Update local accent color only when user metadata changes
-  React.useEffect(() => {
-    if (profile?.accent_color) {
-      const mapped = findAccentBy500Hex(profile.accent_color);
-      if (mapped) {
-        setLocalAccentColor(mapped);
-        return;
-      }
-    }
-    setLocalAccentColor(generateAccentColor(auth_user?.id || ""));
-  }, [auth_user?.id, profile?.accent_color]);
+	// Update local accent color only when user metadata changes
+	React.useEffect(() => {
+		if (profile?.accent_color) {
+			const mapped = findAccentBy500Hex(profile.accent_color);
+			if (mapped) {
+				setLocalAccentColor(mapped);
+				return;
+			}
+		}
+		setLocalAccentColor(generateAccentColor(auth_user?.id || ""));
+	}, [auth_user?.id, profile?.accent_color]);
 
-  // Get current accent color from local state
-  const currentAccentColor = localAccentColor;
+	// Get current accent color from local state
+	const currentAccentColor = localAccentColor;
 
-  // Function to update accent color
-  const handleUpdateAccentColor = useCallback(
-    async (newColor?: AccentColor) => {
-      // If no color provided, generate a random one different from current
-      const colorToUse =
-        newColor || generateRandomAccentColor(currentAccentColor);
-      console.log("🎨 Updating accent color:", {
-        current: currentAccentColor,
-        new: colorToUse,
-      });
+	// Function to update accent color
+	const handleUpdateAccentColor = useCallback(
+		async (newColor?: AccentColor) => {
+			// If no color provided, generate a random one different from current
+			const colorToUse =
+				newColor || generateRandomAccentColor(currentAccentColor);
+			console.log("🎨 Updating accent color:", {
+				current: currentAccentColor,
+				new: colorToUse,
+			});
 
-      try {
-        // Persist as HEX in DB via server action
-        if (!profile) throw new Error("No profile loaded");
-        const hex = getAccentColorValue(colorToUse, 500);
-        const token = await getToken();
-        const res = await upsertProfile(
-          {
-            username: profile.username,
-            display_name: profile.display_name,
-            accent_color: hex,
-            cover_url: profile.cover_url ?? null,
-          },
-          token || undefined,
-        );
-        if (
-          typeof res === "object" &&
-          res &&
-          "error" in res &&
-          (res as { error?: string }).error
-        )
-          throw new Error((res as { error?: string }).error || "update failed");
-        setLocalAccentColor(colorToUse);
-        toast.success(`Accent color updated to ${colorToUse}!`);
-      } catch (error) {
-        console.error("❌ Error updating accent color:", error);
-        toast.error("Failed to update accent color");
-      }
-    },
-    [currentAccentColor, profile, getToken],
-  );
+			try {
+				// Persist as HEX in DB via server action
+				if (!profile) throw new Error("No profile loaded");
+				const hex = getAccentColorValue(colorToUse, 500);
+				const token = await getToken();
+				const res = await upsertProfile(
+					{
+						username: profile.username,
+						display_name: profile.display_name,
+						accent_color: hex,
+						cover_url: profile.cover_url ?? null,
+					},
+					token || undefined,
+				);
+				if (
+					typeof res === "object" &&
+					res &&
+					"error" in res &&
+					(res as { error?: string }).error
+				)
+					throw new Error((res as { error?: string }).error || "update failed");
+				setLocalAccentColor(colorToUse);
+				toast.success(`Accent color updated to ${colorToUse}!`);
+			} catch (error) {
+				console.error("❌ Error updating accent color:", error);
+				toast.error("Failed to update accent color");
+			}
+		},
+		[currentAccentColor, profile, getToken],
+	);
 
-  // Prevent automatic color updates - only update when explicitly called
-  const handleColorChange = useCallback(
-    (newColor: AccentColor) => {
-      console.log("🎯 handleColorChange called with:", newColor);
-      console.log("🎯 currentAccentColor:", currentAccentColor);
+	// Prevent automatic color updates - only update when explicitly called
+	const handleColorChange = useCallback(
+		(newColor: AccentColor) => {
+			console.log("🎯 handleColorChange called with:", newColor);
+			console.log("🎯 currentAccentColor:", currentAccentColor);
 
-      if (newColor !== currentAccentColor) {
-        console.log("🎯 Calling handleUpdateAccentColor...");
-        handleUpdateAccentColor(newColor);
-      } else {
-        console.log("🎯 No change detected, skipping update");
-      }
-    },
-    [currentAccentColor, handleUpdateAccentColor],
-  );
+			if (newColor !== currentAccentColor) {
+				console.log("🎯 Calling handleUpdateAccentColor...");
+				handleUpdateAccentColor(newColor);
+			} else {
+				console.log("🎯 No change detected, skipping update");
+			}
+		},
+		[currentAccentColor, handleUpdateAccentColor],
+	);
 
-  // Function to handle theme change
-  // Example: const handleThemeChange = useCallback((newTheme: 'light' | 'dark' | 'system') => { setTheme(newTheme); toast.success(`Theme changed to ${newTheme}!`) }, [setTheme])
+	// Function to handle theme change
+	// Example: const handleThemeChange = useCallback((newTheme: 'light' | 'dark' | 'system') => { setTheme(newTheme); toast.success(`Theme changed to ${newTheme}!`) }, [setTheme])
 
-  // CSS for dynamic ring colors and hiding default radio indicators
-  const ringColorStyle = `
+	// CSS for dynamic ring colors and hiding default radio indicators
+	const ringColorStyle = `
     [data-selected="true"][data-color="blue"] { --tw-ring-color: #1e40af; }
     [data-selected="true"][data-color="green"] { --tw-ring-color: #166534; }
     [data-selected="true"][data-color="purple"] { --tw-ring-color: #6b21a8; }
@@ -138,82 +138,83 @@ export function Appearance() {
     }
   `;
 
-  return (
-    <>
-      <style>{ringColorStyle}</style>
-      <div className="space-y-6">
-        <div className="space-y-1">
-          <h3 className="text-lg font-semibold">Theme</h3>
-          <p className="text-sm text-gray-600 mb-3">
-            Choose your preferred theme for the application
-          </p>
-          <SettingsThemeRow />
-        </div>
+	return (
+		<>
+			<style>{ringColorStyle}</style>
+			<div className="space-y-6">
+				<div className="space-y-1">
+					<h3 className="text-lg font-semibold">Theme</h3>
+					<p className="text-sm text-gray-600 mb-3">
+						Choose your preferred theme for the application
+					</p>
+					<SettingsThemeRow />
+				</div>
 
-        <Separator />
+				<Separator />
 
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Accent Color</h3>
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600 mb-2">
-              Choose your preferred accent color for profile elements
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {ACCENT_COLORS.map((color: AccentColor) => {
-                const isSelected = currentAccentColor === color;
+				<div className="space-y-4">
+					<h3 className="text-lg font-semibold">Accent Color</h3>
+					<div className="space-y-3">
+						<p className="text-sm text-gray-600 mb-2">
+							Choose your preferred accent color for profile elements
+						</p>
+						<div className="flex flex-wrap gap-2">
+							{ACCENT_COLORS.map((color: AccentColor) => {
+								const isSelected = currentAccentColor === color;
 
-                return (
-                  <Button
-                    key={color}
-                    size={"lg"}
-                    onClick={() => handleColorChange(color)}
-                    className={`rounded-lg ring-2 ring-offset-2 ring-offset-white transition-all duration-200 flex items-center justify-center ${isSelected
-                      ? "ring-opacity-100"
-                      : "ring-transparent hover:ring-opacity-30"
-                      }`}
-                    style={getAccentColorStyle(color, 200, "backgroundColor")}
-                    data-selected={isSelected}
-                    data-color={color}
-                  >
-                    <span
-                      className="text-sm capitalize drop-shadow-sm"
-                      style={getAccentColorStyle(color, 950, "color")}
-                    >
-                      {color}
-                    </span>
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+								return (
+									<Button
+										key={color}
+										size={"lg"}
+										onClick={() => handleColorChange(color)}
+										className={`rounded-lg ring-2 ring-offset-2 ring-offset-white transition-all duration-200 flex items-center justify-center ${
+											isSelected
+												? "ring-opacity-100"
+												: "ring-transparent hover:ring-opacity-30"
+										}`}
+										style={getAccentColorStyle(color, 200, "backgroundColor")}
+										data-selected={isSelected}
+										data-color={color}
+									>
+										<span
+											className="text-sm capitalize drop-shadow-sm"
+											style={getAccentColorStyle(color, 950, "color")}
+										>
+											{color}
+										</span>
+									</Button>
+								);
+							})}
+						</div>
+					</div>
+				</div>
 
-        <Separator />
+				<Separator />
 
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Display</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label>Compact Mode</Label>
-                <p className="text-sm text-muted-foreground">
-                  Reduce spacing between elements
-                </p>
-              </div>
-              <Switch />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label>Show Animations</Label>
-                <p className="text-sm text-muted-foreground">
-                  Enable smooth transitions and animations
-                </p>
-              </div>
-              <Switch defaultChecked />
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
+				<div className="space-y-4">
+					<h3 className="text-lg font-semibold">Display</h3>
+					<div className="space-y-4">
+						<div className="flex items-center justify-between">
+							<div className="space-y-1">
+								<Label>Compact Mode</Label>
+								<p className="text-sm text-muted-foreground">
+									Reduce spacing between elements
+								</p>
+							</div>
+							<Switch />
+						</div>
+						<div className="flex items-center justify-between">
+							<div className="space-y-1">
+								<Label>Show Animations</Label>
+								<p className="text-sm text-muted-foreground">
+									Enable smooth transitions and animations
+								</p>
+							</div>
+							<Switch defaultChecked />
+						</div>
+					</div>
+				</div>
+			</div>
+		</>
+	);
 }

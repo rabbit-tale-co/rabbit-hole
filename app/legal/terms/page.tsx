@@ -24,6 +24,7 @@ import { TypographyP } from "@/components/ui/typography/p";
 // constants moved to app/legal/data
 
 export default function TermsPage() {
+  const { smoothScrollTo } = useSmoothScroll();
   const effectiveDate = useMemo(() => new Date(EFFECTIVE_TERMS), []);
   const effectiveHuman = useMemo(
     () =>
@@ -36,7 +37,6 @@ export default function TermsPage() {
   );
   const sectionIds = useMemo(() => TERMS_SECTIONS.map((s) => s.id), []);
   const activeSection = useActiveSection(sectionIds);
-  const { smoothScrollTo } = useSmoothScroll();
   return (
     <div className="mx-auto max-w-6xl py-10">
       {/* hero */}
@@ -93,7 +93,7 @@ export default function TermsPage() {
             <Section key={section.id} id={section.id} title={section.title}>
               {section.blocks.map((block, i) =>
                 block.type === "p" ? (
-                  <TypographyP key={i}>{renderInline(block.text)}</TypographyP>
+                  <TypographyP key={i}>{renderInline(block.text, false, smoothScrollTo)}</TypographyP>
                 ) : (
                   <RenderList key={i} items={block.items} />
                 ),
@@ -114,11 +114,11 @@ function RenderList({
     <TypographyList>
       {items.map((item, idx) => {
         if (typeof item === "string") {
-          return <li key={idx}>{renderInline(item, true)}</li>;
+          return <li key={idx}>{renderInline(item, true, useSmoothScroll)}</li>;
         }
         return (
           <li key={idx}>
-            {renderInline(item.text, true)}
+            {renderInline(item.text, true, useSmoothScroll)}
             {item.items?.length ? <RenderList items={item.items} /> : null}
           </li>
         );
@@ -162,6 +162,7 @@ function SectionHeading({
 function renderInline(
   text: string,
   boldBeforeColon: boolean = false,
+  smoothScrollTo?: (href: string, e?: React.MouseEvent<HTMLAnchorElement>) => void,
 ): React.ReactNode {
   const replaced = text
     .replaceAll("{SITE}", SITE)
@@ -247,7 +248,7 @@ function renderInline(
           key={parts.length}
           className="underline underline-offset-4"
           href={href}
-          onClick={(e) => smoothScrollTo(href, e)}
+          onClick={smoothScrollTo ? (e) => smoothScrollTo(href, e) : undefined}
         >
           {parseBold(label)}
         </Link>,

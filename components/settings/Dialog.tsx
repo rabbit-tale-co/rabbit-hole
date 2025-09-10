@@ -69,7 +69,7 @@ type Ctx = {
   runSave: () => Promise<void>;
 };
 
-const UnsavedChangesContext = React.createContext<Ctx | null>(null);
+export const UnsavedChangesContext = React.createContext<Ctx | null>(null);
 
 export function useUnsavedChanges() {
   const ctx = React.useContext(UnsavedChangesContext);
@@ -139,15 +139,18 @@ export function SettingsDialog({
   const [internalOpen, setInternalOpen] = React.useState(false);
   const [activeSection, setActiveSection] = React.useState(initialSection);
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
-  const [activeSaveFunction, setActiveSaveFunction] = React.useState<SaveFn>(null);
-  const [activeResetFunction, setActiveResetFunction] = React.useState<ResetFn>(null);
+  const [activeSaveFunction, setActiveSaveFunction] =
+    React.useState<SaveFn>(null);
+  const [activeResetFunction, setActiveResetFunction] =
+    React.useState<ResetFn>(null);
   const [isDesktop, setIsDesktop] = React.useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = React.useState(false);
   const [unsavedData, setUnsavedData] = React.useState<{
     reason: string;
     onConfirm: () => void;
   } | null>(null);
-  const [showCancelSubscriptionDialog, setShowCancelSubscriptionDialog] = React.useState(false);
+  const [showCancelSubscriptionDialog, setShowCancelSubscriptionDialog] =
+    React.useState(false);
   const [canceling, setCanceling] = React.useState(false);
 
   const { user: auth_user, profile } = useAuth();
@@ -172,7 +175,8 @@ export function SettingsDialog({
   const currentKeyRef = React.useRef<string>("");
   const canonDeep = React.useCallback((v: unknown): unknown => {
     if (v === null || v === undefined) return v;
-    if (typeof v === "string") return v.normalize("NFC").replace(/\r\n/g, "\n").trim();
+    if (typeof v === "string")
+      return v.normalize("NFC").replace(/\r\n/g, "\n").trim();
     if (typeof v === "number" || typeof v === "boolean") return v;
     if (Array.isArray(v)) return v.map(canonDeep);
     if (typeof v === "object") {
@@ -207,7 +211,7 @@ export function SettingsDialog({
         canonSnapshot,
         key,
         baselineKey: baselineKeyRef.current,
-        isDirty
+        isDirty,
       });
       setHasUnsavedChanges(isDirty);
     },
@@ -239,7 +243,8 @@ export function SettingsDialog({
         if (isDesktop) {
           // Desktop: show modal dialog
           setUnsavedData({
-            reason: "You have unsaved changes. Are you sure you want to switch sections?",
+            reason:
+              "You have unsaved changes. Are you sure you want to switch sections?",
             onConfirm: () => {
               setActiveSection(sectionId);
               resetChanges();
@@ -338,9 +343,15 @@ export function SettingsDialog({
       setShowCancelSubscriptionDialog(true);
     };
 
-    window.addEventListener("settings:showCancelDialog", handleShowCancelDialog);
+    window.addEventListener(
+      "settings:showCancelDialog",
+      handleShowCancelDialog,
+    );
     return () => {
-      window.removeEventListener("settings:showCancelDialog", handleShowCancelDialog);
+      window.removeEventListener(
+        "settings:showCancelDialog",
+        handleShowCancelDialog,
+      );
     };
   }, []);
 

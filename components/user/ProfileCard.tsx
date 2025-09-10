@@ -54,7 +54,7 @@ export function UserChipHoverCard({ user, className, size = "md" }: Props) {
     stats,
   } = user;
   const accent500 =
-    accentColor || getAccentColorValue(generateAccentColor(username), 500);
+    accentColor || getAccentColorValue(generateAccentColor(user_id), 500);
 
   const [isHoverOpen, setIsHoverOpen] = useState(false);
 
@@ -159,7 +159,7 @@ export function UserChipHoverCard({ user, className, size = "md" }: Props) {
                 accentColor
                   ? getStyleFromHexShade(accentColor, "100", "backgroundColor")
                   : getAccentColorStyle(
-                    generateAccentColor(username),
+                    generateAccentColor(user_id),
                     100,
                     "backgroundColor",
                   )

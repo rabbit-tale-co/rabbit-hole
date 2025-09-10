@@ -1,12 +1,14 @@
 import type { PlacedTile, Tile } from "@/types";
 
-export function bucketFromWH(w: number, h: number): {
+export function bucketFromWH(
+	w: number,
+	h: number,
+): {
 	w: 1 | 2;
 	h: 1 | 2;
 } {
 	const a = w / h;
-	if (w >= 1200 && h >= 1200 && Math.abs(a - 1) < 0.15)
-		return { w: 2, h: 2 };
+	if (w >= 1200 && h >= 1200 && Math.abs(a - 1) < 0.15) return { w: 2, h: 2 };
 	if (a >= 1.3) return { w: 2, h: 1 };
 	if (a <= 1 / 1.3) return { w: 1, h: 2 };
 	return { w: 1, h: 1 };
@@ -35,7 +37,6 @@ export function bucketFromWH(w: number, h: number): {
 // 		];
 // 	return [{ w: 1, h: 1 }];
 // }
-
 
 type PixelNode = {
 	key: string;

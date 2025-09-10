@@ -27,6 +27,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { PremiumBadge } from "@/components/user/PremiumBadge";
 import { buildPublicUrl } from "@/lib/publicUrl";
 import { usePost } from "@/hooks/usePost";
+import { useAuth } from "@/providers/AuthProvider";
 import { BanUserDialog } from "./BanUserDialog";
 import { ConfirmDelete } from "./ConfirmDelete";
 
@@ -56,6 +57,7 @@ export default function PostPage() {
   const router = useRouter();
   const [banOpen, setBanOpen] = React.useState(false);
 
+  const { user } = useAuth();
   const {
     post,
     author,
@@ -67,7 +69,7 @@ export default function PostPage() {
     isOwnPost,
     isAdmin,
     deletePost,
-    copyLink
+    copyLink,
   } = usePost(id);
 
   const publicUrl = React.useCallback(
@@ -160,7 +162,7 @@ export default function PostPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={copyLink}>Copy link</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => copyLink(id)}>Copy link</DropdownMenuItem>
               {isOwnPost && (
                 <>
                   <DropdownMenuSeparator />

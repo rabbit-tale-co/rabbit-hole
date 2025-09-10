@@ -1,95 +1,95 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  type AccentColor,
-  generateAccentColor,
-  getAccentColorStyle,
-  getStyleFromHexShade,
+	type AccentColor,
+	generateAccentColor,
+	getAccentColorStyle,
+	getStyleFromHexShade,
 } from "@/lib/accent-colors";
 import { OutlineUser } from "../icons/Icons";
 
 interface UserAvatarProps {
-  username: string;
-  avatarUrl?: string;
-  size?: "sm" | "md" | "lg" | "xl" | "2xl";
-  accentColor?: AccentColor;
-  accentHex?: string | null;
-  className?: string;
-  showBorder?: boolean;
+	username: string;
+	avatarUrl?: string;
+	size?: "sm" | "md" | "lg" | "xl" | "2xl";
+	accentColor?: AccentColor;
+	accentHex?: string | null;
+	className?: string;
+	showBorder?: boolean;
 }
 
 const sizeClasses = {
-  sm: "size-8",
-  md: "size-10",
-  lg: "size-12",
-  xl: "size-16",
-  "2xl": "size-32",
+	sm: "size-8",
+	md: "size-10",
+	lg: "size-12",
+	xl: "size-16",
+	"2xl": "size-32",
 };
 
 const fallbackSizes = {
-  sm: 16,
-  md: 20,
-  lg: 24,
-  xl: 28,
-  "2xl": 32,
+	sm: 16,
+	md: 20,
+	lg: 24,
+	xl: 28,
+	"2xl": 32,
 };
 
 export function UserAvatar({
-  username,
-  avatarUrl,
-  size = "md",
-  accentColor,
-  accentHex,
-  className = "",
-  showBorder = false,
+	username,
+	avatarUrl,
+	size = "md",
+	accentColor,
+	accentHex,
+	className = "",
+	showBorder = false,
 }: UserAvatarProps) {
-  // Use provided accentColor or generate one based on username
-  const currentAccentColor = accentColor || generateAccentColor(username);
+	// Use provided accentColor or generate one based on username
+	const currentAccentColor = accentColor || generateAccentColor(username);
 
-  // Get color styles for fallback
-  const avatarBgStyle = accentHex
-    ? getStyleFromHexShade(accentHex, "200", "backgroundColor")
-    : getAccentColorStyle(currentAccentColor, 200, "backgroundColor");
-  const avatarForegroundStyle = accentHex
-    ? getStyleFromHexShade(accentHex, "950", "color")
-    : getAccentColorStyle(currentAccentColor, 950, "color");
+	// Get color styles for fallback
+	const avatarBgStyle = accentHex
+		? getStyleFromHexShade(accentHex, "200", "backgroundColor")
+		: getAccentColorStyle(currentAccentColor, 200, "backgroundColor");
+	const avatarForegroundStyle = accentHex
+		? getStyleFromHexShade(accentHex, "950", "color")
+		: getAccentColorStyle(currentAccentColor, 950, "color");
 
-  const sizeClass = sizeClasses[size];
-  const fallbackSize = fallbackSizes[size];
-  const borderClass = showBorder
-    ? "border-4 border-white dark:border-black"
-    : "";
+	const sizeClass = sizeClasses[size];
+	const fallbackSize = fallbackSizes[size];
+	const borderClass = showBorder
+		? "border-4 border-white dark:border-black"
+		: "";
 
-  const isWebm = Boolean(avatarUrl && /\.webm(\?|#|$)/i.test(avatarUrl));
+	const isWebm = Boolean(avatarUrl && /\.webm(\?|#|$)/i.test(avatarUrl));
 
-  return (
-    <Avatar className={`${sizeClass} ${borderClass} ${className}`}>
-      {isWebm ? (
-        <video
-          key={avatarUrl}
-          src={avatarUrl}
-          className="size-full object-cover"
-          muted
-          playsInline
-          autoPlay
-          loop
-          style={avatarBgStyle as React.CSSProperties}
-        />
-      ) : (
-        <AvatarImage
-          key={avatarUrl}
-          src={avatarUrl}
-          alt={`${username} avatar`}
-          style={avatarBgStyle}
-        />
-      )}
-      {!isWebm && (
-        <AvatarFallback
-          className="font-bold rounded-md"
-          style={{ ...avatarBgStyle, ...avatarForegroundStyle }}
-        >
-          <OutlineUser size={fallbackSize} />
-        </AvatarFallback>
-      )}
-    </Avatar>
-  );
+	return (
+		<Avatar className={`${sizeClass} ${borderClass} ${className}`}>
+			{isWebm ? (
+				<video
+					key={avatarUrl}
+					src={avatarUrl}
+					className="size-full object-cover"
+					muted
+					playsInline
+					autoPlay
+					loop
+					style={avatarBgStyle as React.CSSProperties}
+				/>
+			) : (
+				<AvatarImage
+					key={avatarUrl}
+					src={avatarUrl}
+					alt={`${username} avatar`}
+					style={avatarBgStyle}
+				/>
+			)}
+			{!isWebm && (
+				<AvatarFallback
+					className="font-bold rounded-md"
+					style={{ ...avatarBgStyle, ...avatarForegroundStyle }}
+				>
+					<OutlineUser size={fallbackSize} />
+				</AvatarFallback>
+			)}
+		</Avatar>
+	);
 }

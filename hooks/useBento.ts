@@ -218,10 +218,7 @@ export function packAppendGeneric<T extends { w: 1 | 2; h: 1 | 2 }>(
 	return out;
 }
 
-export function useBento(
-	tiles: Tile[],
-	forceUpdate?: number,
-) {
+export function useBento(tiles: Tile[], forceUpdate?: number) {
 	const [cols, setCols] = useState(3);
 
 	// responsive columns based on window width (not container width)
@@ -248,8 +245,6 @@ export function useBento(
 			window.removeEventListener("orientationchange", onResize);
 		};
 	}, [forceUpdate]);
-
-
 
 	// compute placed purely with memo to avoid setState churn on rapid resizes
 	const placed = useMemo<PlacedTile[]>(() => {

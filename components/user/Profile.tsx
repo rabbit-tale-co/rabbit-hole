@@ -44,10 +44,10 @@ export function UserProfile({
   const isAdmin = Boolean(
     (myProfile as unknown as { is_admin?: boolean } | null)?.is_admin,
   );
-  // Use provided accentColor or generate one based on username
-  const currentAccentColor = useMemo(
-    () => generateAccentColor(profile.username),
-    [profile.username],
+  // Generate accent color only when user doesn't have custom color
+  const generatedAccentColor = useMemo(
+    () => generateAccentColor(profile.user_id),
+    [profile.user_id],
   );
   const {
     loading: followLoading,
@@ -72,14 +72,8 @@ export function UserProfile({
   const { coverBgStyle } = useMemo(() => {
     if (profile.accent_color)
       return getUserAccentStylesFromHex(profile.accent_color);
-    return getUserAccentStyles(currentAccentColor);
-  }, [currentAccentColor, profile.accent_color]);
-
-  // No async admin check; rely on profiles.is_admin (same as is_premium path)
-
-  // moderation actions moved to ModerationMenu
-
-  // no longer needed since we reuse SettingsDialog's profile section
+    return getUserAccentStyles(generatedAccentColor);
+  }, [generatedAccentColor, profile.accent_color]);
 
   const isSuspended = Boolean(
     profile.banned_until && Date.parse(profile.banned_until) > Date.now(),
@@ -107,7 +101,7 @@ export function UserProfile({
               : undefined
           }
           size="2xl"
-          accentColor={currentAccentColor}
+          accentColor={profile.accent_color ? undefined : generatedAccentColor}
           accentHex={profile.accent_color || undefined}
           showBorder={true}
           className="flex items-center justify-center text-2xl font-bold"
@@ -203,15 +197,13 @@ export function UserProfile({
         )}
       </div>
 
-      {
-        isEditDialogOpen && (
-          <SettingsDialog
-            open={isEditDialogOpen}
-            onOpenChange={setIsEditDialogOpen}
-            initialSection="profile"
-          />
-        )
-      }
+      {isEditDialogOpen && (
+        <SettingsDialog
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          initialSection="profile"
+        />
+      )}
     </>
   );
 }

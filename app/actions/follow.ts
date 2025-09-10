@@ -2,7 +2,7 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import type { SafeUserListItem } from "@/types/user";
+import type { UserListItem } from "@/types/user";
 
 type FollowStats = {
 	isFollowing: boolean;
@@ -199,7 +199,7 @@ export async function getFollowersPage(
 	cursor?: string,
 	limit = 24,
 ): Promise<
-	{ items: SafeUserListItem[]; nextCursor: string | null } | { error: string }
+	{ items: UserListItem[]; nextCursor: string | null } | { error: string }
 > {
 	const supabase = supabaseAdmin;
 
@@ -255,16 +255,17 @@ export async function getFollowersPage(
 			const profile = profileMap.get(row.follower_id);
 			if (!profile) return null;
 
-			return {
-				username: profile.username,
-				display_name: profile.display_name,
-				bio: profile.bio,
-				avatar_url: profile.avatar_url,
-				cover_url: profile.cover_url,
-				accent_color: profile.accent_color,
-				is_premium: profile.is_premium,
-				followed_at: row.created_at,
-			};
+		return {
+			user_id: profile.user_id,
+			username: profile.username,
+			display_name: profile.display_name,
+			bio: profile.bio,
+			avatar_url: profile.avatar_url,
+			cover_url: profile.cover_url,
+			accent_color: profile.accent_color,
+			is_premium: profile.is_premium,
+			followed_at: row.created_at,
+		};
 		})
 		.filter((item): item is NonNullable<typeof item> => item !== null);
 
@@ -278,13 +279,12 @@ export async function getFollowersPage(
 	return { items, nextCursor };
 }
 
-// Get following list with pagination - OPTIMIZED VERSION
 export async function getFollowingPage(
 	targetUserId: string,
 	cursor?: string,
 	limit = 24,
 ): Promise<
-	{ items: SafeUserListItem[]; nextCursor: string | null } | { error: string }
+	{ items: UserListItem[]; nextCursor: string | null } | { error: string }
 > {
 	const supabase = supabaseAdmin;
 
@@ -337,16 +337,17 @@ export async function getFollowingPage(
 			const profile = profileMap.get(row.following_id);
 			if (!profile) return null;
 
-			return {
-				username: profile.username,
-				display_name: profile.display_name,
-				bio: profile.bio,
-				avatar_url: profile.avatar_url,
-				cover_url: profile.cover_url,
-				accent_color: profile.accent_color,
-				is_premium: profile.is_premium,
-				followed_at: row.created_at,
-			};
+		return {
+			user_id: profile.user_id,
+			username: profile.username,
+			display_name: profile.display_name,
+			bio: profile.bio,
+			avatar_url: profile.avatar_url,
+			cover_url: profile.cover_url,
+			accent_color: profile.accent_color,
+			is_premium: profile.is_premium,
+			followed_at: row.created_at,
+		};
 		})
 		.filter((item): item is NonNullable<typeof item> => item !== null);
 

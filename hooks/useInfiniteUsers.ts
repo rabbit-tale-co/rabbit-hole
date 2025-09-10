@@ -1,17 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { SafeUserListItem } from "@/types/user";
+import type { UserListItem } from "@/types/user";
 
-export type UserListItem = {
-  user_id: string;
-  username: string;
-  display_name?: string;
-  bio?: string | null;
-  avatar_url?: string | null;
-  cover_url?: string | null;
-  accent_color?: string | null;
-};
+export type { UserListItem };
 
 export function useInfiniteUsers(
 	initial?: { items: UserListItem[]; nextCursor: string | null },

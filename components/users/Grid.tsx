@@ -28,7 +28,7 @@ function UserCard({
   };
 }) {
   const avatarAccentHex =
-    u.accent_color || getAccentColorValue(generateAccentColor(u.username), 500);
+    u.accent_color || getAccentColorValue(generateAccentColor(u.user_id), 500);
   const isSuspended = Boolean(
     u.banned_until && Date.parse(u.banned_until) > Date.now(),
   );
@@ -104,7 +104,7 @@ function UserCard({
               u.accent_color
                 ? getStyleFromHexShade(u.accent_color, "100", "backgroundColor")
                 : getAccentColorStyle(
-                  generateAccentColor(u.username),
+                  generateAccentColor(u.user_id),
                   100,
                   "backgroundColor",
                 )
@@ -235,7 +235,15 @@ export default function UsersGrid({
                 is_premium: (u as { is_premium?: boolean }).is_premium ?? false,
                 banned_until:
                   (u as { banned_until?: string | null }).banned_until ?? null,
-                followStats: (u as { followStats?: { isFollowing: boolean; followers: number; following: number } }).followStats,
+                followStats: (
+                  u as {
+                    followStats?: {
+                      isFollowing: boolean;
+                      followers: number;
+                      following: number;
+                    };
+                  }
+                ).followStats,
               }}
             />
           ))}

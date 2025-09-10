@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { sanitizeUserResponse } from "@/utils/userSanitizer";
 
 const Username = z
 	.string()
