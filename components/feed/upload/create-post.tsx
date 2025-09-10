@@ -429,7 +429,7 @@ export function CreateMediaPost({
     is_cover: boolean;
   };
   const [uploadedMetas, setUploadedMetas] = useState<Meta[]>([]);
-  type UploadResp = { path?: string; mime?: NonNullable<Item["mime"]>; imageId?: string };
+  type UploadResp = { path?: string; mime?: NonNullable<Item["mime"]>; imageId?: string; postId?: string };
 
   const canSubmit = useMemo(() => {
     const res = payloadSchema.safeParse({
@@ -576,6 +576,10 @@ export function CreateMediaPost({
               return;
             }
             const json: UploadResp = await res.json();
+            // Update postId if returned from API
+            if (json.postId && json.postId !== postId) {
+              setPostId(json.postId);
+            }
             serverMeta = {
               id: json.imageId, // Use imageId from API response
               path: json.path,
@@ -638,6 +642,10 @@ export function CreateMediaPost({
             return;
           }
           const json: UploadResp = await res.json();
+          // Update postId if returned from API
+          if (json.postId && json.postId !== postId) {
+            setPostId(json.postId);
+          }
           const built = {
             id: json.imageId, // Use imageId from API response
             path: json.path,
@@ -733,12 +741,15 @@ export function CreateMediaPost({
   useEffect(() => {
     const idle = items.filter((i) => i.status === "idle");
     if (idle.length === 0 || uploading) return;
-    const ensurePost = postId ?? randomUUIDv7();
-    if (!postId) setPostId(ensurePost);
+
+    // Generate a temporary postId for the first upload if none exists
+    const tempPostId = postId ?? randomUUIDv7();
+    if (!postId) setPostId(tempPostId);
+
     setUploading(true);
     (async () => {
       try {
-        const metas = await uploadAll(idle, ensurePost, patchItem);
+        const metas = await uploadAll(idle, tempPostId, patchItem);
         setUploadedMetas((prev) => {
           const existing = new Set(prev.map((m) => m.id));
           const added = metas.filter((m) => !existing.has(m.id));
@@ -772,8 +783,10 @@ export function CreateMediaPost({
     };
 
     try {
-      const ensuredPostId = postId ?? randomUUIDv7();
-      if (!postId) setPostId(ensuredPostId);
+      // Use postId from API uploads, don't generate new one
+      if (!postId) {
+        throw new Error("No postId available - uploads must complete first");
+      }
       // optimistic immediately
       onPostCreated(optimistic);
 
@@ -782,7 +795,7 @@ export function CreateMediaPost({
       if (metas.length !== items.length) {
         const pending = items.filter((i) => i.status !== "done");
         if (pending.length) {
-          const extra = await uploadAll(pending, ensuredPostId, patchItem);
+          const extra = await uploadAll(pending, postId, patchItem);
           metas = [...uploadedMetas, ...extra];
           setUploadedMetas(metas);
         }
@@ -804,7 +817,7 @@ export function CreateMediaPost({
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          id: ensuredPostId,
+          id: postId, // Use postId from API uploads
           text: optimistic.content,
           images: metas.map((m) => ({
             id: m.id,
