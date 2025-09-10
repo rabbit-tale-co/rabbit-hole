@@ -141,6 +141,7 @@ export const POST = withAuth(
 				url: result.url || `${EXTERNAL_API_URL}/${result.path}`,
 				mime: result.mime,
 				ext: result.ext || (result.mime?.includes("webm") ? "webm" : "webp"),
+				imageId: result.imageId,
 				crop: { x: cropX, y: cropY, w: cropW, h: cropH },
 			});
 		} catch (e: unknown) {
