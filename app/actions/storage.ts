@@ -156,10 +156,32 @@ export async function finalizeCover(userId: string, pathOrUrl: string) {
 // Optional helper to remove entire post folder when a post is deleted
 export async function deletePostFolder(postId: string) {
 	const sb = supabaseAdmin;
-	const { error } = await sb.storage
-		.from(BUCKET)
-		.remove([`${FOLDER_POSTS}/${postId}`]);
-	if (error) return { error: error.message };
+
+	// First, list all files in the post folder
+	try {
+		const { data: listed } = await sb.storage
+			.from(BUCKET)
+			.list(`${FOLDER_POSTS}/${postId}`);
+
+		if (listed && listed.length > 0) {
+			// Remove all files in the folder
+			const filesToRemove = listed.map(
+				(file) => `${FOLDER_POSTS}/${postId}/${file.name}`,
+			);
+			const { error } = await sb.storage
+				.from(BUCKET)
+				.remove(filesToRemove);
+			if (error) {
+				console.error(`[Storage] Failed to remove files for post ${postId}:`, error);
+				return { error: error.message };
+			}
+			console.log(`[Storage] Removed ${filesToRemove.length} files for post: ${postId}`);
+		}
+	} catch (error) {
+		console.error(`[Storage] Failed to list files for post ${postId}:`, error);
+		return { error: (error as Error).message };
+	}
+
 	return { ok: true };
 }
 

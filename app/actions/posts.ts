@@ -73,13 +73,20 @@ export async function createPost(input: unknown) {
 	}
 
 	const sb = supabaseAdmin;
+	const insertData: any = {
+		author_id: parsed.data.author_id,
+		text: parsed.data.text ?? null,
+		images: parsed.data.images,
+	};
+
+	// Use provided ID if available, otherwise let database generate one
+	if (parsed.data.id) {
+		insertData.id = parsed.data.id;
+	}
+
 	const { data, error } = await sb
 		.from("posts")
-		.insert({
-			author_id: parsed.data.author_id,
-			text: parsed.data.text ?? null,
-			images: parsed.data.images,
-		})
+		.insert(insertData)
 		.select()
 		.single();
 
@@ -133,14 +140,14 @@ export async function updatePost(input: unknown) {
 	return { post: data };
 }
 
-// --- delete post (soft delete + return paths for caller to purge if needed) ---
+// --- delete post (hard delete from database) ---
 export async function deletePost(post_id: string, author_id: string) {
 	// Note: Authorization is already verified by the caller (API endpoint)
 	// We just need to verify that the user can delete this specific post
 	const sb = supabaseAdmin;
 	const { data: post, error: getErr } = await sb
 		.from("posts")
-		.select("author_id, images, is_deleted")
+		.select("author_id, images")
 		.eq("id", post_id)
 		.single();
 	if (getErr) return { error: getErr.message };
@@ -160,14 +167,30 @@ export async function deletePost(post_id: string, author_id: string) {
 		return { error: "Forbidden" };
 	}
 
-	if (post.is_deleted)
-		return { ok: true, already: true, images: post.images ?? [] };
-
+	// Hard delete the post from database
 	const { error } = await sb
 		.from("posts")
-		.update({ is_deleted: true })
+		.delete()
 		.eq("id", post_id);
 	if (error) return { error: error.message };
+
+	// Also delete related data
+	await sb.from("likes").delete().eq("post_id", post_id);
+	await sb.from("bookmarks").delete().eq("post_id", post_id);
+	await sb.from("reposts").delete().eq("post_id", post_id);
+	await sb.from("comments").delete().eq("post_id", post_id);
+	await sb.from("posts_stats").delete().eq("post_id", post_id);
+
+	// Delete post folder from storage to free up space
+	try {
+		const { deletePostFolder } = await import("@/app/actions/storage");
+		await deletePostFolder(post_id);
+		console.log(`[Storage] Deleted folder for post: ${post_id}`);
+	} catch (error) {
+		console.error(`[Storage] Failed to delete folder for post ${post_id}:`, error);
+		// Don't fail the entire operation if storage cleanup fails
+	}
+
 	return { ok: true, images: post.images ?? [] };
 }
 
@@ -262,7 +285,7 @@ export async function removeComment(input: unknown) {
 	if (c.author_id !== parsed.data.author_id) return { error: "Forbidden" };
 	const { error } = await sb
 		.from("comments")
-		.update({ is_deleted: true })
+		.delete()
 		.eq("id", parsed.data.comment_id);
 	if (error) return { error: error.message };
 	return { ok: true };
@@ -278,7 +301,6 @@ export async function getFeedPage(input: unknown) {
 	const query = sb
 		.from("posts")
 		.select("*")
-		.or("is_deleted.is.null,is_deleted.eq.false")
 		.order("created_at", { ascending: false })
 		.order("id", { ascending: false })
 		.limit(parsed.data.limit);
@@ -307,8 +329,7 @@ export async function getFeedPage(input: unknown) {
 			const { data: commentCounts } = await sb
 				.from("comments")
 				.select("post_id")
-				.in("post_id", postIds)
-				.eq("is_deleted", false);
+				.in("post_id", postIds);
 
 			// Get repost counts
 			const { data: repostCounts } = await sb
@@ -494,8 +515,7 @@ export async function getUserFeedPage(input: unknown) {
 			const { data: commentCounts } = await sb
 				.from("comments")
 				.select("post_id")
-				.in("post_id", postIds)
-				.eq("is_deleted", false);
+				.in("post_id", postIds);
 
 			// Get repost counts
 			const { data: repostCounts } = await sb

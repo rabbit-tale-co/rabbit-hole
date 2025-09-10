@@ -59,6 +59,7 @@ export function usePostComposer(authorId: string) {
 					images: metas,
 				});
 				const res = await createPost({
+					id: postId,
 					author_id: authorId,
 					text: caption,
 					images: metas,

@@ -1,6 +1,6 @@
 // app/api/posts/route.ts
 import type { NextRequest } from "next/server";
-import { getFeedPage, getUserFeedPage } from "@/app/actions/posts";
+import { getFeedPage, getUserFeedPage, createPost } from "@/app/actions/posts";
 import { getUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { CreatePost, Cursor } from "@/lib/validation";
@@ -107,22 +107,15 @@ export async function POST(req: NextRequest) {
 	if (!parsed.success)
 		return Response.json({ error: parsed.error.issues }, { status: 400 });
 
-	const { images, text } = parsed.data;
+	// Use createPost action which handles ID properly
+	const result = await createPost({
+		...parsed.data,
+		author_id: user.id,
+	});
 
-	// Insert post
-	const { data, error } = await supabaseAdmin
-		.from("posts")
-		.insert({
-			author_id: user.id,
-			text: text ?? null,
-			images,
-		})
-		.select()
-		.single();
-
-	if (error) {
-		return Response.json({ error: error.message }, { status: 500 });
+	if (result.error) {
+		return Response.json({ error: result.error }, { status: 500 });
 	}
 
-	return Response.json({ post: data }, { status: 201 });
+	return Response.json({ post: result.post }, { status: 201 });
 }

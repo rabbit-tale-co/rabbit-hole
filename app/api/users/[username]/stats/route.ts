@@ -40,8 +40,7 @@ export async function GET(
 		const { count: postsCount, error: postsError } = await supabaseAdmin
 			.from("posts")
 			.select("*", { count: "exact", head: true })
-			.eq("author_id", userId)
-			.eq("is_deleted", false);
+			.eq("author_id", userId);
 
 		if (postsError) {
 			console.error(
@@ -55,8 +54,7 @@ export async function GET(
 		const { data: postsData, error: postsDataError } = await supabaseAdmin
 			.from("posts")
 			.select("id")
-			.eq("author_id", userId)
-			.eq("is_deleted", false);
+			.eq("author_id", userId);
 
 		if (postsDataError) {
 			console.error(

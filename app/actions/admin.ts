@@ -60,19 +60,30 @@ export async function adminDeletePost(post_id: string) {
 	if ("error" in auth) return auth;
 	const { error } = await supabaseAdmin
 		.from("posts")
-		.update({ is_deleted: true })
+		.delete()
 		.eq("id", post_id);
 	if (error) return { error: error.message };
+
+	// Delete post folder from storage to free up space
+	try {
+		const { deletePostFolder } = await import("@/app/actions/storage");
+		await deletePostFolder(post_id);
+		console.log(`[Storage] Admin deleted folder for post: ${post_id}`);
+	} catch (error) {
+		console.error(`[Storage] Failed to delete folder for post ${post_id}:`, error);
+		// Don't fail the entire operation if storage cleanup fails
+	}
+
 	return { ok: true };
 }
 
-// TEMP DEV TOOL: soft-delete all posts
+// TEMP DEV TOOL: delete all posts
 export async function adminDeleteAllPosts() {
 	const auth = await requireAdmin();
 	if ("error" in auth) return auth;
 	const { error } = await supabaseAdmin
 		.from("posts")
-		.update({ is_deleted: true })
+		.delete()
 		.neq("id", "");
 	if (error) return { error: error.message };
 	return { ok: true };
