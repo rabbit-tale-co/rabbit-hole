@@ -12,22 +12,9 @@ import {
 	PostIdUserId,
 	UpdatePost,
 } from "@/schemas/post";
+import { encodeCursor, decodeCursor } from "@/lib/cursor-utils";
 
 // using central schemas from '@/schemas/post'
-
-// --- helpers ---
-function decodeCursor(cursor?: string | null) {
-	if (!cursor) return null;
-	try {
-		const [ts, id] = Buffer.from(cursor, "base64").toString("utf8").split("|");
-		return { ts, id };
-	} catch {
-		return null;
-	}
-}
-function encodeCursor(ts: string, id: string) {
-	return Buffer.from(`${ts}|${id}`).toString("base64");
-}
 
 // Require logged-in and not-banned user. Optionally assert the userId matches the current user.
 import { requireActiveUser } from "./auth";
@@ -64,6 +51,7 @@ export async function createPost(input: unknown, skipAuth = false) {
 		author_id: parsed.data.author_id,
 		text: parsed.data.text ?? null,
 		images: parsed.data.images,
+		rabbit_hole_id: parsed.data.rabbit_hole_id ?? null,
 	};
 
 	// Use provided ID if available, otherwise let database generate one
@@ -294,31 +282,37 @@ export async function removeComment(input: unknown) {
 // --- feed page ---
 export async function getFeedPage(input: unknown) {
 	const parsed = FeedCursor.safeParse(input);
-	if (!parsed.success) return { error: "Invalid cursor" };
+	if (!parsed.success) return { error: "Invalid parameters" };
 
+	const sb = supabaseAdmin;
+	const query = sb
+		.from("posts")
+		.select("*")
+		.order("created_at", { ascending: false })
+		.order("id", { ascending: false })
+		.limit(parsed.data.take + 1);
 
-		const sb = supabaseAdmin;
-		const decoded = decodeCursor(parsed.data.cursor);
-		const query = sb
-			.from("posts")
-			.select("*")
-			.order("created_at", { ascending: false })
-			.order("id", { ascending: false })
-			.limit(parsed.data.limit);
+	// Apply cursor-based pagination
+	if (parsed.data.cursorId && parsed.data.cursorCreatedAt) {
+		query.or(`created_at.lt.${parsed.data.cursorCreatedAt},and(created_at.eq.${parsed.data.cursorCreatedAt},id.lt.${parsed.data.cursorId})`);
+	}
 
-		if (decoded) {
-			// simple keyset without tie-break OR to avoid overriding previous OR filters
-			query.lt("created_at", decoded.ts);
-		}
+	const { data, error } = await query;
+	if (error) return { error: error.message };
 
-		const { data, error } = await query;
-		if (error) return { error: error.message };
+	// Check if there are more posts
+	const hasMore = data && data.length > parsed.data.take;
+	const items = hasMore ? data.slice(0, -1) : data || [];
 
-		// Calculate reaction counts for all posts
-		let itemsWithReactionStats = data ?? [];
-		if (data && data.length > 0) {
-			try {
-				const postIds = data.map((post) => post.id);
+	// Get next cursor info
+	const nextId = hasMore && items.length > 0 ? items[items.length - 1].id : null;
+	const nextCreatedAt = hasMore && items.length > 0 ? items[items.length - 1].created_at : null;
+
+	// Calculate reaction counts for all posts
+	let itemsWithReactionStats = items ?? [];
+	if (items && items.length > 0) {
+		try {
+			const postIds = items.map((post) => post.id);
 
 				// Get like counts
 				const { data: likeCounts } = await sb
@@ -390,7 +384,7 @@ export async function getFeedPage(input: unknown) {
 			});
 
 			// Attach reaction counts to posts
-			itemsWithReactionStats = data.map((post) => ({
+			itemsWithReactionStats = items.map((post) => ({
 				...post,
 				like_count: likeCountMap.get(post.id) || 0,
 				comment_count: commentCountMap.get(post.id) || 0,
@@ -401,7 +395,7 @@ export async function getFeedPage(input: unknown) {
 		} catch (err) {
 			console.error("Error fetching reaction stats:", err);
 			// Return posts without reaction stats on error
-			itemsWithReactionStats = data.map((post) => ({
+			itemsWithReactionStats = items.map((post) => ({
 				...post,
 				like_count: 0,
 				comment_count: 0,
@@ -415,9 +409,9 @@ export async function getFeedPage(input: unknown) {
 	// Fetch real post stats for all posts in batch
 	let itemsWithStats = itemsWithReactionStats;
 
-		if (data && data.length > 0) {
+	if (items && items.length > 0) {
 		try {
-			const postIds = data.map((post) => post.id);
+			const postIds = items.map((post) => post.id);
 
 			const { data: statsData, error: statsError } = await sb
 				.from("posts_stats")
@@ -426,7 +420,7 @@ export async function getFeedPage(input: unknown) {
 
 			if (statsError) {
 				// If stats table doesn't exist, return posts without stats
-				itemsWithStats = data.map((post) => {
+				itemsWithStats = items.map((post) => {
 					// Find the original post with is_liked from itemsWithReactionStats
 					const originalPost = itemsWithReactionStats.find(p => p.id === post.id);
 					return {
@@ -469,7 +463,7 @@ export async function getFeedPage(input: unknown) {
 		} catch (err) {
 			console.error("Error fetching post stats:", err);
 			// Return posts without stats if there's an error
-			itemsWithStats = data.map((post) => {
+			itemsWithStats = items.map((post) => {
 				// Find the original post with is_liked from itemsWithReactionStats
 				const originalPost = itemsWithReactionStats.find(p => p.id === post.id);
 				return {
@@ -485,31 +479,34 @@ export async function getFeedPage(input: unknown) {
 		}
 	}
 
-	const nextCursor =
-		data && data.length
-			? encodeCursor(
-					data[data.length - 1].created_at as string,
-					data[data.length - 1].id as string,
-				)
-			: null;
+	const nextCursor = hasMore ? encodeCursor(
+		nextCreatedAt as string,
+		nextId as string,
+	) : null;
 
-	return { items: itemsWithStats, nextCursor };
+	return {
+		items: itemsWithStats,
+		nextCursor,
+		nextId,
+		nextCreatedAt
+	};
 }
 
 // --- feed page filtered by author ---
 const FeedByAuthor = z.object({
-	cursor: z.string().optional(),
-	limit: z.number().int().min(1).max(50).default(24),
+	take: z.number().int().min(1).max(50).default(24),
+	skip: z.number().int().min(0).default(0),
+	cursorId: z.string().optional(),
+	cursorCreatedAt: z.string().optional(),
 	author_id: UUID,
 	user_id: z.string().optional(), // for checking is_liked, is_bookmarked, etc.
 });
 
 export async function getUserFeedPage(input: unknown) {
 	const parsed = FeedByAuthor.safeParse(input);
-	if (!parsed.success) return { error: "Invalid cursor or author_id" };
+	if (!parsed.success) return { error: "Invalid parameters" };
 
 	const sb = supabaseAdmin;
-	const decoded = decodeCursor(parsed.data.cursor);
 	const query = sb
 		.from("posts")
 		.select("*")
@@ -517,21 +514,29 @@ export async function getUserFeedPage(input: unknown) {
 		.eq("author_id", parsed.data.author_id)
 		.order("created_at", { ascending: false })
 		.order("id", { ascending: false })
-		.limit(parsed.data.limit);
+		.limit(parsed.data.take + 1);
 
-	if (decoded) {
-		// simple keyset without tie-break OR to avoid overriding filters
-		query.lt("created_at", decoded.ts);
+	// Apply cursor-based pagination
+	if (parsed.data.cursorId && parsed.data.cursorCreatedAt) {
+		query.or(`created_at.lt.${parsed.data.cursorCreatedAt},and(created_at.eq.${parsed.data.cursorCreatedAt},id.lt.${parsed.data.cursorId})`);
 	}
 
 	const { data, error } = await query;
 	if (error) return { error: error.message };
 
+	// Check if there are more posts
+	const hasMore = data && data.length > parsed.data.take;
+	const items = hasMore ? data.slice(0, -1) : data || [];
+
+	// Get next cursor info
+	const nextId = hasMore && items.length > 0 ? items[items.length - 1].id : null;
+	const nextCreatedAt = hasMore && items.length > 0 ? items[items.length - 1].created_at : null;
+
 	// Calculate reaction counts for all posts
-	let itemsWithReactionStats = data ?? [];
-	if (data && data.length > 0) {
+	let itemsWithReactionStats = items ?? [];
+	if (items && items.length > 0) {
 		try {
-			const postIds = data.map((post) => post.id);
+			const postIds = items.map((post) => post.id);
 
 			// Get like counts
 			const { data: likeCounts } = await sb
@@ -639,7 +644,7 @@ export async function getUserFeedPage(input: unknown) {
 
 			if (statsError) {
 				// If stats table doesn't exist, return posts without stats
-				itemsWithStats = data.map((post) => ({
+				itemsWithStats = items.map((post) => ({
 					...post,
 					stats: {
 						views_total: 0,
@@ -659,7 +664,7 @@ export async function getUserFeedPage(input: unknown) {
 				});
 
 				// Attach stats to each post
-				itemsWithStats = data.map((post) => {
+				itemsWithStats = items.map((post) => {
 					const stats = statsMap.get(post.id) || {
 						views_total: 0,
 						unique_viewers: 0,
@@ -674,7 +679,7 @@ export async function getUserFeedPage(input: unknown) {
 		} catch (err) {
 			console.error("Error fetching user post stats:", err);
 			// Return posts without stats on error
-			itemsWithStats = data.map((post) => ({
+			itemsWithStats = items.map((post) => ({
 				...post,
 				stats: {
 					views_total: 0,
@@ -685,30 +690,36 @@ export async function getUserFeedPage(input: unknown) {
 		}
 	}
 
-	const nextCursor =
-		itemsWithStats && itemsWithStats.length
-			? encodeCursor(
-					itemsWithStats[itemsWithStats.length - 1].created_at as string,
-					itemsWithStats[itemsWithStats.length - 1].id as string,
-				)
-			: null;
+	const nextCursor = hasMore ? encodeCursor(
+		nextCreatedAt as string,
+		nextId as string,
+	) : null;
 
-	return { items: itemsWithStats, nextCursor };
+	return {
+		items: itemsWithStats,
+		nextCursor,
+		nextId,
+		nextCreatedAt
+	};
 }
 
 // --- following feed page ---
 const FeedFollowing = z.object({
-	cursor: z.string().optional(),
-	limit: z.number().int().min(1).max(50).default(24),
+	take: z.number().int().min(1).max(50).default(24),
+	skip: z.number().int().min(0).default(0),
+	cursorId: z.string().optional(),
+	cursorCreatedAt: z.string().optional(),
 	user_id: UUID,
+	user_id_for_likes: z.string().optional(),
 });
 
 export async function getFollowingFeedPage(input: unknown) {
 	const parsed = FeedFollowing.safeParse(input);
-	if (!parsed.success) return { error: "Invalid cursor or user_id" };
+	if (!parsed.success) return { error: "Invalid parameters" };
+
+	console.log("[getFollowingFeedPage] Called with user_id:", parsed.data.user_id);
 
 	const sb = supabaseAdmin;
-	const decoded = decodeCursor(parsed.data.cursor);
 
 	// First get list of users that the current user follows
 	const { data: followingData, error: followingError } = await sb
@@ -731,20 +742,37 @@ export async function getFollowingFeedPage(input: unknown) {
 		.in("author_id", followingIds)
 		.order("created_at", { ascending: false })
 		.order("id", { ascending: false })
-		.limit(parsed.data.limit);
+		.limit(parsed.data.take + 1); // +1 to check if there are more
 
-	if (decoded) {
-		query.lt("created_at", decoded.ts);
+	// Apply cursor-based pagination
+	if (parsed.data.cursorId && parsed.data.cursorCreatedAt) {
+		query.or(`created_at.lt.${parsed.data.cursorCreatedAt},and(created_at.eq.${parsed.data.cursorCreatedAt},id.lt.${parsed.data.cursorId})`);
 	}
 
 	const { data, error } = await query;
 	if (error) return { error: error.message };
 
+	console.log("[getFollowingFeedPage] Query result:", {
+		followingCount: followingIds.length,
+		followingIds: followingIds.slice(0, 5), // First 5 IDs
+		postsFound: data?.length || 0,
+		firstPostAuthor: data?.[0]?.author_id,
+		isFirstPostFromFollowing: data?.[0] ? followingIds.includes(data[0].author_id) : null
+	});
+
+	// Check if there are more posts
+	const hasMore = data && data.length > parsed.data.take;
+	const items = hasMore ? data.slice(0, -1) : data || [];
+
+	// Get next cursor info
+	const nextId = hasMore && items.length > 0 ? items[items.length - 1].id : null;
+	const nextCreatedAt = hasMore && items.length > 0 ? items[items.length - 1].created_at : null;
+
 	// Calculate reaction counts for all posts
-	let itemsWithReactionStats = data ?? [];
-	if (data && data.length > 0) {
+	let itemsWithReactionStats = items ?? [];
+	if (items && items.length > 0) {
 		try {
-			const postIds = data.map((post) => post.id);
+			const postIds = items.map((post) => post.id);
 
 			// Get like counts
 			const { data: likeCounts } = await sb
@@ -772,11 +800,11 @@ export async function getFollowingFeedPage(input: unknown) {
 
 			// Get user's likes if user_id is provided
 			let userLikes: string[] = [];
-			if (parsed.data.user_id) {
+			if (parsed.data.user_id_for_likes) {
 				const { data: userLikesData } = await sb
 					.from("likes")
 					.select("post_id")
-					.eq("user_id", parsed.data.user_id)
+					.eq("user_id", parsed.data.user_id_for_likes)
 					.in("post_id", postIds);
 				userLikes = (userLikesData || []).map(like => like.post_id);
 			}
@@ -804,7 +832,7 @@ export async function getFollowingFeedPage(input: unknown) {
 			});
 
 			// Add reaction counts to posts
-			itemsWithReactionStats = data.map((post) => ({
+			itemsWithReactionStats = items.map((post) => ({
 				...post,
 				stats: {
 					likes: likeCountMap.get(post.id) || 0,
@@ -823,9 +851,9 @@ export async function getFollowingFeedPage(input: unknown) {
 	// Fetch real post stats for all posts in batch
 	let itemsWithStats = itemsWithReactionStats;
 
-	if (data && data.length > 0) {
+	if (items && items.length > 0) {
 		try {
-			const postIds = data.map((post) => post.id);
+			const postIds = items.map((post) => post.id);
 			const { data: statsData, error: statsError } = await sb
 				.from("posts_stats")
 				.select("post_id, views_total, unique_viewers, last_view_at")
@@ -833,7 +861,7 @@ export async function getFollowingFeedPage(input: unknown) {
 
 			if (statsError) {
 				// If stats table doesn't exist, return posts without stats
-				itemsWithStats = data.map((post) => ({
+				itemsWithStats = items.map((post) => ({
 					...post,
 					stats: {
 						views_total: 0,
@@ -864,7 +892,7 @@ export async function getFollowingFeedPage(input: unknown) {
 		} catch (error) {
 			console.error("Error fetching post stats:", error);
 			// Return posts without stats if there's an error
-			itemsWithStats = data.map((post) => ({
+			itemsWithStats = items.map((post) => ({
 				...post,
 				stats: {
 					views_total: 0,
@@ -875,14 +903,17 @@ export async function getFollowingFeedPage(input: unknown) {
 		}
 	}
 
-	const nextCursor = data && data.length === parsed.data.limit
-		? encodeCursor(
-				data[data.length - 1].created_at as string,
-				data[data.length - 1].id as string,
-			)
-		: null;
+	const nextCursor = hasMore ? encodeCursor(
+		nextCreatedAt as string,
+		nextId as string,
+	) : null;
 
-	return { items: itemsWithStats, nextCursor };
+	return {
+		items: itemsWithStats,
+		nextCursor,
+		nextId,
+		nextCreatedAt
+	};
 }
 
 // --- get post stats ---
@@ -962,4 +993,304 @@ export async function trackPostView(postId: string, userId?: string) {
 		console.error("Failed to track post view:", err);
 		return { error: "Failed to track view" };
 	}
+}
+
+// --- get user replies page ---
+export async function getUserRepliesPage(input: unknown) {
+	const parsed = FeedByAuthor.safeParse(input);
+	if (!parsed.success) return { error: "Invalid parameters" };
+
+	const sb = supabaseAdmin;
+
+	// Get user's comments (replies) with the original post data
+	const query = sb
+		.from("comments")
+		.select(`
+			*,
+			posts!inner(*)
+		`)
+		.eq("author_id", parsed.data.author_id)
+		.order("created_at", { ascending: false })
+		.order("id", { ascending: false })
+		.limit(parsed.data.take + 1);
+
+	// Apply cursor-based pagination
+	if (parsed.data.cursorId && parsed.data.cursorCreatedAt) {
+		query.or(`created_at.lt.${parsed.data.cursorCreatedAt},and(created_at.eq.${parsed.data.cursorCreatedAt},id.lt.${parsed.data.cursorId})`);
+	}
+
+	const { data, error } = await query;
+	if (error) return { error: error.message };
+
+	// Check if there are more comments
+	const hasMore = data && data.length > parsed.data.take;
+	const items = hasMore ? data.slice(0, -1) : data || [];
+
+	// Get next cursor info
+	const nextId = hasMore && items.length > 0 ? items[items.length - 1].id : null;
+	const nextCreatedAt = hasMore && items.length > 0 ? items[items.length - 1].created_at : null;
+
+	// Transform comments to post format for consistency
+	const itemsWithReactionStats = items.map((comment) => ({
+		...comment.posts, // Use the original post data
+		comment_text: comment.text, // Add the comment text
+		comment_id: comment.id, // Add the comment ID
+		comment_created_at: comment.created_at, // Add the comment timestamp
+		like_count: 0,
+		comment_count: 0,
+		repost_count: 0,
+		bookmark_count: 0,
+		is_liked: false,
+	}));
+
+	const nextCursor = hasMore ? encodeCursor(
+		nextCreatedAt as string,
+		nextId as string,
+	) : null;
+
+	return {
+		items: itemsWithReactionStats,
+		nextCursor,
+		nextId,
+		nextCreatedAt
+	};
+}
+
+// --- get user liked page ---
+export async function getUserLikedPage(input: unknown) {
+	console.log("[getUserLikedPage] Called with input:", input);
+
+	const parsed = z.object({
+		user_id: z.string(),
+		take: z.number(),
+		skip: z.number(),
+		cursorId: z.string().optional(),
+		cursorCreatedAt: z.string().optional(),
+	}).safeParse(input);
+	if (!parsed.success) {
+		console.log("[getUserLikedPage] Validation failed:", parsed.error);
+		return { error: "Invalid parameters" };
+	}
+
+	console.log("[getUserLikedPage] Parsed successfully:", parsed.data);
+
+	const sb = supabaseAdmin;
+
+	// Get user's liked posts
+	const query = sb
+		.from("likes")
+		.select(`
+			*,
+			posts!inner(*)
+		`)
+		.eq("user_id", parsed.data.user_id)
+		.order("created_at", { ascending: false })
+		.limit(parsed.data.take + 1);
+
+	// Apply cursor-based pagination
+	if (parsed.data.cursorId && parsed.data.cursorCreatedAt) {
+		query.or(`created_at.lt.${parsed.data.cursorCreatedAt},and(created_at.eq.${parsed.data.cursorCreatedAt},post_id.lt.${parsed.data.cursorId})`);
+	}
+
+	const { data, error } = await query;
+	console.log("[getUserLikedPage] Query result:", { data: data?.length || 0, error });
+	if (data && data.length > 0) {
+		console.log("[getUserLikedPage] First item structure:", {
+			hasPosts: !!data[0].posts,
+			postsKeys: data[0].posts ? Object.keys(data[0].posts) : [],
+			postsAuthorId: data[0].posts?.author_id,
+			postsId: data[0].posts?.id
+		});
+	}
+
+	if (error) return { error: error.message };
+
+	// Check if there are more likes
+	const hasMore = data && data.length > parsed.data.take;
+	const items = hasMore ? data.slice(0, -1) : data || [];
+
+	console.log("[getUserLikedPage] Items:", items.length);
+
+	// Get next cursor info
+	const nextId = hasMore && items.length > 0 ? items[items.length - 1].post_id : null;
+	const nextCreatedAt = hasMore && items.length > 0 ? items[items.length - 1].created_at : null;
+
+	// Calculate reaction counts for all posts
+	let itemsWithReactionStats = items ?? [];
+	if (items && items.length > 0) {
+		try {
+			const postIds = items.map((like) => like.posts.id);
+
+			// Get like counts
+			const { data: likeCounts } = await sb
+				.from("likes")
+				.select("post_id")
+				.in("post_id", postIds);
+
+			// Get comment counts
+			const { data: commentCounts } = await sb
+				.from("comments")
+				.select("post_id")
+				.in("post_id", postIds);
+
+			// Get repost counts
+			const { data: repostCounts } = await sb
+				.from("reposts")
+				.select("post_id")
+				.in("post_id", postIds);
+
+			// Get bookmark counts
+			const { data: bookmarkCounts } = await sb
+				.from("bookmarks")
+				.select("post_id")
+				.in("post_id", postIds);
+
+			// Get user's likes if user_id is provided
+			let userLikes: string[] = [];
+			if (parsed.data.user_id) {
+				const { data: userLikesData } = await sb
+					.from("likes")
+					.select("post_id")
+					.eq("user_id", parsed.data.user_id)
+					.in("post_id", postIds);
+				userLikes = (userLikesData || []).map(like => like.post_id);
+			}
+
+			// Count occurrences
+			const likeCountMap = new Map();
+			const commentCountMap = new Map();
+			const repostCountMap = new Map();
+			const bookmarkCountMap = new Map();
+
+			(likeCounts || []).forEach((like) => {
+				likeCountMap.set(
+					like.post_id,
+					(likeCountMap.get(like.post_id) || 0) + 1,
+				);
+			});
+
+			(commentCounts || []).forEach((comment) => {
+				commentCountMap.set(
+					comment.post_id,
+					(commentCountMap.get(comment.post_id) || 0) + 1,
+				);
+			});
+
+			(repostCounts || []).forEach((repost) => {
+				repostCountMap.set(
+					repost.post_id,
+					(repostCountMap.get(repost.post_id) || 0) + 1,
+				);
+			});
+
+			(bookmarkCounts || []).forEach((bookmark) => {
+				bookmarkCountMap.set(
+					bookmark.post_id,
+					(bookmarkCountMap.get(bookmark.post_id) || 0) + 1,
+				);
+			});
+
+			// Attach reaction counts to posts
+			itemsWithReactionStats = items.map((like) => ({
+				...like.posts, // Use the original post data
+				like_count: likeCountMap.get(like.posts.id) || 0,
+				comment_count: commentCountMap.get(like.posts.id) || 0,
+				repost_count: repostCountMap.get(like.posts.id) || 0,
+				bookmark_count: bookmarkCountMap.get(like.posts.id) || 0,
+				is_liked: userLikes.includes(like.posts.id),
+			}));
+		} catch (err) {
+			console.error("Error fetching reaction stats:", err);
+			// Return posts without reaction stats on error
+			itemsWithReactionStats = items.map((like) => ({
+				...like.posts, // Use the original post data
+				like_count: 0,
+				comment_count: 0,
+				repost_count: 0,
+				bookmark_count: 0,
+				is_liked: true, // User liked this post
+			}));
+		}
+	}
+
+	// Fetch real post stats for all posts in batch
+	let itemsWithStats = itemsWithReactionStats;
+	if (items && items.length > 0) {
+		try {
+			const postIds = items.map((like) => like.posts.id);
+			const { data: statsData, error: statsError } = await sb
+				.from("posts_stats")
+				.select("post_id, views_total, unique_viewers, last_view_at")
+				.in("post_id", postIds);
+
+			if (statsError) {
+				// If stats table doesn't exist, return posts without stats
+				itemsWithStats = itemsWithReactionStats.map((post) => ({
+					...post,
+					stats: {
+						views_total: 0,
+						unique_viewers: 0,
+						last_view_at: null,
+					},
+				}));
+			} else {
+				// Create a map of post_id to stats for efficient lookup
+				const statsMap = new Map();
+				(statsData ?? []).forEach((stat) => {
+					statsMap.set(stat.post_id, {
+						views_total: stat.views_total || 0,
+						unique_viewers: stat.unique_viewers || 0,
+						last_view_at: stat.last_view_at,
+					});
+				});
+
+				// Attach stats to each post
+				itemsWithStats = itemsWithReactionStats.map((post) => {
+					const stats = statsMap.get(post.id) || {
+						views_total: 0,
+						unique_viewers: 0,
+						last_view_at: null,
+					};
+					return {
+						...post,
+						stats,
+					};
+				});
+			}
+		} catch (err) {
+			console.error("Error fetching post stats:", err);
+			// Return posts without stats on error
+			itemsWithStats = itemsWithReactionStats.map((post) => ({
+				...post,
+				stats: {
+					views_total: 0,
+					unique_viewers: 0,
+					last_view_at: null,
+				},
+			}));
+		}
+	}
+
+	console.log("[getUserLikedPage] Transformed items:", itemsWithStats.map(item => ({
+		id: item.id,
+		author_id: item.author_id,
+		like_count: item.like_count,
+		comment_count: item.comment_count,
+		stats: item.stats,
+		text: item.text?.substring(0, 50) + "...",
+		hasAuthorId: !!item.author_id,
+		authorIdType: typeof item.author_id
+	})));
+
+	const nextCursor = hasMore ? encodeCursor(
+		nextCreatedAt as string,
+		nextId as string,
+	) : null;
+
+	return {
+		items: itemsWithStats,
+		nextCursor,
+		nextId,
+		nextCreatedAt
+	};
 }

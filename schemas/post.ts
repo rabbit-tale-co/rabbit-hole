@@ -8,6 +8,7 @@ export const PostRow = z.object({
 	text: z.string().max(2000).nullable(),
 	images: z.array(ImageMeta).min(1).max(10),
 	is_deleted: z.boolean().default(false),
+	rabbit_hole_id: UUID.optional(),
 	created_at: ISODate,
 	updated_at: ISODate,
 	like_count: z.number().int().nonnegative(),
@@ -21,6 +22,7 @@ export const CreatePost = z.object({
 	author_id: UUID,
 	text: z.string().max(2000).optional(),
 	images: z.array(ImageMeta).min(1).max(10),
+	rabbit_hole_id: UUID.optional(),
 });
 
 export const UpdatePost = z.object({

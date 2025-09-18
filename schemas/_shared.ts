@@ -24,7 +24,9 @@ export const MimeImage = z.enum([
 
 // Pagination
 export const Cursor = z.object({
-	cursor: z.string().optional(), // base64(created_at|id)
-	limit: z.number().int().min(1).max(50).default(24),
+	take: z.number().int().min(1).max(50).default(24),
+	skip: z.number().int().min(0).default(0),
+	cursorId: z.string().optional(),
+	cursorCreatedAt: z.string().optional(),
 	user_id: z.string().optional(), // for checking is_liked, is_bookmarked, etc.
 });

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback, useRef } from "react";
 import { ModerationMenu } from "@/components/mod/ModerationMenu";
 import { SettingsDialog } from "@/components/settings/Dialog";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import { PremiumBadge } from "./PremiumBadge";
 import { ProfileBio } from "./ProfileBio";
 import { ProfileCover } from "./ProfileCover";
 import { ProfileStats } from "./ProfileStats";
+import { ProfileFeedSelector, ProfileFeedType } from "./ProfileFeedSelector";
+import Feed from "../feed/Index";
 
 interface UserProfileData {
   user_id: string;
@@ -27,7 +29,7 @@ interface UserProfileData {
 
 interface UserProfileProps {
   profile: UserProfileData;
-  stats: { posts: number; views: number }; // posts and views count from props, followers/following from useFollow
+  stats: { posts: number }; // posts count from props, followers/following from useFollow
   isOwnProfile: boolean;
   isLoading?: boolean;
   onEditProfile?: () => void;
@@ -40,6 +42,37 @@ export function UserProfile({
   isLoading = false,
 }: UserProfileProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [currentFeed, setCurrentFeed] = useState<ProfileFeedType>("posts");
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  console.log("[Profile] currentFeed:", currentFeed);
+
+  const handleFeedChange = useCallback((feed: ProfileFeedType) => {
+    console.log("[Profile] handleFeedChange called with:", feed);
+
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    // Debounce the feed change by 150ms
+    timeoutRef.current = setTimeout(() => {
+      console.log("[Profile] Actually changing feed to:", feed);
+      setCurrentFeed(feed);
+      timeoutRef.current = null;
+    }, 150);
+  }, []);
+
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
   const { profile: myProfile } = useAuth();
   const isAdmin = Boolean(
     (myProfile as unknown as { is_admin?: boolean } | null)?.is_admin,
@@ -161,7 +194,6 @@ export function UserProfile({
         {!isSuspended && (
           <ProfileStats
             posts={stats.posts}
-            views={stats.views}
             following={following}
             followers={followers}
             targetUserId={profile.user_id}
@@ -170,6 +202,34 @@ export function UserProfile({
             showAdminStats={isAdmin}
             isLoading={isLoading || followLoading}
           />
+        )}
+
+        {/* Feed Selector */}
+        {!isSuspended && (
+          <div className="mt-6">
+            <ProfileFeedSelector
+              currentFeed={currentFeed}
+              onFeedChange={handleFeedChange}
+            />
+          </div>
+        )}
+
+        {/* Feed Content */}
+        {!isSuspended && (
+          <div className="mt-6">
+            <Feed
+              username={profile.username}
+              isOwnProfile={isOwnProfile}
+              emptyStateVariant="home"
+              profileFeedType={currentFeed}
+            />
+            {/* Debug: show current feed */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-muted-foreground mt-2">
+                Debug: currentFeed = {currentFeed}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

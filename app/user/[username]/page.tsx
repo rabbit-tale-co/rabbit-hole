@@ -2,8 +2,6 @@
 
 import { useParams } from "next/navigation";
 import Center from "@/components/Center";
-import { EmptyState } from "@/components/feed/Empty";
-import Feed from "@/components/feed/Index";
 import { OutlineUser } from "@/components/icons/Icons";
 import { UserProfile } from "@/components/user/Profile";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -61,25 +59,12 @@ export default function UserProfilePage() {
         profile={profile}
         stats={{
           posts: userStats?.posts || 0,
-          views: userStats?.views || 0,
         }}
         isOwnProfile={isOwn}
         isLoading={userStatsLoading}
       />
 
-      {!isSuspended ? (
-        <Feed
-          username={profile.username}
-          isOwnProfile={isOwn}
-        />
-      ) : (
-        <EmptyState
-          variant="profile"
-          isOwnProfile={false}
-          message="This account is suspended"
-          description="Posts are hidden while the account is under review."
-        />
-      )}
+      {/* Feed is now rendered inside UserProfile component */}
     </>
   );
 }

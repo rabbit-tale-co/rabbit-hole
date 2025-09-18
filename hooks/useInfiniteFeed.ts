@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PostRow } from "@/types";
+import { ProfileFeedType } from "@/components/user/ProfileFeedSelector";
 
 type Page = { items: PostRow[]; nextCursor: string | null };
 
@@ -12,7 +13,7 @@ let globalInFlight = false;
 export function useInfiniteFeed(
 	initial?: Page,
 	pageSize = 24,
-	opts?: { username?: string; following?: boolean; rabbitHole?: string },
+	opts?: { username?: string; following?: boolean; rabbitHole?: string; profileFeedType?: ProfileFeedType },
 ) {
 	const [pages, setPages] = useState<Page[]>(initial ? [initial] : []);
 	const [cursor, setCursor] = useState<string | null | "">(
@@ -73,17 +74,36 @@ export function useInfiniteFeed(
 		const currentCursor = cursorRef.current;
 		const cursorParam = currentCursor === "" ? undefined : currentCursor;
 
+		// Decode cursor to get id and created_at
+		let cursorId: string | undefined;
+		let cursorCreatedAt: string | undefined;
+		if (cursorParam) {
+			try {
+				const [ts, id] = Buffer.from(cursorParam, "base64").toString("utf8").split("|");
+				cursorId = id;
+				cursorCreatedAt = ts;
+			} catch {
+				// Invalid cursor, ignore
+			}
+		}
+
 		const qs = new URLSearchParams();
-		if (cursorParam) qs.set("cursor", cursorParam);
-		qs.set("limit", String(pageSize));
+		qs.set("take", String(pageSize));
+		if (cursorId) qs.set("id", cursorId);
+		if (cursorCreatedAt) qs.set("created_at", cursorCreatedAt);
 		if (opts?.username) qs.set("username", opts.username);
 		if (opts?.following) qs.set("following", "true");
 		if (opts?.rabbitHole) qs.set("rabbitHole", opts.rabbitHole);
+		if (opts?.profileFeedType) qs.set("profileFeedType", opts.profileFeedType);
 		const url = `/api/posts${qs.toString() ? `?${qs.toString()}` : ""}`;
 
+
+		// Abort any existing request
 		if (abortRef.current) {
 			abortRef.current.abort();
 		}
+
+		// Create new abort controller for this request
 		const ac = new AbortController();
 		abortRef.current = ac;
 
@@ -113,6 +133,8 @@ export function useInfiniteFeed(
 			const res = (await r.json()) as {
 				items?: PostRow[];
 				nextCursor?: string | null;
+				nextId?: string | null;
+				nextCreatedAt?: string | null;
 			};
 
 			const next = ("nextCursor" in res ? res.nextCursor : null) ?? null;
@@ -137,6 +159,7 @@ export function useInfiniteFeed(
 				{ items: res.items ?? [], nextCursor: finalNext },
 			]);
 			setCursor(finalNext);
+			setLoading(false);
 		} catch (e: unknown) {
 			if (e instanceof Error && e.name === "AbortError") {
 				return;
@@ -151,14 +174,21 @@ export function useInfiniteFeed(
 			} else {
 				setError("Unknown error occurred");
 			}
+			setLoading(false);
 		} finally {
-			if (mounted.current) {
-				setLoading(false);
+			// Only update state if this request wasn't aborted
+			if (mounted.current && !ac.signal.aborted) {
+				// setLoading(false) moved to success case
 			}
 			inFlight.current = false;
 			globalInFlight = false;
+
+			// Clear abort controller if this is the current one
+			if (abortRef.current === ac) {
+				abortRef.current = null;
+			}
 		}
-	}, [pageSize, opts?.username]);
+	}, [pageSize, opts?.username, opts?.following, opts?.rabbitHole, opts?.profileFeedType]);
 
 	const hasMore = cursor !== null;
 
@@ -180,11 +210,34 @@ export function useInfiniteFeed(
 		sameTokenHits.current = 0;
 	}, [initial]);
 
+	// Reset feed when opts change (username, following, rabbitHole, profileFeedType)
+	useEffect(() => {
+		console.log("[useInfiniteFeed] opts changed:", opts);
+		console.log("[useInfiniteFeed] profileFeedType:", opts?.profileFeedType);
+
+		// Abort any ongoing request
+		if (abortRef.current) {
+			abortRef.current.abort();
+		}
+
+		setPages([]);
+		setCursor("");
+		hasAutoLoaded.current = false;
+		sameTokenHits.current = 0;
+		setError(null);
+		setLoading(false);
+		inFlight.current = false;
+		globalInFlight = false;
+	}, [opts?.username, opts?.following, opts?.rabbitHole, opts?.profileFeedType]);
+
 	useEffect(() => {
 		mounted.current = true;
 		return () => {
 			mounted.current = false;
-			abortRef.current?.abort();
+			if (abortRef.current) {
+				abortRef.current.abort();
+				abortRef.current = null;
+			}
 		};
 	}, []);
 

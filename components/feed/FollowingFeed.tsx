@@ -39,6 +39,7 @@ export default function FollowingFeed() {
     <section>
       <Feed
         following={true}
+        emptyStateVariant="following"
       />
     </section>
   );

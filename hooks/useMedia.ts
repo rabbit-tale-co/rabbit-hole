@@ -1,6 +1,6 @@
 "use client";
 
-export type UploadResp = { path?: string; url?: string };
+export type UploadResp = { path?: string; url?: string; imageId?: string };
 
 export function useMedia() {
 	const MEDIA_API =
@@ -52,6 +52,20 @@ export function useMedia() {
 		return postFormWithProgress(buildUrl("profile/cover"), fd, onProgress);
 	}
 
+	function uploadRabbitHoleAvatar(
+		fd: FormData,
+		onProgress?: (pct: number) => void,
+	) {
+		return postFormWithProgress(buildUrl("rabbit-holes/avatar"), fd, onProgress);
+	}
+
+	function uploadRabbitHoleCover(
+		fd: FormData,
+		onProgress?: (pct: number) => void,
+	) {
+		return postFormWithProgress(buildUrl("rabbit-holes/cover"), fd, onProgress);
+	}
+
 	function uploadPostMedia(fd: FormData, onProgress?: (pct: number) => void) {
 		return postFormWithProgress(buildUrl("post/upload"), fd, onProgress);
 	}
@@ -62,6 +76,8 @@ export function useMedia() {
 		postFormWithProgress,
 		uploadProfileAvatar,
 		uploadProfileCover,
+		uploadRabbitHoleAvatar,
+		uploadRabbitHoleCover,
 		uploadPostMedia,
 	};
 }

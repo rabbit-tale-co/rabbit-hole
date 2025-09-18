@@ -2,10 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { SolidLogo } from "@/components/icons/Icons";
+import { useEffect, useRef } from "react";
+import {
+  SolidLogo,
+  OutlineHome,
+  SolidHome,
+  OutlineSearch,
+  SolidSearch,
+  OutlineCompass,
+  SolidCompass
+} from "@/components/icons/Icons";
 import { useIsMobile } from "@/hooks/useMobile";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/AuthProvider";
 import { AuthModal } from "./auth/AuthModal";
 import PostButton from "./feed/upload/post-button";
@@ -17,17 +24,31 @@ export default function Header() {
   const pathname = usePathname();
   const { user: auth_user, loading } = useAuth();
 
+  const getIcon = (path: string, isActive: boolean) => {
+    switch (path) {
+      case "/":
+        return isActive ? <SolidHome /> : <OutlineHome />;
+      case "/explore":
+        return isActive ? <SolidSearch /> : <OutlineSearch />;
+      case "/rabbit-holes":
+        return isActive ? <SolidCompass /> : <OutlineCompass />;
+      default:
+        return null;
+    }
+  };
+
   const navigationLinks = [
-    { href: "/", label: "", icon: <SolidLogo size={24} /> },
-    { href: "/explore", label: "Explore", icon: null },
-    { href: "/rabbit-holes", label: "Rabbit Holes", icon: null },
+    { href: "/", label: "Home" },
+    { href: "/explore", label: "Explore" },
+    { href: "/rabbit-holes", label: "Rabbit Holes" },
   ];
 
   const NavLinks = ({ size = "md" }: { size?: "sm" | "md" }) => (
     <>
       {navigationLinks.map((link) => {
         const isActive = pathname === link.href;
-        const hasOnlyIcon = link.icon && !link.label;
+        const icon = getIcon(link.href, isActive);
+        const hasOnlyIcon = icon && !link.label;
         const buttonSize = hasOnlyIcon
           ? "icon"
           : size === "sm"
@@ -43,8 +64,8 @@ export default function Header() {
             className="rounded-full"
           >
             <Link href={link.href}>
+              {icon}
               {link.label}
-              {link.icon}
             </Link>
           </Button>
         );

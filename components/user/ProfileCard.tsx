@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type * as React from "react";
-import { useState } from "react";
+import { useState, memo } from "react";
 import {
   HoverCard,
   HoverCardContent,
@@ -42,7 +42,7 @@ type Props = {
   insideLink?: boolean; // if rendered inside a clickable parent (e.g., Link), use button trigger to avoid nested <a>
 };
 
-export function UserChipHoverCard({ user, className, size = "md" }: Props) {
+export const UserChipHoverCard = memo(function UserChipHoverCard({ user, className, size = "md" }: Props) {
   const {
     user_id,
     username,
@@ -257,4 +257,4 @@ export function UserChipHoverCard({ user, className, size = "md" }: Props) {
       </HoverCardContent>
     </HoverCard>
   );
-}
+});

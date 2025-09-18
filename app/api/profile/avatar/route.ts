@@ -3,16 +3,6 @@ import { logSecureError } from "@/lib/secure-db";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { withAuth } from "@/middleware/auth";
 
-let ffmpegPath: string | null = null;
-try {
-	const mod = await import("ffmpeg-static");
-	ffmpegPath =
-		(mod as unknown as { default?: string }).default ||
-		(mod as unknown as string);
-} catch {
-	ffmpegPath = null;
-}
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const preferredRegion = "auto";

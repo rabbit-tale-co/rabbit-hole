@@ -45,6 +45,8 @@ import { convertImageToWebP, convertVideoToWebM } from "@/lib/media";
 import { supabase } from "@/lib/supabase";
 import { randomUUIDv7 } from "@/lib/uuid";
 import { useAuth } from "@/providers/AuthProvider";
+import { useRabbitHoles } from "@/hooks/useRabbitHoles";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Hook to detect mobile devices
 function useIsMobile() {
@@ -290,6 +292,7 @@ export function CreateMediaPost({
   onOpenChange,
 }: CreatePostProps) {
   const { user, profile } = useAuth();
+  const { rabbitHoles } = useRabbitHoles();
 
   // Use profile.is_premium from database instead of user_metadata
   const isPremium = isPremiumProp ?? Boolean(profile?.is_premium);
@@ -308,6 +311,7 @@ export function CreateMediaPost({
   const FILE_MAX = actualFileSizeMbMax * 1024 * 1024; // bytes
 
   const [caption, setCaption] = useState("");
+  const [selectedRabbitHole, setSelectedRabbitHole] = useState<string>("none");
   const [items, setItems] = useState<Item[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
@@ -841,6 +845,7 @@ export function CreateMediaPost({
           mime: m.mime,
           is_cover: m.is_cover,
         })),
+        rabbit_hole_id: selectedRabbitHole === "none" ? undefined : selectedRabbitHole,
       };
       console.log("[POST CREATE] Sending to /api/posts:", postData);
 
@@ -854,13 +859,17 @@ export function CreateMediaPost({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to create post");
+        const errorMessage = Array.isArray(data.error)
+          ? data.error.map((err: any) => err.message || err).join(", ")
+          : data.error || "Failed to create post";
+        throw new Error(errorMessage);
       }
       const realPost = await res.json();
       onPostCreated(optimistic, realPost);
 
       // reset
       setCaption("");
+      setSelectedRabbitHole("none");
       clearAll();
       handleOpenChange(false); // Close drawer after successful post
     } catch (e: unknown) {
@@ -883,7 +892,7 @@ export function CreateMediaPost({
       className="rounded-3xl bg-white ring-1 ring-border backdrop-blur-sm"
     >
       {/* Top: Caption + limits */}
-      <div className="flex flex-col gap-2 p-3">
+      <div className="flex relative flex-col gap-2 p-3">
         <div className="flex items-center justify-between gap-2 px-1">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <OutlineAI className="size-[1.5em]" />
@@ -895,7 +904,21 @@ export function CreateMediaPost({
             )}
           </div>
           <div className="text-[11px] text-muted-foreground flex items-center gap-2">
-            {caption.trim().length}/{MAX_CHARS}
+            {rabbitHoles && rabbitHoles.length > 0 && (
+              <Select value={selectedRabbitHole} onValueChange={setSelectedRabbitHole}>
+                <SelectTrigger className="w-auto min-w-[100px] h-6 text-xs border-dashed">
+                  <SelectValue placeholder="Rabbit Hole" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Rabbit Hole</SelectItem>
+                  {rabbitHoles.map((hole) => (
+                    <SelectItem key={hole.id} value={hole.id}>
+                      {hole.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button type="submit" size="sm" disabled={!canSubmit || posting}>
               {posting ? "Posting…" : "Post"}
             </Button>
@@ -909,7 +932,12 @@ export function CreateMediaPost({
           className="min-h-[84px] shadow-none p-3 resize-none border-0 bg-transparent focus-visible:ring-0 text-[15px] leading-6"
           disabled={posting}
         />
+        <div className="mt-3" />
+        <div className="absolute right-3 bottom-3" >
+          <span className="text-xs text-muted-foreground/50">{caption.trim().length}/{MAX_CHARS}</span>
+        </div>
       </div>
+
 
       {/* Media area */}
       <div className="border-t px-3 py-3">

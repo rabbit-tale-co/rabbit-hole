@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { RabbitHolesPage } from "@/components/rabbit-holes/RabbitHolesPage";
+import RabbitHolesPage from "@/components/rabbit-holes/RabbitHolesPage";
 
 export const metadata: Metadata = {
   title: "Rabbit Holes | RabbitHole",

@@ -1,7 +1,7 @@
 "use client";
 import NumberFlow from "@number-flow/react";
 import type { MouseEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, memo } from "react";
 import {
   OutlineBookmark,
   OutlineChat,
@@ -33,7 +33,7 @@ interface SocialActionsProps {
   animateGate?: boolean; // bramka z Feed
 }
 
-export function SocialActions({
+export const SocialActions = memo(function SocialActions({
   postId,
   likes,
   comments,
@@ -274,4 +274,4 @@ export function SocialActions({
       </div>
     </div>
   );
-}
+});

@@ -11,6 +11,7 @@ import { useContainerWidth } from "./useUI";
 import { bucketFromWH } from "@/lib/bento";
 import { buildPublicUrl } from "@/lib/publicUrl";
 import type { Tile, PostRow } from "@/types";
+import { ProfileFeedType } from "@/components/user/ProfileFeedSelector";
 
 export function useFeed(
 	initial?: Parameters<typeof useInfiniteFeed>[0],
@@ -20,15 +21,18 @@ export function useFeed(
 	forceUpdate?: number,
 	following?: boolean,
 	rabbitHole?: string,
+	profileFeedType?: ProfileFeedType,
 ) {
+
 	const router = useRouter();
 	const { recordImpression } = useManualImpression({ enabled: false });
 
 	// Data fetching
+	console.log("[useFeed] profileFeedType:", profileFeedType);
 	const { items, loadMore, loading, error, hasMore } = useInfiniteFeed(
 		initial,
-		24,
-		{ username, following, rabbitHole },
+		15,
+		{ username, following, rabbitHole, profileFeedType },
 	);
 
 	// Map posts to tiles (first image per post as cover)
@@ -52,6 +56,7 @@ export function useFeed(
 		});
 	}, [items]);
 
+
 	// Quick lookup for overlays
 	const idToPost = useMemo(() => {
 		const m = new Map<string, (typeof items)[number]>();
@@ -61,9 +66,11 @@ export function useFeed(
 
 	// Author profiles caching
 	const authorIds = useMemo(() => {
-		return items
+		const ids = items
 			.map((p) => p.author_id)
 			.filter((id, i, arr) => arr.indexOf(id) === i);
+		console.log("[useFeed] authorIds from items:", ids);
+		return ids;
 	}, [items]);
 
 	const { authorProfiles } = useAuthorProfiles(authorIds);
@@ -83,28 +90,35 @@ export function useFeed(
 	// Bento layout - use container width for responsive column calculation
 	const { cols, placed } = useBento(tiles, bentoForceUpdate);
 
+	// Memoize expensive calculations
+	const memoizedValues = useMemo(() => {
+		const gap = 12;
+		const MAX_W_PX = 56 * 16; // 56rem w px = 896
+		const effectiveW = Math.min(containerWidth, MAX_W_PX);
+		const cell = cols > 0 ? Math.floor((effectiveW - (cols - 1) * gap) / cols) : 0;
+		const rows = placed.length ? Math.max(...placed.map((p) => p.y + p.h)) : 0;
+		const containerHeight = rows > 0 ? rows * cell + (rows - 1) * gap : Math.max(cell, 240);
+
+		return { gap, effectiveW, cell, rows, containerHeight };
+	}, [containerWidth, cols, placed]);
+
 	// Intersection observer for infinite scroll
 	const sentinelRef = useIntersection(
 		() => {
-			if (!loading && hasMore) loadMore();
+			if (!loading && hasMore) {
+				loadMore();
+			}
 		},
 		{
-			rootMargin: "1200px 0px 800px 0px", // prefetch ~1 screen earlier
+			rootMargin: "2000px 0px 1500px 0px", // prefetch ~2 screens earlier
 			threshold: 0,
 			disabled: loading || !hasMore,
-			debounceMs: 80,
+			debounceMs: 50, // faster response
 		},
 	);
 
-	// Layout math
-	const gap = 12;
-	const MAX_W_PX = 56 * 16; // 56rem w px = 896
-	const effectiveW = Math.min(containerWidth, MAX_W_PX);
-	const cell =
-		cols > 0 ? Math.floor((effectiveW - (cols - 1) * gap) / cols) : 0;
-	const rows = placed.length ? Math.max(...placed.map((p) => p.y + p.h)) : 0;
-	const containerHeight =
-		rows > 0 ? rows * cell + (rows - 1) * gap : Math.max(cell, 240);
+	// Layout math - use memoized values
+	const { gap, cell, containerHeight } = memoizedValues;
 
 	// Animation state
 	const feedReady = !loading && items.length > 0 && cell > 0;

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { joinRabbitHole } from "@/app/actions/rabbit-holes";
+import { isMemberOfRabbitHole } from "@/app/actions/rabbit-holes";
 import { verifySupabaseJWT } from "@/lib/jwt-utils";
 
-export async function POST(
+export async function GET(
   req: NextRequest,
-  { params }: { params: { name: string } }
+  { params }: { params: Promise<{ url: string }> }
 ) {
   try {
-    const { name } = params;
+    const { url } = await params;
     const authHeader = req.headers.get("authorization");
 
     if (!authHeader?.startsWith("Bearer ")) {
@@ -21,27 +21,23 @@ export async function POST(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Get rabbit hole ID
+    // Get rabbit hole ID by url
     const { supabaseAdmin } = await import("@/lib/supabase-admin");
     const { data: rabbitHole } = await supabaseAdmin
       .from("rabbit_holes")
       .select("id")
-      .eq("name", name)
+      .eq("url", url)
       .single();
 
     if (!rabbitHole) {
       return NextResponse.json({ error: "Rabbit hole not found" }, { status: 404 });
     }
 
-    const { error } = await joinRabbitHole(rabbitHole.id);
+    const { isMember } = await isMemberOfRabbitHole(rabbitHole.id, user.userId);
 
-    if (error) {
-      return NextResponse.json({ error }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ isMember });
   } catch (error) {
-    console.error("[API] Error joining rabbit hole:", error);
+    console.error("[API] Error checking membership:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

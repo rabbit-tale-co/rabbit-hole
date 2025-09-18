@@ -512,6 +512,7 @@ export function useAuthorProfiles(authorIds: string[]) {
 	const fetchAuthorProfiles = useCallback(async (missingIds: string[]) => {
 		if (missingIds.length === 0) return;
 
+		console.log("[useAuthorProfiles] Fetching profiles for authorIds:", missingIds);
 		setLoading(true);
 		setError(null);
 

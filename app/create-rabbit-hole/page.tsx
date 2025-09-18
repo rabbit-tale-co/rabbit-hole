@@ -39,7 +39,7 @@ export default function CreateRabbitHolePage() {
       const data = await response.json();
 
       if (response.ok) {
-        router.push(`/rabbit-hole/${formData.name}`);
+        router.push(`/rabbitholes/${formData.name}`);
       } else {
         alert(data.error || "Failed to create rabbit hole");
       }

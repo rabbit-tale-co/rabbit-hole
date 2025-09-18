@@ -1,8 +1,9 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { CreateRabbitHole, RabbitHoleRow } from "@/schemas/rabbit-hole";
+import { CreateRabbitHole } from "@/schemas/rabbit-hole";
 import { requireActiveUser } from "@/app/actions/auth";
+import { encodeCursor } from "@/lib/cursor-utils";
 
 export async function createRabbitHole(input: unknown) {
   const auth = await requireActiveUser();
@@ -39,11 +40,27 @@ export async function createRabbitHole(input: unknown) {
   return { data };
 }
 
-export async function getRabbitHoleByName(name: string) {
+export async function getRabbitHoleByUrl(url: string) {
   const { data, error } = await supabaseAdmin
     .from("rabbit_holes")
-    .select("*")
-    .eq("name", name)
+    .select(`
+      id,
+      name,
+      url,
+      description,
+      rules,
+      avatar_url,
+      cover_url,
+      owner_id,
+      member_count,
+      post_count,
+      like_count,
+      accent_color,
+      created_at,
+      updated_at,
+      is_public
+    `)
+    .eq("url", url)
     .eq("is_public", true)
     .single();
 
@@ -60,34 +77,26 @@ export async function getRabbitHoleByName(name: string) {
 
 export async function getRabbitHoleFeedPage(input: {
   rabbit_hole_id: string;
-  limit: number;
-  cursor?: string;
+  take: number;
+  skip?: number;
+  cursorId?: string;
+  cursorCreatedAt?: string;
   user_id?: string; // for checking is_liked
 }) {
-  const { rabbit_hole_id, limit, cursor } = input;
+  const { rabbit_hole_id, take, skip = 0, cursorId, cursorCreatedAt, user_id } = input;
 
   // Get posts from this rabbit hole
   let query = supabaseAdmin
     .from("posts")
-    .select(`
-      *,
-      profiles!posts_author_id_fkey (
-        user_id,
-        username,
-        display_name,
-        avatar_url,
-        cover_url,
-        accent_color,
-        is_premium
-      )
-    `)
+    .select("*")
     .eq("rabbit_hole_id", rabbit_hole_id)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(limit + 1);
+    .limit(take + 1);
 
-  if (cursor) {
-    query = query.lt("created_at", cursor);
+  // Apply cursor-based pagination
+  if (cursorId && cursorCreatedAt) {
+    query = query.or(`created_at.lt.${cursorCreatedAt},and(created_at.eq.${cursorCreatedAt},id.lt.${cursorId})`);
   }
 
   const { data: posts, error } = await query;
@@ -97,9 +106,13 @@ export async function getRabbitHoleFeedPage(input: {
     return { error: error.message };
   }
 
-  const hasMore = posts.length > limit;
+  const hasMore = posts.length > take;
   const items = hasMore ? posts.slice(0, -1) : posts;
-  const nextCursor = hasMore ? items[items.length - 1]?.created_at : null;
+
+  // Get next cursor info
+  const nextId = hasMore && items.length > 0 ? items[items.length - 1].id : null;
+  const nextCreatedAt = hasMore && items.length > 0 ? items[items.length - 1].created_at : null;
+  const nextCursor = hasMore ? encodeCursor(nextCreatedAt as string, nextId as string) : null;
 
   // Get reaction counts
   const postIds = items.map(p => p.id);
@@ -163,6 +176,8 @@ export async function getRabbitHoleFeedPage(input: {
   return {
     items: itemsWithCounts,
     nextCursor,
+    nextId,
+    nextCreatedAt,
   };
 }
 

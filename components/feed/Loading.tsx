@@ -1,71 +1,147 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { packAppendGeneric } from "@/hooks/useBento";
 
-type SkelTile = { id: string; w: 1 | 2; h: 1 | 2 };
+type SkelTile = { id: string; w: 1 | 2; h: 1 | 2; x: number; y: number };
 
-function makeSkeletonTiles(count: number): SkelTile[] {
-	// A pleasant repeating pattern: 2x1,1x2,1x1,1x1,(rare)2x2
-	const pattern: SkelTile[] = [
-		{ id: "a", w: 2, h: 1 },
-		{ id: "b", w: 1, h: 2 },
-		{ id: "c", w: 1, h: 1 },
-		{ id: "d", w: 1, h: 1 },
-		{ id: "e", w: 2, h: 2 },
-	];
-	const arr: SkelTile[] = [];
-	let i = 0;
-	while (arr.length < count) {
-		const p = pattern[i % pattern.length];
-		arr.push({ ...p, id: `${p.id}-${arr.length}` });
-		i++;
-	}
-	return arr.slice(0, count);
+// Generate 3-row grid patterns based on column count
+function generateSkeletonPresets(cols: number): SkelTile[][] {
+  const maxWidth = Math.min(cols, 2); // Max width for tiles
+
+  return [
+    // Pattern 1: Balanced layout
+    [
+      { id: "a", w: Math.min(2, cols) as 1 | 2, h: 1, x: 0, y: 0 },
+      ...(cols > 2 ? [{ id: "b", w: 1, h: 1, x: 2, y: 0 }] : []),
+      ...(cols > 3 ? [{ id: "c", w: 1, h: 1, x: 3, y: 0 }] : []),
+      { id: "d", w: 1, h: 2, x: 0, y: 1 },
+      ...(cols > 1 ? [{ id: "e", w: 1, h: 1, x: 1, y: 1 }] : []),
+      ...(cols > 2 ? [{ id: "f", w: Math.min(2, cols - 2) as 1 | 2, h: 1, x: 2, y: 1 }] : []),
+      { id: "g", w: 1, h: 1, x: 0, y: 2 },
+      ...(cols > 1 ? [{ id: "h", w: 1, h: 1, x: 1, y: 2 }] : []),
+      ...(cols > 2 ? [{ id: "i", w: 1, h: 1, x: 2, y: 2 }] : []),
+      ...(cols > 3 ? [{ id: "j", w: 1, h: 1, x: 3, y: 2 }] : []),
+    ].filter(Boolean) as SkelTile[],
+
+    // Pattern 2: Large featured items
+    [
+      { id: "a", w: Math.min(2, cols) as 1 | 2, h: 2, x: 0, y: 0 },
+      ...(cols > 2 ? [{ id: "b", w: 1, h: 1, x: 2, y: 0 }] : []),
+      ...(cols > 3 ? [{ id: "c", w: 1, h: 1, x: 3, y: 0 }] : []),
+      ...(cols > 2 ? [{ id: "d", w: 1, h: 1, x: 2, y: 1 }] : []),
+      ...(cols > 3 ? [{ id: "e", w: 1, h: 1, x: 3, y: 1 }] : []),
+      { id: "f", w: 1, h: 1, x: 0, y: 2 },
+      ...(cols > 1 ? [{ id: "g", w: 1, h: 1, x: 1, y: 2 }] : []),
+      ...(cols > 2 ? [{ id: "h", w: 1, h: 1, x: 2, y: 2 }] : []),
+      ...(cols > 3 ? [{ id: "i", w: 1, h: 1, x: 3, y: 2 }] : []),
+    ].filter(Boolean) as SkelTile[],
+
+    // Pattern 3: Grid-like layout
+    [
+      { id: "a", w: 1, h: 1, x: 0, y: 0 },
+      ...(cols > 1 ? [{ id: "b", w: 1, h: 1, x: 1, y: 0 }] : []),
+      ...(cols > 2 ? [{ id: "c", w: 1, h: 1, x: 2, y: 0 }] : []),
+      ...(cols > 3 ? [{ id: "d", w: 1, h: 1, x: 3, y: 0 }] : []),
+      { id: "e", w: Math.min(2, cols) as 1 | 2, h: 1, x: 0, y: 1 },
+      ...(cols > 2 ? [{ id: "f", w: 1, h: 1, x: 2, y: 1 }] : []),
+      ...(cols > 3 ? [{ id: "g", w: 1, h: 1, x: 3, y: 1 }] : []),
+      { id: "h", w: 1, h: 1, x: 0, y: 2 },
+      ...(cols > 1 ? [{ id: "i", w: 1, h: 1, x: 1, y: 2 }] : []),
+      ...(cols > 2 ? [{ id: "j", w: Math.min(2, cols - 2) as 1 | 2, h: 1, x: 2, y: 2 }] : []),
+    ].filter(Boolean) as SkelTile[],
+
+    // Pattern 4: Mixed sizes
+    [
+      { id: "a", w: 1, h: 2, x: 0, y: 0 },
+      ...(cols > 1 ? [{ id: "b", w: 1, h: 1, x: 1, y: 0 }] : []),
+      ...(cols > 2 ? [{ id: "c", w: 1, h: 1, x: 2, y: 0 }] : []),
+      ...(cols > 3 ? [{ id: "d", w: 1, h: 1, x: 3, y: 0 }] : []),
+      ...(cols > 1 ? [{ id: "e", w: 1, h: 1, x: 1, y: 1 }] : []),
+      ...(cols > 2 ? [{ id: "f", w: Math.min(2, cols - 2) as 1 | 2, h: 1, x: 2, y: 1 }] : []),
+      { id: "g", w: 1, h: 1, x: 0, y: 2 },
+      ...(cols > 1 ? [{ id: "h", w: 1, h: 1, x: 1, y: 2 }] : []),
+      ...(cols > 2 ? [{ id: "i", w: 1, h: 1, x: 2, y: 2 }] : []),
+      ...(cols > 3 ? [{ id: "j", w: 1, h: 1, x: 3, y: 2 }] : []),
+    ].filter(Boolean) as SkelTile[],
+
+    // Pattern 5: Asymmetric layout
+    [
+      { id: "a", w: 1, h: 1, x: 0, y: 0 },
+      ...(cols > 1 ? [{ id: "b", w: Math.min(2, cols - 1) as 1 | 2, h: 1, x: 1, y: 0 }] : []),
+      ...(cols > 3 ? [{ id: "c", w: 1, h: 1, x: 3, y: 0 }] : []),
+      { id: "d", w: 1, h: 1, x: 0, y: 1 },
+      ...(cols > 1 ? [{ id: "e", w: 1, h: 1, x: 1, y: 1 }] : []),
+      ...(cols > 2 ? [{ id: "f", w: 1, h: 2, x: 2, y: 1 }] : []),
+      ...(cols > 3 ? [{ id: "g", w: 1, h: 1, x: 3, y: 1 }] : []),
+      { id: "h", w: Math.min(2, cols) as 1 | 2, h: 1, x: 0, y: 2 },
+      ...(cols > 2 ? [{ id: "i", w: 1, h: 1, x: 2, y: 2 }] : []),
+      ...(cols > 3 ? [{ id: "j", w: 1, h: 1, x: 3, y: 2 }] : []),
+    ].filter(Boolean) as SkelTile[],
+  ];
+}
+
+function makeSkeletonTiles(count: number, isClient: boolean, cols: number): SkelTile[] {
+  const presets = generateSkeletonPresets(cols);
+
+  if (!isClient) {
+    // Server-side: use first preset to avoid hydration mismatch
+    const preset = presets[0];
+    return preset.slice(0, Math.min(count, preset.length));
+  }
+
+  // Client-side: cycle through presets for variety
+  const presetIndex = Math.floor(Math.random() * presets.length);
+  const preset = presets[presetIndex];
+  return preset.slice(0, Math.min(count, preset.length));
 }
 
 export function BentoSkeleton({
-	cols,
-	containerWidth,
-	gap = 12,
-	count = 12,
+  cols,
+  containerWidth,
+  gap = 12,
+  count = 12,
 }: {
-	cols: number;
-	containerWidth: number;
-	gap?: number;
-	count?: number;
-	className?: string;
+  cols: number;
+  containerWidth: number;
+  gap?: number;
+  count?: number;
+  className?: string;
 }) {
-	// each column width in px
-	const cell =
-		cols > 0 ? Math.floor((containerWidth - (cols - 1) * gap) / cols) : 0;
+  const [isClient, setIsClient] = useState(false);
 
-	const placed = useMemo(() => {
-		const tiles = makeSkeletonTiles(count);
-		return packAppendGeneric([], tiles, Math.max(cols, 1));
-	}, [cols, count]);
+  // each column width in px
+  const cell =
+    cols > 0 ? Math.floor((containerWidth - (cols - 1) * gap) / cols) : 0;
 
-	const rows = placed.length ? Math.max(...placed.map((p) => p.y + p.h)) : 0;
-	const containerHeight = rows > 0 ? rows * cell + (rows - 1) * gap : 0;
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
-	return (
-		<div className="relative" style={{ height: containerHeight }}>
-			{placed.map((p) => {
-				const top = p.y * (cell + gap);
-				const left = p.x * (cell + gap);
-				const width = p.w * cell + (p.w - 1) * gap;
-				const height = p.h * cell + (p.h - 1) * gap;
-				return (
-					<div
-						key={p.tile.id}
-						className="absolute rounded-2xl overflow-hidden"
-						style={{ top, left, width, height }}
-					>
-						<Skeleton className="w-full h-full bg-neutral-200" />
-					</div>
-				);
-			})}
-		</div>
-	);
+  const tiles = useMemo(() => {
+    return makeSkeletonTiles(count, isClient, cols);
+  }, [count, isClient, cols]);
+
+  // Calculate container height based on 3-row grid
+  const containerHeight = 3 * cell + 2 * gap; // 3 rows with 2 gaps between them
+
+  return (
+    <div className="relative" style={{ height: containerHeight }}>
+      {tiles.map((tile) => {
+        const top = tile.y * (cell + gap);
+        const left = tile.x * (cell + gap);
+        const width = tile.w * cell + (tile.w - 1) * gap;
+        const height = tile.h * cell + (tile.h - 1) * gap;
+        return (
+          <div
+            key={tile.id}
+            className="absolute rounded-3xl overflow-hidden"
+            style={{ top, left, width, height }}
+          >
+            <Skeleton className="w-full h-full bg-neutral-200 dark:bg-neutral-800" />
+          </div>
+        );
+      })}
+    </div>
+  );
 }

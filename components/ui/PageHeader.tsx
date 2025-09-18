@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { OutlineArrowLeft, SolidArrowLeft } from "../icons/Icons";
+import { SolidArrowLeft } from "../icons/Icons";
 
 interface PageHeaderProps {
-  title: string;
+  title?: string;
   backHref?: string;
   backLabel?: string;
   actions?: React.ReactNode;
@@ -25,17 +25,17 @@ export function PageHeader({
       "sticky top-16 z-40",
       className
     )}>
-      <div className="flex items-center justify-between h-16 gap-4">
-        <div className="flex items-center gap-2 p-1 pr-3 bg-background rounded-full">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 p-1 bg-background rounded-full">
           {/* Back Button */}
           <Button variant="ghost" asChild>
             <Link href={backHref}>
-              <SolidArrowLeft /> {backLabel}
+              <SolidArrowLeft className="size-4" /> {backLabel}
             </Link>
           </Button>
 
           {/* Title */}
-          <h1 className="text-xl font-semibold">{title}</h1>
+          {/* <h1 className="text-xl font-semibold">{title}</h1> */}
         </div>
 
         {/* Actions */}
